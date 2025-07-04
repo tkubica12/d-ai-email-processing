@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: d-ai-email-processing
+metadata:
+  template: minimal
+
+services:
+  logic-app:
+    project: ./src/logic-app
+    language: js
+    host: function
+
+infra:
+  provider: terraform
+  path: ./infra
+
+pipeline:
+  provider: github

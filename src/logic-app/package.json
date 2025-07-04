@@ -1,0 +1,17 @@
+{
+  "name": "email-processing-logic-app",
+  "version": "1.0.0",
+  "description": "Logic App for processing incoming emails",
+  "main": "index.js",
+  "scripts": {
+    "start": "func start",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "azure-functions-core-tools": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

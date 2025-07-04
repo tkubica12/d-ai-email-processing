@@ -8,7 +8,7 @@ Establish the basic email processing pipeline that captures incoming emails, sto
 ### Tasks
 
 #### 1. Infrastructure Setup
-- [ ] **1.1 Initialize Azure Developer CLI project**
+- [x] **1.1 Initialize Azure Developer CLI project**
   - Set up azd configuration files (`azure.yaml`, `.azure/`)
   - Configure environment variables and parameters
   - Define resource naming conventions
