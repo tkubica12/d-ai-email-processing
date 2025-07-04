@@ -20,11 +20,6 @@ Establish the basic email processing pipeline that captures incoming emails, sto
   - Resource group and common tags
   - Managed identities and role assignments
 
-- [ ] **1.3 Configure deployment pipeline**
-  - GitHub Actions workflow for infrastructure deployment
-  - Environment-specific configuration (dev, staging, prod)
-  - Secret management for sensitive configuration
-
 #### 2. Logic App Development
 - [ ] **2.1 Email trigger configuration**
   - Configure Office 365 Outlook connector or Exchange connector
