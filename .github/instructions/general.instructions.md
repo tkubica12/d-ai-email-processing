@@ -1,0 +1,14 @@
+---
+applyTo: '**'
+---
+- We use Azure so when giving cloud examples, use Azure solutions. 
+- For Infrastructure as Code we use Terraform in this project. 
+- Use Azure Developer CLI (azd) for local development and deployment.
+- Use GitHub Actions for CI/CD pipelines.
+- Use docstrings to document functionality. 
+- Comments only for things that are not obvious, not based on comments of progress, just to explain non-obvious lines worth extra documentation.
+- Prefer simplicity and readability
+- As you implement code, update ImplementationLog.md with your progress and technical and architecture decisions
+- Document common errors and pitfalls you encountered and had to fix in CommonErrors.md
+- Continuously build short instructions how to run and test the project in README.md
+- Try to avoid too big files, split code if it makes sense
