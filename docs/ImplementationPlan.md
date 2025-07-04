@@ -13,11 +13,11 @@ Establish the basic email processing pipeline that captures incoming emails, sto
   - Configure environment variables and parameters
   - Define resource naming conventions
 
-- [ ] **1.2 Create Terraform infrastructure modules**
+- [x] **1.2 Create Terraform infrastructure modules**
   - Storage Account with blob storage configuration
   - Service Bus namespace and topic
-  - Logic App Standard hosting plan and app
-  - Resource group and common tags
+  - Logic App Workflow (multitenant/consumption model)
+  - Resource group and naming conventions
   - Managed identities and role assignments
 
 #### 2. Logic App Development

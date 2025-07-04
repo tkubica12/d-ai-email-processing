@@ -1,0 +1,15 @@
+# Example Terraform variables file
+# Copy this file to terraform.tfvars and customize the values
+
+# Environment name (dev, staging, prod)
+environment_name = "dev"
+
+# Azure region for resource deployment
+location = "East US"
+
+# Project name for resource naming
+project_name = "d-ai-email-processing"
+
+# Email mailbox to monitor for incoming emails
+# This should be set during deployment or via environment variables
+email_mailbox = "submissions@yourcompany.com"
