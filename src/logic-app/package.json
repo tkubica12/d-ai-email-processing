@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "start": "func start",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "echo 'No build needed for Logic App workflows'",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy": "echo 'Logic App deployed via Azure infrastructure'"
   },
   "dependencies": {},
   "devDependencies": {
@@ -13,5 +15,8 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "azd": {
+    "type": "function"
   }
 }

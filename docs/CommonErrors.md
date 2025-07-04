@@ -58,7 +58,37 @@ ERROR: error executing step command 'provision': deployment failed: error deploy
 
 **Root Cause**: AZD expects a JSON-formatted parameters file to pass variables to Terraform, even when variables have default values defined.
 
+### Error: AZD deploy looking in wrong resource group
+**Issue**: When running `azd deploy`, AZD searches for resources in the wrong resource group, even though the correct resource group exists and has properly tagged resources.
+
+**Error Message**:
+```
+ERROR: getting target resource: resource not found: unable to find a resource tagged with 'azd-service-name: logic-app'. Ensure the service resource is correctly tagged in your infrastructure configuration, and rerun provision
+```
+
+**Debug Output Shows**:
+```
+GET https://management.azure.com/subscriptions/.../resourceGroups/rg-sharepoint/resources?...
+```
+(Instead of the correct resource group like `rg-email-dev-srng`)
+
+**Solution**: Explicitly set the `AZURE_RESOURCE_GROUP` environment variable to force AZD to look in the correct resource group:
+
+```bash
+azd env set AZURE_RESOURCE_GROUP rg-email-dev-srng
+azd deploy
+```
+
+**Root Cause**: This is a known AZD bug (GitHub Issue #689) where AZD gets confused when there are multiple resource groups in the subscription and may cache or search in the wrong resource group.
+
+**Additional Notes**:
+- The issue occurs even when the target resource has correct tags (`azd-service-name: logic-app`)
+- The problem is intermittent and depends on the presence of other resource groups
+- Setting `AZURE_RESOURCE_GROUP` explicitly resolves the issue permanently
+
 ## Best Practices Learned
 - Always use the short form of language names in AZD configuration
 - Test AZD configuration after each change to catch validation errors early
 - Keep environment-specific values in `.azure/[env]/.env.json` files
+- When working with multiple resource groups, explicitly set `AZURE_RESOURCE_GROUP` environment variable to avoid AZD confusion
+- For Logic App Standard deployment, use `host: function` in azure.yaml and deploy using zip deploy mechanism

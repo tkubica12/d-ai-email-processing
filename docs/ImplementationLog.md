@@ -120,3 +120,68 @@
 
 ### Task 1.2 Status: ✅ COMPLETED
 Infrastructure is ready for Logic App workflow implementation.
+
+## July 4, 2025 - Logic App Standard Implementation and Email Trigger
+
+### Completed Tasks
+
+#### 2.1 Email trigger configuration ✅
+- **Action**: Implemented Logic App Standard with Office 365 email trigger
+- **Technical Decisions**:
+  - Switched to Logic App Standard (instead of consumption) for better AZD integration
+  - Used Windows-based App Service Plan (WS1 SKU) for Logic App Standard
+  - Configured minimal app settings for Node.js runtime
+  - Added system-assigned managed identity
+  - Created Office 365 API connection for email monitoring
+
+- **Files Created/Modified**:
+  - `infra/logic_app.tf` - Updated to use `azurerm_logic_app_standard` resource
+  - `src/logic-app/host.json` - Logic App runtime configuration
+  - `src/logic-app/local.settings.json` - Local development settings
+  - `src/logic-app/email-processing-workflow/workflow.json` - Email trigger workflow definition
+  - `src/logic-app/connections.json` - Office 365 API connection configuration
+  - `scripts/setup-office365-connection.ps1` - Connection setup automation
+
+- **Workflow Definition**:
+  ```json
+  {
+    "triggers": {
+      "When_a_new_email_arrives": {
+        "type": "ApiConnectionNotification",
+        "inputs": {
+          "host": { "connection": { "referenceName": "office365" } },
+          "fetch": { "pathTemplate": { "template": "/v3/Mail/OnNewEmail" } },
+          "queries": {
+            "subjectFilter": "DEMO",
+            "folderPath": "Inbox",
+            "includeAttachments": true
+          }
+        }
+      }
+    }
+  }
+  ```
+
+- **Infrastructure Updates**:
+  - Added Log Analytics Workspace and Application Insights
+  - Updated RBAC assignments to use Logic App Standard identity
+  - Fixed Terraform resource references and outputs
+
+### Critical AZD Deployment Issue Resolution ✅
+- **Problem**: AZD deploy failed with "resource not found" error, looking in wrong resource group
+- **Error**: AZD was searching in `rg-sharepoint` instead of `rg-email-dev-srng`
+- **Root Cause**: Known AZD bug (GitHub Issue #689) when multiple resource groups exist
+- **Solution**: Set explicit resource group environment variable:
+  ```bash
+  azd env set AZURE_RESOURCE_GROUP rg-email-dev-srng
+  azd deploy
+  ```
+- **Result**: ✅ Successful deployment via AZD zip deploy mechanism
+
+### Deployment Success ✅
+- **Logic App Standard**: Successfully deployed and running
+- **Email Trigger**: Configured to monitor emails with "DEMO" in subject
+- **Next Steps**: Manual Office 365 connection authentication required via Azure Portal
+
+### Task 2.1 Status: ✅ COMPLETED
+Email trigger configuration implemented successfully. Ready for Office 365 connection authentication and testing.
