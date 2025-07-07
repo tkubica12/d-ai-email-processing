@@ -6,3 +6,6 @@ applyTo: '**/*.py'
 - For ease of local development prefer using different default local port for each service.
 - Always use docstrings for all public methods and classes explaining its purpose, parameters, return values, and exceptions.
 - Never add and continuously remove any comments that document the obvious or progress of the code, only use comments to explain non-obvious lines worth extra documentation.
+- We are using FastHTML for the web application so make sure you follow its best practices, HTMX and server side rendering. Do not add any JavaScript unless absolutely necessary and after consulting with me.
+- Use Pydantic models for data validation and serialization.
+- Use Python's built-in logging module for logging, with appropriate log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL).
