@@ -56,6 +56,12 @@ async def process_message(message: ServiceBusMessage, storage: CosmosDBStorage) 
                    f"for user: {submission_doc.userId} "
                    f"with {len(submission_doc.documents)} documents")
         
+        # Create and store SubmissionCreatedEvent
+        submission_created_event = await storage.create_submission_created_event(submission_message)
+        
+        logger.info(f"Successfully created SubmissionCreatedEvent: {submission_created_event.id} "
+                   f"for submission: {submission_created_event.submissionId}")
+        
         # Log submission details
         logger.info(f"Submission details: ID={submission_message.submissionId}, "
                    f"User={submission_message.userId}, "

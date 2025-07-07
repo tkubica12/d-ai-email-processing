@@ -168,7 +168,6 @@ This approach uses event-driven architecture with event sourcing patterns to imp
   "userId": "user@example.com",
   "timestamp": "2025-07-07T10:00:00Z",
   "data": {
-    "messageLength": 500,
     "documentUrls": [
       "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
       "https://storage.blob.core.windows.net/submission-guid/document2.docx"

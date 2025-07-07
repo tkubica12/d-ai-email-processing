@@ -69,12 +69,12 @@ User Form → FastHTML Handler → Azure Blob Storage
 {
   "submissionId": "uuid",
   "userId": "email@example.com",
-  "metadata": {
-    "messageLength": 245,
-    "attachmentCount": 2,
-    "attachmentNames": ["file1.pdf", "file2.docx"],
-    "containerName": "uuid"
-  }
+  "documentUrls": [
+    "https://storage.blob.core.windows.net/uuid/body.txt",
+    "https://storage.blob.core.windows.net/uuid/file1.pdf",
+    "https://storage.blob.core.windows.net/uuid/file2.docx"
+  ],
+  "submittedAt": "2025-07-07T14:30:00.123456Z"
 }
 ```
 
@@ -637,3 +637,57 @@ class SubmissionDocument(BaseModel):
 - ⏳ Document processing pipeline integration
 
 The service now successfully stores initial submission documents in Cosmos DB using the exact schema defined in the architecture design, providing the foundation for the event sourcing workflow.
+
+---
+
+## Event Models Implementation (July 7, 2025)
+
+### Added Pydantic Event Schemas
+Implemented event models in `src/submission-intake/models.py` based on Design.md specifications:
+
+**SubmissionCreatedEvent**: 
+- Emitted when a new submission is successfully created and stored
+- Contains submission metadata including message length and container information
+- Follows the exact JSON schema from Design.md
+
+**DocumentUploadedEvent**:
+- Emitted for each document when a submission is created  
+- Triggers document processing by parser services
+- Contains document URL for processing
+
+**Architecture Decision**: Using Pydantic models for event validation ensures type safety and consistent serialization across services. Events follow the standardized format with id, eventType, submissionId, userId, timestamp, and data fields.
+
+**Technical Implementation**:
+- Event models use proper Pydantic validation with Field descriptions
+- Included comprehensive examples in Config classes for documentation
+- Maintained consistency with existing model patterns in the codebase
+
+### Event Creation Logic Implementation
+Added event creation and storage functionality to the submission-intake service:
+
+**CosmosDBStorage Enhancements**:
+- Added `_events_container` reference for events container access
+- Implemented `create_submission_created_event()` method for event creation and storage
+- Automatic UUID generation for unique event identifiers
+
+**Event Processing Flow**:
+1. Store submission document in submissions container
+2. Create SubmissionCreatedEvent with submission metadata
+3. Store event in events container for event sourcing
+4. Log successful event creation for monitoring
+
+**Event Data Population**:
+- `documentUrls`: Copied from original submission message
+- `containerName`: Set to submissionId (following Design.md pattern)
+- `timestamp`: Generated at event creation time using UTC
+
+**Error Handling**: Events are created after successful submission storage, ensuring data consistency. Failed event creation will still allow message reprocessing.
+
+### Event Schema Simplification (July 7, 2025)
+**Removed messageLength field** from SubmissionCreatedEvent schema:
+- **Design.md**: Updated event format to remove messageLength from data payload
+- **Pydantic Models**: Removed messageLength field from SubmissionCreatedData
+- **Implementation**: Removed messageLength calculation from storage.py
+- **Documentation**: Updated implementation log and removed obsolete references
+
+**Rationale**: The messageLength field was not providing meaningful value for event processing and added unnecessary complexity to the event creation logic.

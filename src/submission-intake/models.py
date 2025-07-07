@@ -164,3 +164,185 @@ class SubmissionMessage(BaseModel):
                 "submittedAt": "2025-07-07T14:30:00.123456Z"
             }
         }
+
+
+class SubmissionCreatedData(BaseModel):
+    """
+    Data payload for SubmissionCreated event.
+    
+    Contains submission-specific information for the event.
+    
+    Attributes:
+        documentUrls: List of Azure Blob Storage URLs for uploaded documents
+        containerName: Azure Blob Storage container name (same as submissionId)
+    """
+    
+    documentUrls: List[str] = Field(
+        default_factory=list,
+        description="List of Azure Blob Storage URLs for uploaded documents",
+        example=[
+            "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
+            "https://storage.blob.core.windows.net/submission-guid/document2.docx"
+        ]
+    )
+    
+    containerName: str = Field(
+        ...,
+        description="Azure Blob Storage container name (same as submissionId)",
+        example="submission-guid"
+    )
+
+
+class SubmissionCreatedEvent(BaseModel):
+    """
+    Event model for SubmissionCreated events (Design.md schema).
+    
+    This event is emitted when a new submission is successfully created
+    and stored in the submissions container.
+    
+    Attributes:
+        id: Unique event identifier (UUID)
+        eventType: Event type identifier
+        submissionId: Submission identifier this event relates to
+        userId: Email address of the user who submitted
+        timestamp: ISO 8601 timestamp when the event occurred
+        data: Event-specific data payload
+    """
+    
+    id: str = Field(
+        ...,
+        description="Unique event identifier (UUID)",
+        example="uuid"
+    )
+    
+    eventType: str = Field(
+        default="SubmissionCreated",
+        description="Event type identifier",
+        example="SubmissionCreated"
+    )
+    
+    submissionId: str = Field(
+        ...,
+        description="Submission identifier this event relates to",
+        example="submission-guid"
+    )
+    
+    userId: str = Field(
+        ...,
+        description="Email address of the user who submitted",
+        example="user@example.com"
+    )
+    
+    timestamp: datetime = Field(
+        ...,
+        description="ISO 8601 timestamp when the event occurred",
+        example="2025-07-07T10:00:00Z"
+    )
+    
+    data: SubmissionCreatedData = Field(
+        ...,
+        description="Event-specific data payload"
+    )
+    
+    class Config:
+        """Pydantic configuration for the model."""
+        json_schema_extra = {
+            "example": {
+                "id": "uuid",
+                "eventType": "SubmissionCreated",
+                "submissionId": "submission-guid",
+                "userId": "user@example.com",
+                "timestamp": "2025-07-07T10:00:00Z",
+                "data": {
+                    "documentUrls": [
+                        "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
+                        "https://storage.blob.core.windows.net/submission-guid/document2.docx"
+                    ],
+                    "containerName": "submission-guid"
+                }
+            }
+        }
+
+
+class DocumentUploadedEventData(BaseModel):
+    """
+    Data payload for DocumentUploadedEvent.
+    
+    Contains document-specific information for the event.
+    
+    Attributes:
+        documentUrl: Azure Blob Storage URL for the uploaded document
+    """
+    
+    documentUrl: str = Field(
+        ...,
+        description="Azure Blob Storage URL for the uploaded document",
+        example="https://storage.blob.core.windows.net/submission-guid/document1.pdf"
+    )
+
+
+class DocumentUploadedEvent(BaseModel):
+    """
+    Event model for DocumentUploadedEvent events (Design.md schema).
+    
+    This event is emitted for each document when a submission is created,
+    triggering document processing by parser services.
+    
+    Attributes:
+        id: Unique event identifier (UUID)
+        eventType: Event type identifier
+        submissionId: Submission identifier this event relates to
+        userId: Email address of the user who submitted
+        timestamp: ISO 8601 timestamp when the event occurred
+        data: Event-specific data payload
+    """
+    
+    id: str = Field(
+        ...,
+        description="Unique event identifier (UUID)",
+        example="uuid"
+    )
+    
+    eventType: str = Field(
+        default="DocumentUploadedEvent",
+        description="Event type identifier",
+        example="DocumentUploadedEvent"
+    )
+    
+    submissionId: str = Field(
+        ...,
+        description="Submission identifier this event relates to",
+        example="submission-guid"
+    )
+    
+    userId: str = Field(
+        ...,
+        description="Email address of the user who submitted",
+        example="user@example.com"
+    )
+    
+    timestamp: datetime = Field(
+        ...,
+        description="ISO 8601 timestamp when the event occurred",
+        example="2025-07-07T10:00:00Z"
+    )
+    
+    data: DocumentUploadedEventData = Field(
+        ...,
+        description="Event-specific data payload"
+    )
+    
+    class Config:
+        """Pydantic configuration for the model."""
+        json_schema_extra = {
+            "example": {
+                "id": "uuid",
+                "eventType": "DocumentUploadedEvent",
+                "submissionId": "submission-guid",
+                "userId": "user@example.com",
+                "timestamp": "2025-07-07T10:00:00Z",
+                "data": {
+                    "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf"
+                }
+            }
+        }

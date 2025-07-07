@@ -6,6 +6,7 @@ submission documents from Azure Cosmos DB.
 """
 
 import logging
+import uuid
 from datetime import datetime
 from typing import Optional
 
@@ -14,7 +15,13 @@ from azure.cosmos.exceptions import CosmosResourceNotFoundError, CosmosHttpRespo
 from azure.identity.aio import DefaultAzureCredential
 
 from config import CosmosDBConfig
-from models import SubmissionDocument, DocumentInfo, SubmissionMessage
+from models import (
+    SubmissionDocument, 
+    DocumentInfo, 
+    SubmissionMessage,
+    SubmissionCreatedEvent,
+    SubmissionCreatedData
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +45,7 @@ class CosmosDBStorage:
         self._client: Optional[CosmosClient] = None
         self._database: Optional[DatabaseProxy] = None
         self._submissions_container: Optional[ContainerProxy] = None
+        self._events_container: Optional[ContainerProxy] = None
         self._credential = DefaultAzureCredential()
         
     async def initialize(self) -> None:
@@ -63,6 +71,10 @@ class CosmosDBStorage:
             
             self._submissions_container = self._database.get_container_client(
                 container=self.config.submissions_container_name
+            )
+            
+            self._events_container = self._database.get_container_client(
+                container=self.config.events_container_name
             )
             
             logger.info(
@@ -128,6 +140,61 @@ class CosmosDBStorage:
         except CosmosHttpResponseError as e:
             logger.error(
                 f"Failed to store submission {submission_message.submissionId}: {e}"
+            )
+            raise
+    
+    async def create_submission_created_event(self, submission_message: SubmissionMessage) -> SubmissionCreatedEvent:
+        """
+        Create and store a SubmissionCreatedEvent in the events container.
+        
+        This method creates a SubmissionCreatedEvent based on the Service Bus
+        message and stores it in the events container for event sourcing.
+        
+        Args:
+            submission_message: The submission message from Service Bus
+            
+        Returns:
+            SubmissionCreatedEvent: The created and stored event
+            
+        Raises:
+            CosmosHttpResponseError: If the storage operation fails
+        """
+        if not self._events_container:
+            raise RuntimeError("Storage not initialized. Call initialize() first.")
+        
+        # Create event data
+        event_data = SubmissionCreatedData(
+            documentUrls=submission_message.documentUrls,
+            containerName=submission_message.submissionId  # Container name same as submission ID
+        )
+        
+        # Create the event
+        event = SubmissionCreatedEvent(
+            id=str(uuid.uuid4()),
+            eventType="SubmissionCreated",
+            submissionId=submission_message.submissionId,
+            userId=submission_message.userId,
+            timestamp=datetime.utcnow(),
+            data=event_data
+        )
+        
+        try:
+            # Store event in Cosmos DB events container
+            await self._events_container.create_item(
+                body=event.model_dump(mode='json')
+            )
+            
+            logger.info(
+                f"Created SubmissionCreatedEvent: {event.id} "
+                f"for submission: {event.submissionId} "
+                f"with {len(event.data.documentUrls)} documents"
+            )
+            
+            return event
+            
+        except CosmosHttpResponseError as e:
+            logger.error(
+                f"Failed to store SubmissionCreatedEvent for submission {submission_message.submissionId}: {e}"
             )
             raise
     
