@@ -691,3 +691,69 @@ Added event creation and storage functionality to the submission-intake service:
 - **Documentation**: Updated implementation log and removed obsolete references
 
 **Rationale**: The messageLength field was not providing meaningful value for event processing and added unnecessary complexity to the event creation logic.
+
+### DocumentUploadedEvent Implementation & Code Refactoring (July 7, 2025)
+
+**DocumentUploadedEvent Implementation**:
+- Added `create_document_uploaded_events()` method to create individual events for each document
+- Each document gets a unique event with its own UUID for parallel processing
+- Events follow Design.md schema with documentUrl in the data payload
+
+**Code Refactoring for Event Creation**:
+- Introduced generic `_create_and_store_event()` method to eliminate code duplication
+- Refactored both `create_submission_created_event()` and `create_document_uploaded_events()` to use common logic
+- Added TypeVar for type safety with generic event handling
+- Improved error handling and logging consistency across event types
+
+**Event Processing Flow**:
+1. Store submission document in submissions container
+2. Create SubmissionCreatedEvent with submission metadata  
+3. Create DocumentUploadedEvent for each document URL
+4. Store all events in events container for downstream processing
+5. Log successful event creation for monitoring
+
+**Technical Benefits**:
+- **Code Reuse**: Generic event creation reduces duplication and maintenance overhead
+- **Type Safety**: TypeVar ensures proper typing for different event types
+- **Consistency**: Unified error handling and logging patterns across event creation
+- **Scalability**: Each document triggers independent processing pipeline
+
+**Event Emission**: The service now emits N+1 events per submission (1 SubmissionCreated + N DocumentUploaded events), enabling parallel document processing by downstream services.
+
+### Event Creation Architecture Decision (July 7, 2025)
+
+**Problem**: Event creation methods had similar patterns, raising the question of whether to further abstract the code or maintain separate domain-specific interfaces.
+
+**Options Evaluated**:
+
+1. **Two Public Interfaces Separated**: Completely separate methods with no shared logic
+   - Pros: Clear intent, type safety, simple usage
+   - Cons: Code duplication, maintenance overhead
+
+2. **Two Public Interfaces with Shared Private Logic** (Selected): Domain-specific methods using shared storage implementation
+   - Pros: Clear interfaces + DRY storage logic, easy to extend, separation of concerns
+   - Cons: Some duplication in event object creation patterns
+
+3. **Factory + Single Public Interface**: Factory methods for event creation + generic storage method
+   - Pros: Maximum flexibility, pure functions, testability
+   - Cons: Complex API, easy to misuse, type complexity
+
+4. **Single Generic Interface**: One method handling all event types via type dispatch
+   - Pros: Single interface, batch operations
+   - Cons: Complex implementation, loss of type safety, unclear interface
+
+**Decision: Option 2 - Domain-Specific Interfaces with Shared Storage Logic**
+
+**Rationale**:
+- **Domain Alignment**: Methods naturally match business logic (1 SubmissionCreated vs N DocumentUploaded events)
+- **Clear API Contract**: Callers know exactly what they're getting with proper type safety
+- **Balanced Abstraction**: Storage logic is shared (DRY) while domain logic remains specific
+- **Extensibility**: New event types follow established pattern with shared infrastructure
+- **Practical Simplicity**: Easy for developers to understand, follows common event-driven patterns
+
+**Implementation**: 
+- `create_submission_created_event()` and `create_document_uploaded_events()` provide domain-specific interfaces
+- `_create_and_store_event()` handles common storage logic, error handling, and logging
+- TypeVar ensures type safety while enabling generic storage operations
+
+This approach provides the optimal balance of code reuse, maintainability, and API clarity for our event sourcing implementation.

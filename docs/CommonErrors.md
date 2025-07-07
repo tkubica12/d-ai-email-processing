@@ -234,31 +234,58 @@ async def post(request):
 
 ---
 
-### Error: UploadFile object is not iterable
-**Description**: FastHTML file upload handling fails with iteration error.
+## Cosmos DB Configuration Issues
+
+### Error: Entity with the specified id already exists in the system
+**Description**: Cosmos DB returns conflict error (409) when creating documents, even though document IDs are unique UUIDs.
 
 **Symptoms**:
 ```
-TypeError: 'UploadFile' object is not iterable
+azure.core.exceptions.HttpResponseError: (Conflict) Entity with the specified id already exists in the system.
+RequestStartTime: 2025-07-07T15:19:16.3732535Z, RequestEndTime: 2025-07-07T15:19:16.3747973Z, Number of regions attempted:1
+Code: Conflict
+Message: Entity with the specified id already exists in the system.
 ```
 
-**Root Cause**: FastHTML handles file uploads differently than other frameworks. Multiple files may be passed as individual objects rather than a list.
+**Root Cause**: Misconfigured unique key constraints in Terraform Cosmos DB container configuration. The container had a unique key constraint on a field that doesn't exist in the document schema.
+
+**Example Problem**:
+```terraform
+resource "azurerm_cosmosdb_sql_container" "events" {
+  name                = "events"
+  partition_key_paths = ["/submissionId"]
+  
+  # ❌ Wrong - field doesn't exist in documents
+  unique_key {
+    paths = ["/eventId"]  # This field doesn't exist!
+  }
+}
+```
 
 **Solution**:
-```python
-# ✅ Manual form parsing approach
-@rt("/submit", methods=["POST"])
-async def post(request):
-    form = await request.form()
-    attachments = []
-    if "attachments" in form:
-        files = form.getlist("attachments")  # Get all files with same name
-        for file in files:
-            if hasattr(file, 'filename') and file.filename:
-                attachments.append(file)
+1. Review Cosmos DB container configuration in Terraform
+2. Verify unique key constraints match actual document schema
+3. Remove invalid unique key constraints
+4. Apply Terraform changes: `terraform plan` and `terraform apply`
+
+**Correct Configuration**:
+```terraform
+resource "azurerm_cosmosdb_sql_container" "events" {
+  name                = "events"
+  partition_key_paths = ["/submissionId"]
+  
+  # No unique key constraints needed for events container
+  # Documents use random UUIDs as IDs which are inherently unique
+}
 ```
 
-**Prevention**: Use manual form parsing for file uploads rather than relying on automatic parameter injection.
+**Prevention**: 
+- Always verify unique key paths exist in document schema before configuring
+- Test container configuration with sample documents
+- Use descriptive field names that match the actual data model
+- Review Design.md schema when configuring Cosmos DB containers
+
+**Key Insight**: Cosmos DB conflict errors can be caused by infrastructure configuration issues, not just application code. Always check Terraform configuration when debugging "entity already exists" errors, especially unique key constraints and partition key configuration.
 
 ---
 

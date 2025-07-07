@@ -62,6 +62,12 @@ async def process_message(message: ServiceBusMessage, storage: CosmosDBStorage) 
         logger.info(f"Successfully created SubmissionCreatedEvent: {submission_created_event.id} "
                    f"for submission: {submission_created_event.submissionId}")
         
+        # Create and store DocumentUploadedEvent for each document
+        document_uploaded_events = await storage.create_document_uploaded_events(submission_message)
+        
+        logger.info(f"Successfully created {len(document_uploaded_events)} DocumentUploadedEvent(s) "
+                   f"for submission: {submission_message.submissionId}")
+        
         # Log submission details
         logger.info(f"Submission details: ID={submission_message.submissionId}, "
                    f"User={submission_message.userId}, "

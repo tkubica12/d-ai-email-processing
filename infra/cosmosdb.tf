@@ -42,13 +42,7 @@ resource "azurerm_cosmosdb_sql_container" "events" {
   resource_group_name = azurerm_resource_group.main.name
   account_name        = azurerm_cosmosdb_account.main.name
   database_name       = azurerm_cosmosdb_sql_database.main.name
-  
   partition_key_paths = ["/submissionId"]
-
-  # Unique key constraint on event ID to prevent duplicates
-  unique_key {
-    paths = ["/eventId"]
-  }
 }
 
 # Documents container for processed document results
