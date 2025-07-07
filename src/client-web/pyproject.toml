@@ -1,0 +1,14 @@
+[project]
+name = "client-web"
+version = "0.1.0"
+description = "Web client for email processing system"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "python-dotenv>=1.1.1",
+    "python-fasthtml>=0.12.21",
+    "azure-storage-blob>=12.25.1",
+    "azure-servicebus>=7.14.2",
+    "azure-identity>=1.23.0",
+    "uvicorn>=0.35.0",
+]

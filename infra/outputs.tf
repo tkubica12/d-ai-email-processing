@@ -35,32 +35,13 @@ output "service_bus_topic_name" {
   value       = azurerm_servicebus_topic.email_events.name
 }
 
-output "logic_app_name" {
-  description = "The name of the Logic App Standard"
-  value       = azapi_resource.logic_app_standard.name
+# Additional outputs for client application
+output "storage_account_blob_endpoint" {
+  description = "The blob endpoint URL for the storage account"
+  value       = azurerm_storage_account.main.primary_blob_endpoint
 }
 
-output "logic_app_id" {
-  description = "The ID of the Logic App Standard"
-  value       = azapi_resource.logic_app_standard.id
-}
-
-output "logic_app_identity_principal_id" {
-  description = "The principal ID of the Logic App's managed identity"
-  value       = azapi_resource.logic_app_standard.identity[0].principal_id
-}
-
-output "logic_app_default_hostname" {
-  description = "The default hostname of the Logic App Standard"
-  value       = jsondecode(azapi_resource.logic_app_standard.output).properties.defaultHostName
-}
-
-output "office365_connection_id" {
-  description = "The ID of the Office 365 API connection"
-  value       = azapi_resource.office365_connection.id
-}
-
-output "office365_connection_name" {
-  description = "The name of the Office 365 API connection"
-  value       = azapi_resource.office365_connection.name
+output "service_bus_fqdn" {
+  description = "The fully qualified domain name of the Service Bus namespace"
+  value       = "${azurerm_servicebus_namespace.main.name}.servicebus.windows.net"
 }

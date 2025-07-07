@@ -8,7 +8,8 @@ applyTo: '**'
 - Use docstrings to document functionality. 
 - Comments only for things that are not obvious, not based on comments of progress, just to explain non-obvious lines worth extra documentation.
 - Prefer simplicity and readability
-- As you implement code, update ImplementationLog.md with your progress and technical and architecture decisions
-- Document common errors and pitfalls you encountered and had to fix in CommonErrors.md
+- As you implement code, update docs/ImplementationLog.md with your progress and technical and architecture decisions
+- Document common errors and pitfalls you encountered and had to fix in docs/CommonErrors.md, but only after I have confirmed issues are resolved and you have a solution.
 - Continuously build short instructions how to run and test the project in README.md
 - Try to avoid too big files, split code if it makes sense
+- Do not proactively write any helper scripts outside of application code, only if asked to do so. If you think some helper script is needed, ask first.

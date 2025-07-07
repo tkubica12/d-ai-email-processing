@@ -1,0 +1,470 @@
+"""
+Client Web Application for Email Processing System
+
+This application provides a web interface for users to submit requests
+similar to email submissions. It integrates with Azure Blob Storage
+and Service Bus for processing.
+"""
+
+import os
+import uuid
+import json
+import logging
+import uvicorn
+from pathlib import Path
+from typing import Optional
+
+from fasthtml.common import *
+from azure.storage.blob import BlobServiceClient
+from azure.servicebus import ServiceBusClient, ServiceBusMessage
+from azure.identity import DefaultAzureCredential
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+def get_azure_clients():
+    """Initialize Azure service clients using DefaultAzureCredential for authentication."""
+    credential = DefaultAzureCredential()
+    
+    # Get configuration from environment
+    storage_account_name = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
+    service_bus_fqdn = os.getenv("AZURE_SERVICE_BUS_FQDN")
+    
+    if not storage_account_name or not service_bus_fqdn:
+        raise ValueError(
+            "Missing required environment variables: "
+            "AZURE_STORAGE_ACCOUNT_NAME, AZURE_SERVICE_BUS_FQDN"
+        )
+    
+    # Initialize clients
+    blob_service_client = BlobServiceClient(
+        account_url=f"https://{storage_account_name}.blob.core.windows.net",
+        credential=credential
+    )
+    
+    service_bus_client = ServiceBusClient(
+        fully_qualified_namespace=service_bus_fqdn,
+        credential=credential
+    )
+    
+    return blob_service_client, service_bus_client
+
+# Initialize Azure clients
+try:
+    blob_client, service_bus_client = get_azure_clients()
+    logger.info("Azure clients initialized successfully")
+except Exception as e:
+    logger.warning(f"Failed to initialize Azure clients: {e}")
+    logger.info("Running in development mode without Azure integration")
+    blob_client = None
+    service_bus_client = None
+
+# Initialize FastHTML app
+app, rt = fast_app()
+
+def create_submission_form():
+    """Create the main submission form."""
+    return Form(
+        Div(
+            H2("Email Processing System - Request Submission"),
+            P("Submit your request below. You can attach documents for processing."),
+            cls="header-section"
+        ),
+        
+        Div(
+            Label("Email Address:", For="email"),
+            Input(
+                type="email",
+                id="email",
+                name="email",
+                required=True,
+                placeholder="your.email@example.com"
+            ),
+            cls="form-group"
+        ),
+        
+        Div(
+            Label("Message Body:", For="message"),
+            Textarea(
+                id="message",
+                name="message",
+                required=True,
+                placeholder="Describe your request here...",
+                rows="6"
+            ),
+            cls="form-group"
+        ),
+        
+        Div(
+            Label("Attachments (optional):", For="attachments"),
+            Input(
+                type="file",
+                id="attachments",
+                name="attachments",
+                multiple=True,
+                accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+            ),
+            P("Supported formats: PDF, Word documents, text files, images", cls="help-text"),
+            cls="form-group"
+        ),
+        
+        Div(
+            Button(
+                "Submit Request",
+                type="submit",
+                cls="submit-btn"
+            ),
+            cls="form-group"
+        ),
+        
+        action="/submit",
+        method="post",
+        enctype="multipart/form-data",
+        cls="submission-form"
+    )
+
+def get_styles():
+    """Return CSS styles for the application."""
+    return Style("""
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header-section {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        input[type="email"],
+        input[type="file"],
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="email"]:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+        
+        .submit-btn {
+            background-color: #007acc;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .submit-btn:hover {
+            background-color: #005fa3;
+        }
+        
+        .help-text {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .success-message {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .submission-details {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        
+        .submission-details h3 {
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+        
+        .submission-details p {
+            margin-bottom: 10px;
+        }
+        
+        .submission-details strong {
+            color: #333;
+        }
+    """)
+
+@rt("/")
+def get():
+    """Home page with submission form."""
+    return Html(
+        Head(
+            Title("Email Processing System"),
+            get_styles()
+        ),
+        Body(
+            Div(
+                create_submission_form(),
+                cls="container"
+            )
+        )
+    )
+
+@rt("/submit", methods=["POST"])
+async def post(request):
+    """Handle form submission with improved error handling."""
+    try:
+        # Parse form data
+        form = await request.form()
+        email = form.get("email")
+        message = form.get("message")
+        
+        # Handle file attachments
+        attachments = []
+        if "attachments" in form:
+            files = form.getlist("attachments")
+            for file in files:
+                if hasattr(file, 'filename') and file.filename:
+                    attachments.append(file)
+        
+        # Generate unique submission ID
+        submission_id = str(uuid.uuid4())
+        
+        # Validate inputs
+        if not email or not message:
+            raise ValueError("Email and message are required")
+        
+        logger.info(f"Processing submission {submission_id} from {email}")
+        
+        # Process submission
+        if blob_client and service_bus_client:
+            await process_submission_azure(submission_id, email, message, attachments)
+            success_message = f"Request submitted successfully! Submission ID: {submission_id}"
+            logger.info(f"Successfully processed submission {submission_id}")
+        else:
+            # Development mode - just log the submission
+            success_message = f"[DEV MODE] Request logged! Submission ID: {submission_id}"
+            logger.info(f"Development submission: ID={submission_id}, Email={email}")
+            logger.info(f"Message: {message}")
+            if attachments:
+                logger.info(f"Attachments: {len(attachments)} files")
+        
+        return Html(
+            Head(
+                Title("Submission Successful"),
+                get_styles()
+            ),
+            Body(
+                Div(
+                    Div(success_message, cls="success-message"),
+                    Div(
+                        H3("Submission Details"),
+                        P(Strong("Submission ID: "), submission_id),
+                        P(Strong("Email: "), email),
+                        P(Strong("Message Length: "), f"{len(message)} characters"),
+                        P(Strong("Attachments: "), f"{len(attachments) if attachments else 0} files"),
+                        cls="submission-details"
+                    ),
+                    A("Submit Another Request", href="/", cls="submit-btn", style="display: inline-block; text-decoration: none; margin-top: 20px;"),
+                    cls="container"
+                )
+            )
+        )
+        
+    except ValueError as e:
+        error_message = f"Validation error: {str(e)}"
+        logger.error(f"Validation error in submission: {error_message}")
+        
+        return Html(
+            Head(
+                Title("Submission Error"),
+                get_styles()
+            ),
+            Body(
+                Div(
+                    Div(error_message, cls="error-message"),
+                    A("Try Again", href="/", cls="submit-btn", style="display: inline-block; text-decoration: none;"),
+                    cls="container"
+                )
+            )
+        )
+    except Exception as e:
+        error_message = f"Error processing submission: {str(e)}"
+        logger.error(f"Unexpected error in submission: {error_message}", exc_info=True)
+        
+        return Html(
+            Head(
+                Title("Submission Error"),
+                get_styles()
+            ),
+            Body(
+                Div(
+                    Div("An unexpected error occurred. Please try again later.", cls="error-message"),
+                    A("Try Again", href="/", cls="submit-btn", style="display: inline-block; text-decoration: none;"),
+                    cls="container"
+                )
+            )
+        )
+
+async def process_submission_azure(submission_id: str, email: str, message: str, attachments=None):
+    """
+    Process submission using Azure services.
+    
+    Args:
+        submission_id: Unique identifier for the submission
+        email: User's email address
+        message: Message content
+        attachments: List of uploaded files
+        
+    Raises:
+        Exception: If Azure processing fails
+    """
+    try:
+        logger.info(f"Starting Azure processing for submission {submission_id}")
+        
+        # Create container for this submission
+        container_name = submission_id.lower()
+        container_client = blob_client.get_container_client(container_name)
+        
+        # Create container if it doesn't exist
+        try:
+            container_client.create_container()
+            logger.info(f"Created blob container: {container_name}")
+        except Exception as e:
+            if "ContainerAlreadyExists" not in str(e):
+                logger.error(f"Failed to create container {container_name}: {e}")
+                raise
+            logger.info(f"Container {container_name} already exists")
+        
+        # Upload message body as body.txt
+        body_blob_client = container_client.get_blob_client("body.txt")
+        body_blob_client.upload_blob(message, overwrite=True)
+        logger.info(f"Uploaded message body for submission {submission_id}")
+        
+        # Upload attachments if any
+        attachment_names = []
+        if attachments:
+            for attachment in attachments:
+                if hasattr(attachment, 'filename') and hasattr(attachment, 'file'):
+                    filename = attachment.filename
+                    file_content = attachment.file.read()
+                    
+                    # Upload file to blob storage
+                    file_blob_client = container_client.get_blob_client(filename)
+                    file_blob_client.upload_blob(file_content, overwrite=True)
+                    attachment_names.append(filename)
+                    logger.info(f"Uploaded attachment: {filename}")
+        
+        # Send message to Service Bus topic
+        topic_name = os.getenv("AZURE_SERVICE_BUS_TOPIC_NAME", "email-events")
+        
+        with service_bus_client:
+            sender = service_bus_client.get_topic_sender(topic_name=topic_name)
+            
+            message_body = {
+                "submissionId": submission_id,
+                "userId": email,
+                "metadata": {
+                    "messageLength": len(message),
+                    "attachmentCount": len(attachment_names),
+                    "attachmentNames": attachment_names,
+                    "containerName": container_name
+                }
+            }
+            
+            service_bus_message = ServiceBusMessage(
+                body=json.dumps(message_body),
+                content_type="application/json"
+            )
+            
+            sender.send_messages(service_bus_message)
+            sender.close()
+            logger.info(f"Sent Service Bus message for submission {submission_id}")
+        
+        logger.info(f"Successfully processed submission {submission_id}")
+        
+    except Exception as e:
+        logger.error(f"Error in Azure processing for submission {submission_id}: {e}", exc_info=True)
+        raise
+
+def main():
+    """Main entry point for the application."""
+    port = int(os.getenv("PORT", 8000))
+    host = os.getenv("HOST", "0.0.0.0")
+    
+    logger.info(f"Starting client-web application on {host}:{port}")
+    
+    if blob_client is None or service_bus_client is None:
+        logger.warning("Running in development mode without Azure integration")
+        logger.info("Set environment variables for full functionality:")
+        logger.info("- AZURE_STORAGE_ACCOUNT_NAME")
+        logger.info("- AZURE_SERVICE_BUS_FQDN")
+        logger.info("- AZURE_SERVICE_BUS_TOPIC_NAME")
+    else:
+        logger.info("Azure integration enabled")
+    
+    uvicorn.run(app, host=host, port=port)
+
+if __name__ == "__main__":
+    main()
