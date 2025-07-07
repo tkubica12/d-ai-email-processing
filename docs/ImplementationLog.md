@@ -524,3 +524,56 @@ resource "azurerm_servicebus_subscription" "submission_intake" {
   dead_lettering_on_filter_evaluation_error = true
 }
 ```
+
+---
+
+## Phase 2: Cosmos DB Implementation (2025-07-07)
+
+### Infrastructure Enhancement
+Added serverless Cosmos DB for event sourcing and data persistence as defined in the architecture design.
+
+### Technical Decisions
+1. **Serverless Cosmos DB**: Cost-effective for variable workloads with automatic scaling
+2. **Event Sourcing Pattern**: Using Cosmos DB change feed for event processing triggers
+3. **Container Design**: Three containers aligned with domain boundaries:
+   - `events`: Event sourcing with `/submissionId` partition key
+   - `documents`: Document processing results with `/documentUrl` partition key  
+   - `submissions`: Submission records with `/submissionId` partition key
+4. **RBAC Approach**: Custom role definition with minimal required permissions for security
+
+### Implementation Details
+
+#### Cosmos DB Resources (Terraform)
+```hcl
+# cosmosdb.tf - New file created
+resource "azurerm_cosmosdb_account" "main" {
+  offer_type = "Standard"
+  capabilities {
+    name = "EnableServerless"
+  }
+}
+
+resource "azurerm_cosmosdb_sql_database" "main" {
+  name = "email-processing"
+}
+
+# Three containers for different data domains
+resource "azurerm_cosmosdb_sql_container" "events"
+resource "azurerm_cosmosdb_sql_container" "documents" 
+resource "azurerm_cosmosdb_sql_container" "submissions"
+```
+
+#### Security Configuration
+- **Custom Role Definition**: `EmailProcessingDataContributor` with specific data plane permissions
+- **RBAC Assignment**: Current user granted access for local development
+- **Partition Strategy**: Logical partitioning by submission ID and document URL for optimal query performance
+
+#### Schema Design
+- **Events Container**: Change feed enabled for event processing pipeline
+- **Unique Constraints**: Event ID uniqueness to prevent duplicate events
+- **Partition Keys**: Optimized for query patterns and cross-partition query minimization
+
+### Next Steps
+- Implement event publishing in submission-intake service
+- Create change feed processors for document processing services
+- Add connection configuration to application services
