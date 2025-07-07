@@ -12,3 +12,4 @@ Here are rules to follow:
 - You may ask user to run the application and provide screenshots to verify your changes. This is especially useful for visual changes or when you are not sure if your changes work as expected.
 - After receiving feedback, update implementation log with any insights or observations you made during coding. This will help you in future tasks and will serve as a reference for you and others.
 - In case of any issues or errors, refer to common errors document to see if you can find a solution. Search internet to gather more insights. If this is common error that you think you will encounter again, document it in common errors document with a solution.
+- DO NOT document errors until it is proved it fixes the problem. Always wait for confirmation, when in doubt, ask me.

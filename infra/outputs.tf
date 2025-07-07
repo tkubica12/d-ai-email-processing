@@ -37,30 +37,30 @@ output "service_bus_topic_name" {
 
 output "logic_app_name" {
   description = "The name of the Logic App Standard"
-  value       = azurerm_logic_app_standard.main.name
+  value       = azapi_resource.logic_app_standard.name
 }
 
 output "logic_app_id" {
   description = "The ID of the Logic App Standard"
-  value       = azurerm_logic_app_standard.main.id
+  value       = azapi_resource.logic_app_standard.id
 }
 
 output "logic_app_identity_principal_id" {
   description = "The principal ID of the Logic App's managed identity"
-  value       = azurerm_logic_app_standard.main.identity[0].principal_id
+  value       = azapi_resource.logic_app_standard.identity[0].principal_id
 }
 
 output "logic_app_default_hostname" {
   description = "The default hostname of the Logic App Standard"
-  value       = azurerm_logic_app_standard.main.default_hostname
+  value       = jsondecode(azapi_resource.logic_app_standard.output).properties.defaultHostName
 }
 
 output "office365_connection_id" {
   description = "The ID of the Office 365 API connection"
-  value       = azurerm_api_connection.office365.id
+  value       = azapi_resource.office365_connection.id
 }
 
 output "office365_connection_name" {
   description = "The name of the Office 365 API connection"
-  value       = azurerm_api_connection.office365.name
+  value       = azapi_resource.office365_connection.name
 }

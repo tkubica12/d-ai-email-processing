@@ -6,12 +6,14 @@ resource "azurerm_storage_account" "main" {
   account_tier             = "Standard"
   account_replication_type = "LRS"
   account_kind             = "StorageV2"
+  public_network_access_enabled = true
+  
+  network_rules {
+    default_action = "Allow"
+    bypass         = ["AzureServices"]
+  }
 
-  # Enable blob versioning and soft delete for better data protection
-  blob_properties {
-    versioning_enabled = true
-    delete_retention_policy {
-      days = 7
-    }
+  tags = {
+    environment = local.environment
   }
 }

@@ -37,18 +37,54 @@ resource "azurerm_service_plan" "main" {
   }
 }
 
-# Logic App Standard - Minimal Configuration
-resource "azurerm_logic_app_standard" "main" {
-  name                       = "logic-${local.prefix}"
-  resource_group_name        = azurerm_resource_group.main.name
-  location                   = azurerm_resource_group.main.location
-  app_service_plan_id        = azurerm_service_plan.main.id
-  storage_account_name       = azurerm_storage_account.main.name
-  storage_account_access_key = azurerm_storage_account.main.primary_access_key
+# Logic App Standard - Using AzAPI Provider
+resource "azapi_resource" "logic_app_standard" {
+  type      = "Microsoft.Web/sites@2022-09-01"
+  name      = "logic-${local.prefix}"
+  location  = azurerm_resource_group.main.location
+  parent_id = azurerm_resource_group.main.id
 
-  app_settings = {
-    "FUNCTIONS_WORKER_RUNTIME"     = "node"
-    "WEBSITE_NODE_DEFAULT_VERSION" = "~18"
+  body = {
+    kind = "functionapp,workflowapp"
+    properties = {
+      serverFarmId = azurerm_service_plan.main.id
+      siteConfig = {
+        netFrameworkVersion                    = "v4.0"
+        functionsRuntimeScaleMonitoringEnabled = false
+        appSettings = [
+          {
+            name  = "FUNCTIONS_WORKER_RUNTIME"
+            value = "dotnet"
+          },
+          {
+            name  = "FUNCTIONS_EXTENSION_VERSION"
+            value = "~4"
+          },
+          {
+            name  = "AzureWebJobsStorage"
+            value = "DefaultEndpointsProtocol=https;AccountName=${azurerm_storage_account.main.name};AccountKey=${azurerm_storage_account.main.primary_access_key};EndpointSuffix=core.windows.net"
+          },
+          {
+            name  = "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING"
+            value = "DefaultEndpointsProtocol=https;AccountName=${azurerm_storage_account.main.name};AccountKey=${azurerm_storage_account.main.primary_access_key};EndpointSuffix=core.windows.net"
+          },
+          {
+            name  = "WEBSITE_CONTENTSHARE"
+            value = "logic-${local.prefix}"
+          },
+          {
+            name  = "APPINSIGHTS_INSTRUMENTATIONKEY"
+            value = azurerm_application_insights.main.instrumentation_key
+          },
+          {
+            name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+            value = azurerm_application_insights.main.connection_string
+          }
+        ]
+      }
+      clientAffinityEnabled = false
+      httpsOnly             = true
+    }
   }
 
   identity {
@@ -61,13 +97,23 @@ resource "azurerm_logic_app_standard" "main" {
   }
 }
 
-# Office 365 API Connection
-resource "azurerm_api_connection" "office365" {
-  name                = "office365-${local.prefix}"
-  resource_group_name = azurerm_resource_group.main.name
-  managed_api_id      = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Web/locations/${azurerm_resource_group.main.location}/managedApis/office365"
-  display_name        = "Office 365 Connection"
-  
+# Office 365 API Connection - Using AzAPI Provider
+resource "azapi_resource" "office365_connection" {
+  type      = "Microsoft.Web/connections@2016-06-01"
+  name      = "office365-${local.prefix}"
+  location  = azurerm_resource_group.main.location
+  parent_id = azurerm_resource_group.main.id
+
+  body = {
+    properties = {
+      displayName = "Office 365 Connection"
+      api = {
+        id = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Web/locations/${azurerm_resource_group.main.location}/managedApis/office365"
+      }
+      parameterValues = {}
+    }
+  }
+
   tags = {
     environment = local.environment
   }
