@@ -8,4 +8,4 @@ applyTo: '**/*.py'
 - Never add and continuously remove any comments that document the obvious or progress of the code, only use comments to explain non-obvious lines worth extra documentation.
 - We are using FastHTML for the web application so make sure you follow its best practices, HTMX and server side rendering. Do not add any JavaScript unless absolutely necessary and after consulting with me.
 - Use Pydantic models for data validation and serialization.
-- Use Python's built-in logging module for logging, with appropriate log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL).
+- Use Python's built-in logging module for logging, with appropriate log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL). Make sure native logging from Azure and other SDKs INFO are remapped to DEBUG.

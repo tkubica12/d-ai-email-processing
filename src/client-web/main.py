@@ -8,17 +8,20 @@ and Service Bus for processing.
 
 import os
 import uuid
-import json
 import logging
+import asyncio
 import uvicorn
+from datetime import datetime, UTC
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 
 from fasthtml.common import *
 from azure.storage.blob import BlobServiceClient
 from azure.servicebus import ServiceBusClient, ServiceBusMessage
 from azure.identity import DefaultAzureCredential
 from dotenv import load_dotenv
+
+from models import SubmissionMessage
 
 # Load environment variables
 load_dotenv()
@@ -62,13 +65,15 @@ try:
     blob_client, service_bus_client = get_azure_clients()
     logger.info("Azure clients initialized successfully")
 except Exception as e:
-    logger.warning(f"Failed to initialize Azure clients: {e}")
-    logger.info("Running in development mode without Azure integration")
-    blob_client = None
-    service_bus_client = None
+    logger.error(f"Failed to initialize Azure clients: {e}")
+    logger.error("Application requires Azure integration to function properly")
+    raise SystemExit(1)
 
 # Initialize FastHTML app
 app, rt = fast_app()
+
+# Simple tracking for submission results (in production, use Redis or database)
+submission_results: Dict[str, Dict] = {}
 
 def create_submission_form():
     """Create the main submission form."""
@@ -120,7 +125,8 @@ def create_submission_form():
             Button(
                 "Submit Request",
                 type="submit",
-                cls="submit-btn"
+                cls="submit-btn",
+                id="submit-btn"
             ),
             cls="form-group"
         ),
@@ -253,6 +259,28 @@ def get_styles():
         .submission-details strong {
             color: #333;
         }
+        
+        /* Progress indicator styles */
+        .progress-message {
+            font-weight: 600;
+            color: #007acc;
+            margin-bottom: 15px;
+            font-size: 18px;
+            text-align: center;
+        }
+        
+        .progress-step {
+            font-size: 14px;
+            color: #666;
+            font-style: italic;
+            text-align: center;
+            margin-top: 10px;
+        }
+        
+        .submit-btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
     """)
 
 @rt("/")
@@ -261,7 +289,8 @@ def get():
     return Html(
         Head(
             Title("Email Processing System"),
-            get_styles()
+            get_styles(),
+            Script(src="https://unpkg.com/htmx.org@1.9.10")
         ),
         Body(
             Div(
@@ -273,7 +302,7 @@ def get():
 
 @rt("/submit", methods=["POST"])
 async def post(request):
-    """Handle form submission with improved error handling."""
+    """Handle form submission and redirect to progress page."""
     try:
         # Parse form data
         form = await request.form()
@@ -295,38 +324,36 @@ async def post(request):
         if not email or not message:
             raise ValueError("Email and message are required")
         
-        logger.info(f"Processing submission {submission_id} from {email}")
+        # Store submission data for background processing and results page
+        submission_results[submission_id] = {
+            'status': 'waiting',  # Not processing yet
+            'email': email,
+            'message_body': message,
+            'attachments': attachments,
+            'message_length': len(message),
+            'attachment_count': len(attachments)
+        }
         
-        # Process submission
-        if blob_client and service_bus_client:
-            await process_submission_azure(submission_id, email, message, attachments)
-            success_message = f"Request submitted successfully! Submission ID: {submission_id}"
-            logger.info(f"Successfully processed submission {submission_id}")
-        else:
-            # Development mode - just log the submission
-            success_message = f"[DEV MODE] Request logged! Submission ID: {submission_id}"
-            logger.info(f"Development submission: ID={submission_id}, Email={email}")
-            logger.info(f"Message: {message}")
-            if attachments:
-                logger.info(f"Attachments: {len(attachments)} files")
+        logger.info(f"Created submission {submission_id} from {email}")
         
+        # Return progress page that will start processing after it loads
         return Html(
             Head(
-                Title("Submission Successful"),
-                get_styles()
+                Title("Processing Submission"),
+                get_styles(),
+                Script(src="https://unpkg.com/htmx.org@1.9.10")
             ),
             Body(
                 Div(
-                    Div(success_message, cls="success-message"),
+                    H2("Processing Your Submission"),
                     Div(
-                        H3("Submission Details"),
-                        P(Strong("Submission ID: "), submission_id),
-                        P(Strong("Email: "), email),
-                        P(Strong("Message Length: "), f"{len(message)} characters"),
-                        P(Strong("Attachments: "), f"{len(attachments) if attachments else 0} files"),
-                        cls="submission-details"
+                        Div("This may take a few moments...", cls="progress-step"),
+                        hx_trigger="load delay:100ms",
+                        hx_get=f"/start/{submission_id}",
+                        hx_target="this",
+                        hx_swap="outerHTML",
+                        id="progress-container"
                     ),
-                    A("Submit Another Request", href="/", cls="submit-btn", style="display: inline-block; text-decoration: none; margin-top: 20px;"),
                     cls="container"
                 )
             )
@@ -383,11 +410,10 @@ async def process_submission_azure(submission_id: str, email: str, message: str,
     try:
         logger.info(f"Starting Azure processing for submission {submission_id}")
         
-        # Create container for this submission
+        # Create container
         container_name = submission_id.lower()
         container_client = blob_client.get_container_client(container_name)
         
-        # Create container if it doesn't exist
         try:
             container_client.create_container()
             logger.info(f"Created blob container: {container_name}")
@@ -397,7 +423,7 @@ async def process_submission_azure(submission_id: str, email: str, message: str,
                 raise
             logger.info(f"Container {container_name} already exists")
         
-        # Upload message body as body.txt
+        # Upload message body
         body_blob_client = container_client.get_blob_client("body.txt")
         body_blob_client.upload_blob(message, overwrite=True)
         logger.info(f"Uploaded message body for submission {submission_id}")
@@ -405,7 +431,7 @@ async def process_submission_azure(submission_id: str, email: str, message: str,
         # Upload attachments if any
         attachment_names = []
         if attachments:
-            for attachment in attachments:
+            for i, attachment in enumerate(attachments, 1):
                 if hasattr(attachment, 'filename') and hasattr(attachment, 'file'):
                     filename = attachment.filename
                     file_content = attachment.file.read()
@@ -414,27 +440,39 @@ async def process_submission_azure(submission_id: str, email: str, message: str,
                     file_blob_client = container_client.get_blob_client(filename)
                     file_blob_client.upload_blob(file_content, overwrite=True)
                     attachment_names.append(filename)
-                    logger.info(f"Uploaded attachment: {filename}")
+                    logger.info(f"Uploaded attachment {i}/{len(attachments)}: {filename}")
         
-        # Send message to Service Bus topic
+        # Send message to Service Bus
+        logger.info(f"Preparing Service Bus message for submission {submission_id}")
         topic_name = os.getenv("AZURE_SERVICE_BUS_TOPIC_NAME", "email-events")
         
         with service_bus_client:
             sender = service_bus_client.get_topic_sender(topic_name=topic_name)
             
-            message_body = {
-                "submissionId": submission_id,
-                "userId": email,
-                "metadata": {
-                    "messageLength": len(message),
-                    "attachmentCount": len(attachment_names),
-                    "attachmentNames": attachment_names,
-                    "containerName": container_name
-                }
-            }
+            # Create document URLs for the uploaded files
+            storage_account_name = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
+            document_urls = []
             
+            # Add body.txt URL
+            body_url = f"https://{storage_account_name}.blob.core.windows.net/{container_name}/body.txt"
+            document_urls.append(body_url)
+            
+            # Add attachment URLs
+            for attachment_name in attachment_names:
+                attachment_url = f"https://{storage_account_name}.blob.core.windows.net/{container_name}/{attachment_name}"
+                document_urls.append(attachment_url)
+            
+            # Create Pydantic model for Service Bus message
+            submission_message = SubmissionMessage(
+                submissionId=submission_id,
+                userId=email,
+                documentUrls=document_urls,
+                submittedAt=datetime.now(UTC)
+            )
+            
+            # Create Service Bus message using the Pydantic model
             service_bus_message = ServiceBusMessage(
-                body=json.dumps(message_body),
+                body=submission_message.model_dump_json(),
                 content_type="application/json"
             )
             
@@ -442,11 +480,127 @@ async def process_submission_azure(submission_id: str, email: str, message: str,
             sender.close()
             logger.info(f"Sent Service Bus message for submission {submission_id}")
         
-        logger.info(f"Successfully processed submission {submission_id}")
+        # Mark as complete
+        submission_results[submission_id].update({
+            'status': 'complete'
+        })
+        logger.info(f"Successfully completed processing for submission {submission_id}")
         
     except Exception as e:
         logger.error(f"Error in Azure processing for submission {submission_id}: {e}", exc_info=True)
+        submission_results[submission_id].update({
+            'status': 'error',
+            'error_message': str(e)
+        })
         raise
+
+async def process_submission_background(submission_id: str, email: str, message: str, attachments=None):
+    """Background task to process submission with Azure services."""
+    try:
+        # Process submission with Azure operations
+        await process_submission_azure(submission_id, email, message, attachments)
+        logger.info(f"Successfully processed submission {submission_id}")
+        
+    except Exception as e:
+        logger.error(f"Error in background processing for {submission_id}: {e}", exc_info=True)
+        submission_results[submission_id].update({
+            'status': 'error',
+            'error_message': str(e)
+        })
+
+@rt("/check/{submission_id}")
+def check_completion(submission_id: str):
+    """Check if submission processing is complete."""
+    result = submission_results.get(submission_id, {})
+    status = result.get('status', 'processing')
+    
+    logger.info(f"Checking completion for {submission_id}: status={status}")
+    
+    if status == 'complete':
+        # Redirect to result page
+        logger.info(f"Submission {submission_id} completed, redirecting to result page")
+        return Div(
+            Script("window.location.href = '/result/" + submission_id + "'")
+        )
+    elif status == 'error':
+        # Show error message
+        error_message = result.get('error_message', 'Unknown error occurred')
+        logger.error(f"Error in submission {submission_id}: {error_message}")
+        return Div(
+            Div("Processing Error", cls="progress-message"),
+            Div(f"Error: {error_message}", cls="error-message"),
+            A("Try Again", href="/", cls="submit-btn", style="display: inline-block; text-decoration: none; margin-top: 10px;")
+        )
+    else:
+        # Still processing - show same message
+        return Div(
+            Div("Processing your submission...", cls="progress-message"),
+            Div("This may take a few moments...", cls="progress-step"),
+            hx_trigger="every 1s",
+            hx_get=f"/check/{submission_id}",
+            hx_target="this",
+            hx_swap="outerHTML"
+        )
+
+@rt("/result/{submission_id}")
+def get_result(submission_id: str):
+    """Show final result page."""
+    result = submission_results.get(submission_id, {})
+    email = result.get('email', 'Unknown')
+    message_length = result.get('message_length', 0)
+    attachment_count = result.get('attachment_count', 0)
+    
+    return Html(
+        Head(
+            Title("Submission Successful"),
+            get_styles()
+        ),
+        Body(
+            Div(
+                Div(f"Request submitted successfully! Submission ID: {submission_id}", cls="success-message"),
+                Div(
+                    H3("Submission Details"),
+                    P(Strong("Submission ID: "), submission_id),
+                    P(Strong("Email: "), email),
+                    P(Strong("Message Length: "), f"{message_length} characters"),
+                    P(Strong("Attachments: "), f"{attachment_count} files"),
+                    cls="submission-details"
+                ),
+                A("Submit Another Request", href="/", cls="submit-btn", style="display: inline-block; text-decoration: none; margin-top: 20px;"),
+                cls="container"
+            )
+        )
+    )
+
+@rt("/start/{submission_id}")
+async def start_processing(submission_id: str):
+    """Start background processing for a submission."""
+    result = submission_results.get(submission_id, {})
+    
+    if not result:
+        logger.error(f"No submission data found for {submission_id}")
+        return Div("Error: Submission not found", cls="error-message")
+    
+    # Get submission data
+    email = result.get('email', '')
+    message = result.get('message_body', '')
+    attachments = result.get('attachments', [])
+    
+    # Update status to processing
+    submission_results[submission_id]['status'] = 'processing'
+    
+    # Start background processing
+    asyncio.create_task(process_submission_background(submission_id, email, message, attachments))
+    
+    # Return polling div
+    return Div(
+        Div("Processing your submission...", cls="progress-message"),
+        Div("This may take a few moments...", cls="progress-step"),
+        hx_trigger="every 1s",
+        hx_get=f"/check/{submission_id}",
+        hx_target="this",
+        hx_swap="outerHTML"
+    )
 
 def main():
     """Main entry point for the application."""
@@ -454,15 +608,7 @@ def main():
     host = os.getenv("HOST", "0.0.0.0")
     
     logger.info(f"Starting client-web application on {host}:{port}")
-    
-    if blob_client is None or service_bus_client is None:
-        logger.warning("Running in development mode without Azure integration")
-        logger.info("Set environment variables for full functionality:")
-        logger.info("- AZURE_STORAGE_ACCOUNT_NAME")
-        logger.info("- AZURE_SERVICE_BUS_FQDN")
-        logger.info("- AZURE_SERVICE_BUS_TOPIC_NAME")
-    else:
-        logger.info("Azure integration enabled")
+    logger.info("Azure integration enabled")
     
     uvicorn.run(app, host=host, port=port)
 

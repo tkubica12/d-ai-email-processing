@@ -183,3 +183,211 @@ Users manually update the `.env` file with values from Terraform outputs.
 - Comprehensive logging for debugging and monitoring
 - Better user feedback with detailed error messages
 - Improved Azure service integration with proper error handling
+
+---
+
+## Phase 2: Pydantic Model Integration and Message Structure (2025-07-07)
+
+### Objective
+Migrate from plain dictionary message structure to Pydantic models for better data validation, serialization, and type safety.
+
+### Technical Decisions
+1. **Pydantic Models**: Use Pydantic for Service Bus message structure
+2. **Type Safety**: Leverage Python type hints and validation
+3. **JSON Schema**: Automatic generation for API documentation
+4. **Timestamp Tracking**: Add `submittedAt` field to track submission time
+
+### Implementation Details
+
+#### Created Pydantic Model (`models.py`)
+```python
+class SubmissionMessage(BaseModel):
+    submissionId: str = Field(description="Unique GUID identifier for the submission")
+    userId: str = Field(description="Email address of the user submitting the request")
+    documentUrls: List[str] = Field(default_factory=list, description="List of Azure Blob Storage URLs")
+    submittedAt: datetime = Field(description="ISO 8601 timestamp when submission was created")
+```
+
+---
+
+## Phase 3: HTMX Progress Indicator Implementation (2025-07-07)
+
+### Objective
+Replace JavaScript-based progress indicator with server-side HTMX solution for real-time progress feedback during submission processing.
+
+### Technical Approach
+1. **HTMX Polling**: Use `hx-trigger="every 800ms"` for automatic progress updates
+2. **Server-Side Progress Tracking**: In-memory dictionary to track submission progress
+3. **Background Processing**: Async task to process submissions while updating progress
+4. **Progressive Enhancement**: Works without JavaScript, uses only HTMX attributes
+
+### Implementation Details
+
+#### Progress Tracking System
+- **In-Memory Store**: `progress_tracker` dictionary for current progress state
+- **Background Task**: `process_submission_background()` updates progress asynchronously
+- **Real-Time Updates**: Client polls `/progress/{submission_id}` endpoint every 800ms
+
+#### HTMX Integration Pattern
+```html
+<div hx-trigger="load" 
+     hx-get="/progress/{submission_id}" 
+     hx-target="this" 
+     hx-swap="outerHTML">
+</div>
+```
+
+#### Progress States
+1. **Validating submission** (Step 1/5)
+2. **Creating storage container** (Step 2/5)  
+3. **Uploading message body** (Step 3/5)
+4. **Uploading attachments** (Step 4/5, if files present)
+5. **Sending notification** (Step 5/5)
+
+#### User Experience Flow
+1. User submits form → Redirected to progress page
+2. Progress page loads → HTMX starts polling progress endpoint
+3. Progress updates automatically → Visual progress bar and status text
+4. Completion → Auto-redirect to success page
+
+### Technical Benefits
+- **No JavaScript Required**: Pure server-side rendering with HTMX
+- **Real-Time Feedback**: Users see actual progress of their submission
+- **Graceful Degradation**: Works even if HTMX fails to load
+- **Server-Side Control**: Progress logic controlled entirely by server
+- **Accessible**: Progress updates work with screen readers
+
+### Architecture Decision
+**Background Processing**: Submissions now process asynchronously, allowing immediate user feedback while maintaining the same Azure integration functionality.
+
+---
+
+### Progress Timing Fix (2025-07-07)
+
+#### Issue Identified
+The progress indicator was running much faster than actual processing because:
+1. **Simulated Steps**: `process_submission_background()` used artificial `asyncio.sleep()` delays
+2. **Delayed Real Work**: Actual Azure processing happened after all progress steps were "complete"
+3. **Misleading UI**: Users saw 100% complete while Azure operations were still running
+
+#### Solution Implemented
+1. **Real-Time Progress**: Moved progress updates into `process_submission_azure()` 
+2. **Actual Work Timing**: Progress now updates as real Azure operations complete
+3. **Removed Simulation**: Eliminated artificial delays in favor of real processing feedback
+
+#### Code Changes
+- **process_submission_azure()**: Now updates `progress_tracker` during actual operations
+- **process_submission_background()**: Simplified to directly call Azure processing
+- **Development Mode**: Keeps simulated timing only when Azure services unavailable
+
+#### Progress Flow (Fixed)
+1. **Step 1**: Starting Azure processing (immediate)
+2. **Step 2**: Creating storage container (real Azure blob operation)
+3. **Step 3**: Uploading message body (real file upload)
+4. **Step 4**: Uploading attachments (real file uploads, updates per file)
+5. **Step 5**: Sending Service Bus message (real message publication)
+
+Now the progress indicator accurately reflects actual processing time and operations.
+
+---
+
+## Development Mode Removal (2025-07-07)
+
+#### Simplification
+Removed all development mode simulation code to focus on production-ready Azure integration:
+
+1. **Eliminated Simulated Progress**: Removed artificial progress steps with `asyncio.sleep()` delays
+2. **Azure-Only Processing**: Application now requires Azure services to function
+3. **Cleaner Code**: Simplified `process_submission_background()` to only handle real operations
+4. **Fail-Fast Startup**: Application exits with error if Azure clients can't be initialized
+
+#### Code Changes
+- **process_submission_background()**: Simplified to only call Azure processing
+- **main()**: Now exits with error if Azure services unavailable
+- **Removed**: All development mode simulation logic and artificial delays
+
+#### Benefits
+- **Production Focus**: Code is now optimized for real deployment scenarios
+- **Clearer Logic**: No conditional development vs production paths
+- **Reliable Progress**: Progress tracking only reflects actual Azure operations
+- **Error Clarity**: Clear failure messages when Azure configuration is missing
+
+The application now requires proper Azure configuration and provides authentic progress feedback based on real processing operations.
+
+---
+
+## Simplified Progress Feedback (2025-07-07)
+
+### Objective
+Simplify the progress indicator from step-by-step tracking to a generic "Processing..." message with simple completion feedback.
+
+### Technical Changes
+1. **Removed Step Tracking**: Eliminated complex step/total_steps progress bar logic
+2. **Simplified Status**: Progress now uses simple status values: "processing", "complete", "error"
+3. **Generic Messaging**: Single "Processing..." message instead of detailed step descriptions
+4. **Direct Redirect**: Automatic redirect to result page on completion using client-side redirect
+
+### Implementation Details
+
+#### Progress States Simplified
+- **processing**: Shows generic "Processing your submission..." message
+- **complete**: Triggers automatic redirect to result page
+- **error**: Displays error message with retry option
+
+#### User Experience Flow
+1. User submits form → Redirected to progress page with generic processing message
+2. HTMX polls every 500ms → Checks simple status (processing/complete/error)
+3. Processing complete → Automatic redirect to detailed result page
+4. Error state → Shows error message with retry link
+
+#### Code Simplification
+- **Progress Tracker**: Now stores only status and message (no step counting)
+- **Background Processing**: No intermediate progress updates, just final status change
+- **Progress Endpoint**: Simple status check and redirect logic
+- **Removed CSS**: Eliminated progress bar styles in favor of simple text feedback
+
+### Benefits
+- **Reliability**: Less complex logic means fewer potential failure points
+- **User Clarity**: Simple "processing" vs "complete" is clearer than step percentages
+- **Maintenance**: Easier to maintain and debug with simpler state management
+- **Performance**: Fewer updates and calculations during processing
+
+### Architecture Decision
+**Simplicity Over Detail**: Users prefer knowing "something is happening" over detailed step tracking that may not accurately reflect processing complexity.
+
+---
+
+## Final Simplification: Minimal Progress Tracking (2025-07-07)
+
+### Objective
+Reduce complexity further by removing all unnecessary progress tracking infrastructure while maintaining immediate user feedback.
+
+### Technical Changes
+1. **Eliminated Complex Progress Tracker**: Removed step-by-step progress tracking entirely
+2. **Simple Status Model**: Only track 'waiting', 'processing', 'complete', 'error' states
+3. **Deferred Processing**: Background processing starts after progress page loads (prevents blocking)
+4. **Minimal State**: Store only essential data needed for results page
+
+### Implementation Details
+
+#### Flow Simplified
+1. **Form Submit** → Store submission data with status 'waiting', return progress page immediately
+2. **Progress Page Load** → Trigger `/start/{submission_id}` after 100ms delay
+3. **Start Endpoint** → Change status to 'processing', start background Azure operations, return polling div
+4. **Polling** → Check status every second until 'complete' or 'error'
+5. **Complete** → Redirect to result page with submission details
+
+#### Code Simplification
+- **submission_results**: Single dictionary with status, basic data, and error messages
+- **No Progress Steps**: No step counting, percentages, or detailed progress messages
+- **Clean Separation**: Form submission, processing trigger, status checking are separate concerns
+
+### Benefits
+- **Immediate Feedback**: Progress page shows instantly after form submission
+- **Simple Logic**: Minimal state management reduces bugs and complexity
+- **Clear Flow**: Each endpoint has a single, clear responsibility
+- **Maintainable**: Easy to understand and modify the progress system
+
+The application now provides the simplest possible progress feedback while maintaining a professional user experience with real-time status updates.
+
+---

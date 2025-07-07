@@ -6,9 +6,10 @@ The Client Web Application provides a web-based interface for users to submit re
 ## Features
 - **User-friendly Form**: Simple web interface for submission creation
 - **File Uploads**: Support for multiple document attachments
+- **Real-time Progress**: Simple progress feedback during Azure processing
 - **Azure Integration**: Seamless integration with Azure Blob Storage and Service Bus
 - **Secure Authentication**: Uses Entra ID with DefaultAzureCredential for Azure services
-- **Development Mode**: Runs locally without Azure integration for development
+- **Production Ready**: No development mode, requires Azure integration to function
 
 ## Architecture
 
@@ -24,17 +25,24 @@ The Client Web Application provides a web-based interface for users to submit re
 2. User enters email address and message body
 3. User optionally uploads one or more attachments
 4. Application generates unique GUID for the submission
-5. Files are stored in Azure Blob Storage container (named with submission GUID)
-6. Event is published to Azure Service Bus Topic with submission metadata
+5. Background Azure processing begins (Blob Storage upload and Service Bus message)
+6. User sees simple "Processing..." feedback with real-time status polling
+7. Upon completion, user is redirected to a result page with submission details
 
 ### Data Flow
 ```
-Web Form → File Processing → Azure Blob Storage
-    ↓
-Service Bus Topic Event
-    ↓
-Email Processing Pipeline
+Web Form → Background Processing → Azure Blob Storage
+                     ↓
+               Service Bus Topic Event
+                     ↓
+           Email Processing Pipeline
 ```
+
+### Progress Feedback
+- **Real-time Updates**: HTMX polling provides live feedback without JavaScript
+- **Simple UI**: Generic "Processing..." message during Azure operations
+- **Completion Redirect**: Automatic redirect to result page when processing completes
+- **Error Handling**: Clear error messages if processing fails
 
 ## Azure Services Integration
 
@@ -57,19 +65,20 @@ Email Processing Pipeline
 - **Message Format**: JSON containing:
   - `submissionId`: Unique GUID for the submission
   - `userId`: User's email address
-  - `metadata`: Additional submission information
+  - `documentUrls`: Array of Azure Blob Storage URLs for all documents (including body.txt and attachments)
+  - `submittedAt`: ISO 8601 timestamp when the submission was created
 
 ### Example Service Bus Message
 ```json
 {
   "submissionId": "123e4567-e89b-12d3-a456-426614174000",
   "userId": "user@example.com",
-  "metadata": {
-    "messageLength": 245,
-    "attachmentCount": 2,
-    "attachmentNames": ["document.pdf", "image.jpg"],
-    "containerName": "123e4567-e89b-12d3-a456-426614174000"
-  }
+  "documentUrls": [
+    "https://storage.blob.core.windows.net/123e4567-e89b-12d3-a456-426614174000/body.txt",
+    "https://storage.blob.core.windows.net/123e4567-e89b-12d3-a456-426614174000/document1.pdf",
+    "https://storage.blob.core.windows.net/123e4567-e89b-12d3-a456-426614174000/document2.docx"
+  ],
+  "submittedAt": "2025-07-07T14:30:00.123456Z"
 }
 ```
 
@@ -161,10 +170,10 @@ client-web/
 - `PORT`: Application port (default: 8000)
 
 ### Development Mode
-The application can run in development mode without Azure integration:
-- If Azure authentication fails, the app continues in development mode
-- Submissions are logged to console instead of being sent to Azure
-- All form functionality works for testing the UI
+The application requires Azure integration to function properly:
+- Azure authentication is required (no development mode)
+- App fails fast if Azure clients cannot be initialized
+- All submissions are processed through real Azure services
 
 ### Adding Dependencies
 Add new dependencies to `pyproject.toml`:
@@ -186,7 +195,8 @@ Then run `uv sync` to install.
    - Message body
    - Optional file attachments
 3. Submit the form
-4. Verify success message with submission ID
+4. Observe real-time progress feedback
+5. Verify completion with submission ID and details
 
 #### Azure Integration Testing
 1. Check Azure Storage for created containers
