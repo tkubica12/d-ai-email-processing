@@ -18,7 +18,7 @@ The Submission Intake service is the entry point for the event sourcing workflow
 ## Responsibilities
 
 1. **Service Bus Processing**
-   - Listens to Service Bus topic `email-events`
+   - Listens to Service Bus topic `new-submissions`
    - Processes submission messages from client-web application
    - Extracts document URLs from blob storage references
 

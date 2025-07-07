@@ -61,7 +61,7 @@ Web Form → Background Processing → Azure Blob Storage
 
 ### Service Bus Topic
 - **Authentication**: Entra ID DefaultAzureCredential (no connection strings)
-- **Topic Name**: `email-events`
+- **Topic Name**: `new-submissions`
 - **Message Format**: JSON containing:
   - `submissionId`: Unique GUID for the submission
   - `userId`: User's email address
@@ -92,7 +92,7 @@ Web Form → Background Processing → Azure Blob Storage
 
 ### Azure Infrastructure
 - Azure Storage Account (deployed via Terraform)
-- Azure Service Bus Namespace with `email-events` topic (deployed via Terraform)
+- Azure Service Bus Namespace with `new-submissions` topic (deployed via Terraform)
 - RBAC permissions for your user account (configured via Terraform)
 
 ## Setup Instructions
@@ -165,7 +165,7 @@ client-web/
 ### Environment Variables
 - `AZURE_STORAGE_ACCOUNT_NAME`: Name of the Azure Storage Account
 - `AZURE_SERVICE_BUS_FQDN`: Fully qualified domain name of Service Bus namespace
-- `AZURE_SERVICE_BUS_TOPIC_NAME`: Name of the Service Bus topic (default: email-events)
+- `AZURE_SERVICE_BUS_TOPIC_NAME`: Name of the Service Bus topic (default: new-submissions)
 - `HOST`: Application host (default: 0.0.0.0)
 - `PORT`: Application port (default: 8000)
 

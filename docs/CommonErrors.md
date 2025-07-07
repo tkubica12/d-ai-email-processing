@@ -169,7 +169,7 @@ ERROR: failed to solve: process "/bin/sh -c uv sync --frozen" did not complete s
 - Message format issues
 
 **Solution**:
-1. Verify topic exists: `az servicebus topic show --name email-events --namespace-name <namespace>`
+1. Verify topic exists: `az servicebus topic show --name new-submissions --namespace-name <namespace>`
 2. Check Service Bus permissions in Azure Portal
 3. Validate message JSON format
 4. Add error handling for Service Bus operations

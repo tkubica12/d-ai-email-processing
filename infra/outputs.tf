@@ -32,7 +32,7 @@ output "service_bus_connection_string" {
 
 output "service_bus_topic_name" {
   description = "The name of the Service Bus topic for email events"
-  value       = azurerm_servicebus_topic.email_events.name
+  value       = azurerm_servicebus_topic.new_submissions.name
 }
 
 # Additional outputs for client application

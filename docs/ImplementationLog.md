@@ -85,7 +85,7 @@ User Form → FastHTML Handler → Azure Blob Storage
 ### Environment Variables
 - `AZURE_STORAGE_ACCOUNT_NAME`: From Terraform output
 - `AZURE_SERVICE_BUS_FQDN`: From Terraform output  
-- `AZURE_SERVICE_BUS_TOPIC_NAME`: Static (email-events)
+- `AZURE_SERVICE_BUS_TOPIC_NAME`: Static (new-submissions)
 - `HOST` / `PORT`: Application binding configuration
 
 ### Manual Configuration
@@ -389,5 +389,28 @@ Reduce complexity further by removing all unnecessary progress tracking infrastr
 - **Maintainable**: Easy to understand and modify the progress system
 
 The application now provides the simplest possible progress feedback while maintaining a professional user experience with real-time status updates.
+
+---
+
+## Phase 2: Service Bus Topic Rename (2025-07-07)
+
+### Change Description
+Renamed Service Bus topic from `email-events` to `new-submissions` to better reflect its purpose in the system architecture.
+
+### Technical Decisions
+1. **Topic Name**: Changed from `email-events` to `new-submissions` for better semantic clarity
+2. **Scope**: Updated all configuration files, documentation, and code references
+
+### Files Updated
+- `infra/service_bus.tf`: Updated Terraform resource name and topic name
+- `src/client-web/main.py`: Updated default topic name in environment variable
+- `src/client-web/.env.example`: Updated example configuration
+- `src/submission-intake/.env`: Updated development environment configuration
+- Documentation files: Updated README files and implementation logs
+
+### Deployment Impact
+- Requires Terraform re-deployment to update the Service Bus topic name
+- Existing subscriptions will need to be updated to reference the new topic name
+- No data migration required as this is a naming change only
 
 ---

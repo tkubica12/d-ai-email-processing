@@ -6,9 +6,9 @@ resource "azurerm_servicebus_namespace" "main" {
   sku                 = "Standard"
 }
 
-# Service Bus Topic for email events
-resource "azurerm_servicebus_topic" "email_events" {
-  name                = "email-events"
+# Service Bus Topic for new submissions
+resource "azurerm_servicebus_topic" "new_submissions" {
+  name                = "new-submissions"
   namespace_id        = azurerm_servicebus_namespace.main.id
   
   # Configure message settings
