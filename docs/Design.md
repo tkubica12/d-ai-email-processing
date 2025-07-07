@@ -15,11 +15,12 @@ This system processes incoming emails containing submission requests using AI to
      - Publishes event to Service Bus Topic with user ID, submission GUID, and document URLs
 2. **Request Registration**: System generates unique identifier for the submission
 3. **Content Storage**: Message body and attachments are stored for processing
-4. **Document Analysis**: AI analyzes all submitted documents in parallel to:
-   - Extract structured information from documents
-   - Convert documents to searchable text format
-   - Generate metadata and summaries
-   - Create searchable index entries
+5. **Document Analysis**: AI analyzes all submitted documents through a multi-step pipeline:
+   - **Content Extraction**: Azure Document Intelligence converts documents to structured Markdown
+   - **Classification & Summarization**: LLM classifies document types and generates summaries
+   - **Search Indexing**: Content is indexed in Azure AI Search with metadata
+   - **Data Extraction**: LLM extracts structured information based on document type
+   - **Aggregation**: System tracks completion of all processing steps per document
 5. **Submission Evaluation**: AI agent evaluates the complete submission to:
    - Identify missing information
    - Detect inconsistencies or errors
@@ -89,14 +90,22 @@ This approach uses event-driven architecture with event sourcing patterns to imp
   {
     "id": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
     "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
-    "content": "Full text content extracted from document...",
+    "content": "# Document Title\n\nFull markdown content extracted from document using Azure Document Intelligence...",
+    "type": "invoice",
     "summary": "AI-generated summary of document content...",
+    "extractedData": {
+      "invoiceNumber": "INV-2025-001",
+      "amount": 1250.00,
+      "currency": "USD",
+      "dueDate": "2025-08-07",
+      "vendor": "Acme Corp"
+    },
     "metadata": {
       "processingTimestamp": "2025-07-07T10:05:00Z",
-      "processorType": "markitdown",
       "documentLength": 15000,
       "language": "en",
-      "confidence": 0.95
+      "confidence": 0.95,
+      "indexed": true
     }
   }
   ```
@@ -114,15 +123,21 @@ This approach uses event-driven architecture with event sourcing patterns to imp
     "documents": [
       {
         "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
-        "processed": null,
-        "type": null
+        "processed": true,
+        "type": "invoice"
       },
       {
         "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document2.docx",
-        "processed": null,
-        "type": null
+        "processed": true,
+        "type": "contract"
       }
-    ]
+    ],
+    "evaluationResults": {
+      "completeness": 0.85,
+      "recommendations": ["Request additional documentation for item X"],
+      "issues": [],
+      "analysisTimestamp": "2025-07-07T10:15:00Z"
+    }
   }
   ```
 
@@ -133,28 +148,40 @@ This approach uses event-driven architecture with event sourcing patterns to imp
    - Emits `SubmissionCreated` event with document URLs
    - Emits `DocumentUploadedEvent` for each document
 
-2. **docproc-parser-markitdown**
+2. **docproc-parser-foundry**
    - Listens to Change Feed for `DocumentUploadedEvent`
-   - Processes documents using LLM and Markitdown
-   - Stores results in documents container
-   - Emits `DocumentProcessedEvent`
+   - Processes documents using Azure Document Intelligence to convert to Markdown
+   - Stores content in documents container
+   - Emits `DocumentContentExtractedEvent`
 
-3. **docproc-parser-foundry**
-   - Listens to Change Feed for `DocumentUploadedEvent`
-   - Processes documents using Azure Document Intelligence
-   - Stores results in documents container
-   - Emits `DocumentProcessedEvent`
+3. **docproc-classifier**
+   - Listens to Change Feed for `DocumentContentExtractedEvent`
+   - Uses LLM to classify document type and generate summary
+   - Updates document record with type and summary
+   - Emits `DocumentClassifiedEvent`
 
-4. **docproc-aggregator**
-   - Listens to Change Feed for `DocumentProcessedEvent`
-   - Tracks completion of all processors for each document
-   - Emits `DocumentFullyProcessedEvent` when all processors complete
+4. **docproc-search-indexer**
+   - Listens to Change Feed for `DocumentContentExtractedEvent`
+   - Ingests document content into Azure AI Search with metadata
+   - Emits `DocumentIndexedEvent`
+
+5. **docproc-data-extractor**
+   - Listens to Change Feed for `DocumentContentExtractedEvent`
+   - Uses LLM to extract structured information
+   - Updates document record with extractedData
+   - Emits `DocumentDataExtractedEvent`
+
+6. **docproc-aggregator**
+   - Listens to Change Feed for `DocumentClassifiedEvent` and `DocumentDataExtractedEvent`
+   - Tracks completion of classification and data extraction for each document
+   - Emits `DocumentFullyProcessedEvent` when both are complete
    - Emits `SubmissionDocumentsCompleteEvent` when all documents in submission are processed
 
-5. **submission-analyzer**
+7. **submission-analyzer**
    - Listens to Change Feed for `SubmissionDocumentsCompleteEvent`
+   - Updates submission record with processed flags and types for each document
    - Performs final AI analysis of complete submission
-   - Generates evaluation results and recommendations
+   - Updates submission record with evaluation results
    - Emits `SubmissionAnalysisCompleteEvent`
 
 #### Event Formats
@@ -191,6 +218,71 @@ This approach uses event-driven architecture with event sourcing patterns to imp
 }
 ```
 
+**DocumentContentExtractedEvent**
+```json
+{
+  "id": "uuid",
+  "eventType": "DocumentContentExtractedEvent",
+  "submissionId": "submission-guid",
+  "userId": "user@example.com", 
+  "timestamp": "2025-07-07T10:02:00Z",
+  "data": {
+    "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
+    "contentLength": 15000,
+    "success": true
+  }
+}
+```
+
+**DocumentClassifiedEvent**
+```json
+{
+  "id": "uuid",
+  "eventType": "DocumentClassifiedEvent",
+  "submissionId": "submission-guid",
+  "userId": "user@example.com", 
+  "timestamp": "2025-07-07T10:05:00Z",
+  "data": {
+    "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
+    "documentType": "invoice",
+    "confidence": 0.95,
+    "success": true
+  }
+}
+```
+
+**DocumentIndexedEvent**
+```json
+{
+  "id": "uuid",
+  "eventType": "DocumentIndexedEvent",
+  "submissionId": "submission-guid",
+  "userId": "user@example.com", 
+  "timestamp": "2025-07-07T10:04:00Z",
+  "data": {
+    "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
+    "searchIndexId": "doc-uuid-in-search",
+    "success": true
+  }
+}
+```
+
+**DocumentDataExtractedEvent**
+```json
+{
+  "id": "uuid",
+  "eventType": "DocumentDataExtractedEvent",
+  "submissionId": "submission-guid",
+  "userId": "user@example.com", 
+  "timestamp": "2025-07-07T10:06:00Z",
+  "data": {
+    "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
+    "extractedFields": ["invoiceNumber", "amount", "currency", "dueDate", "vendor"],
+    "success": true
+  }
+}
+```
+
 **DocumentProcessedEvent**
 ```json
 {
@@ -198,10 +290,10 @@ This approach uses event-driven architecture with event sourcing patterns to imp
   "eventType": "DocumentProcessedEvent",
   "submissionId": "submission-guid",
   "userId": "user@example.com", 
-  "timestamp": "2025-07-07T10:00:00Z",
+  "timestamp": "2025-07-07T10:07:00Z",
   "data": {
     "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
-    "processorType": "markitdown",
+    "processingStepsComplete": ["classification", "dataExtraction"],
     "success": true
   }
 }
@@ -214,10 +306,11 @@ This approach uses event-driven architecture with event sourcing patterns to imp
   "eventType": "DocumentFullyProcessedEvent",
   "submissionId": "submission-guid",
   "userId": "user@example.com",
-  "timestamp": "2025-07-07T10:00:00Z",
+  "timestamp": "2025-07-07T10:08:00Z",
   "data": {
     "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
-    "allProcessorsComplete": true
+    "allProcessingComplete": true,
+    "documentType": "invoice"
   }
 }
 ```
@@ -229,10 +322,11 @@ This approach uses event-driven architecture with event sourcing patterns to imp
   "eventType": "SubmissionDocumentsCompleteEvent",
   "submissionId": "submission-guid",
   "userId": "user@example.com",
-  "timestamp": "2025-07-07T10:00:00Z",
+  "timestamp": "2025-07-07T10:10:00Z",
   "data": {
     "totalDocuments": 2,
-    "processedDocuments": 2
+    "processedDocuments": 2,
+    "documentTypes": ["invoice", "contract"]
   }
 }
 ```
@@ -244,7 +338,7 @@ This approach uses event-driven architecture with event sourcing patterns to imp
   "eventType": "SubmissionAnalysisCompleteEvent",
   "submissionId": "submission-guid",
   "userId": "user@example.com",
-  "timestamp": "2025-07-07T10:00:00Z",
+  "timestamp": "2025-07-07T10:15:00Z",
   "data": {
     "analysisResults": {
       "completeness": 0.85,
@@ -262,13 +356,17 @@ Service Bus → submission-intake → SubmissionCreated Event
                                  ↓
                               DocumentUploadedEvent (per document)
                                  ↓
-                     ┌─────────────────────────┐
-                     ↓                         ↓
-          docproc-parser-markitdown    docproc-parser-foundry
-                     ↓                         ↓
-              DocumentProcessedEvent    DocumentProcessedEvent
-                     ↓                         ↓
-                           docproc-aggregator
+                           docproc-parser-foundry
+                                 ↓
+                         DocumentContentExtractedEvent
+                                 ↓
+              ┌──────────────────┼──────────────────┐
+              ↓                  ↓                  ↓
+    docproc-classifier  docproc-search-indexer  docproc-data-extractor
+              ↓                  ↓                  ↓
+  DocumentClassifiedEvent  DocumentIndexedEvent  DocumentDataExtractedEvent
+              ↓                                   ↓
+              └─────────────→ docproc-aggregator ←┘
                                  ↓
                         DocumentFullyProcessedEvent
                                  ↓
@@ -277,6 +375,63 @@ Service Bus → submission-intake → SubmissionCreated Event
                           submission-analyzer
                                  ↓
                       SubmissionAnalysisCompleteEvent
+```
+
+#### Process Flow Diagram
+
+```mermaid
+graph TD
+    A[Service Bus Topic] --> B[submission-intake]
+    B --> C[Create Submission Record]
+    B --> D[Emit SubmissionCreated Event]
+    B --> E[Emit DocumentUploadedEvent per document]
+    
+    E --> F[docproc-parser-foundry]
+    F --> G[Azure Document Intelligence]
+    G --> H[Extract Content as Markdown]
+    H --> I[Store content in documents container]
+    I --> J[Emit DocumentContentExtractedEvent]
+    
+    J --> K[docproc-classifier]
+    J --> L[docproc-search-indexer]
+    J --> M[docproc-data-extractor]
+    
+    K --> N[LLM Classification]
+    N --> O[Update document with type & summary]
+    O --> P[Emit DocumentClassifiedEvent]
+    
+    L --> Q[Azure AI Search]
+    Q --> R[Index document content]
+    R --> S[Emit DocumentIndexedEvent]
+    
+    M --> T[LLM Data Extraction]
+    T --> U[Update document with extractedData]
+    U --> V[Emit DocumentDataExtractedEvent]
+    
+    P --> W[docproc-aggregator]
+    V --> W
+    W --> X{All processing complete?}
+    X -->|Yes| Y[Emit DocumentFullyProcessedEvent]
+    X -->|No| Z[Wait for remaining events]
+    Z --> W
+    
+    Y --> AA{All documents processed?}
+    AA -->|Yes| BB[Emit SubmissionDocumentsCompleteEvent]
+    AA -->|No| CC[Wait for more documents]
+    CC --> AA
+    
+    BB --> DD[submission-analyzer]
+    DD --> EE[Update submission with processed flags]
+    EE --> FF[LLM Analysis]
+    FF --> GG[Update submission with evaluation results]
+    GG --> HH[Emit SubmissionAnalysisCompleteEvent]
+    
+    style A fill:#e1f5fe
+    style G fill:#fff3e0
+    style N fill:#e8f5e8
+    style Q fill:#fff3e0
+    style T fill:#e8f5e8
+    style FF fill:#e8f5e8
 ```
 
 #### Error Handling and Resilience

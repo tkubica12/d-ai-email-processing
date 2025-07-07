@@ -757,3 +757,41 @@ Added event creation and storage functionality to the submission-intake service:
 - TypeVar ensures type safety while enabling generic storage operations
 
 This approach provides the optimal balance of code reuse, maintainability, and API clarity for our event sourcing implementation.
+
+---
+
+## Phase 2: Document Processing Architecture Redesign (2025-07-07)
+
+### Architectural Changes
+Updated the document processing pipeline to use Azure Document Intelligence and implement parallel processing steps for better scalability and feature separation.
+
+### Key Design Decisions
+1. **Azure Document Intelligence**: Primary document processing using Azure's native capability to convert documents to Markdown while preserving structure
+2. **Parallel Processing**: Split document processing into three parallel streams after content extraction:
+   - Classification and summarization using LLM
+   - Search indexing in Azure AI Search
+   - Structured data extraction using LLM
+3. **Event-Driven Coordination**: Use Cosmos DB Change Feed to coordinate between processing steps
+4. **Flexible Data Model**: Support for extensible extractedData structure based on document types
+
+### Updated Service Architecture
+- **docproc-parser-foundry**: Uses Azure Document Intelligence for content extraction to Markdown
+- **docproc-classifier**: LLM-based document classification and summarization
+- **docproc-search-indexer**: Ingests content into Azure AI Search with metadata
+- **docproc-data-extractor**: LLM-based structured data extraction
+- **docproc-aggregator**: Coordinates completion tracking across parallel processes
+- **submission-analyzer**: Final evaluation once all document processing is complete
+
+### Data Model Updates
+- **Document Store**: Added `type`, `extractedData`, and `metadata.indexed` fields
+- **Submission Store**: Added `evaluationResults` and updated document tracking with `processed` and `type` flags
+- **Event Model**: Expanded with new event types for each processing step
+
+### Processing Flow
+1. Document uploaded → Azure Document Intelligence extracts content as Markdown
+2. Parallel processing:
+   - LLM classifies document type and creates summary
+   - Content indexed in Azure AI Search with userId/submissionId metadata
+   - LLM extracts structured data based on document type
+3. Aggregator waits for all parallel processes to complete
+4. Submission analyzer evaluates complete submission with all processed documents
