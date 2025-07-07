@@ -73,6 +73,188 @@ This approach uses event-driven architecture with event sourcing patterns to imp
 - Event sourcing provides complete history and enables replay/recovery
 - Asynchronous processing allows for high throughput and scalability
 
+#### Detailed Architecture
+
+**Event Store:** Cosmos DB container with Change Feed enabled
+- Container: `events`
+- Partition Key: `submissionId`
+- Events are immutable and append-only
+
+**Document Store:** Cosmos DB container for processed document results
+- Container: `documents` 
+- Partition Key: `submissionId`
+- Stores final processed text and metadata from document processors
+
+**Submission Store:** Cosmos DB container for submission records
+- Container: `submissions`
+- Partition Key: `submissionId`
+- Tracks submission metadata and document URLs
+
+**Service Architecture:**
+1. **submission-intake**
+   - Listens to Service Bus topic for new submissions
+   - Creates submission record in submissions container
+   - Emits `SubmissionCreated` event with document URLs
+   - Emits `DocumentUploadedEvent` for each document
+
+2. **docproc-parser-markitdown**
+   - Listens to Change Feed for `DocumentUploadedEvent`
+   - Processes documents using LLM and Markitdown
+   - Stores results in documents container
+   - Emits `DocumentProcessedEvent`
+
+3. **docproc-parser-foundry**
+   - Listens to Change Feed for `DocumentUploadedEvent`
+   - Processes documents using Azure Document Intelligence
+   - Stores results in documents container
+   - Emits `DocumentProcessedEvent`
+
+4. **docproc-aggregator**
+   - Listens to Change Feed for `DocumentProcessedEvent`
+   - Tracks completion of all processors for each document
+   - Emits `DocumentFullyProcessedEvent` when all processors complete
+   - Emits `SubmissionDocumentsCompleteEvent` when all documents in submission are processed
+
+5. **submission-analyzer**
+   - Listens to Change Feed for `SubmissionDocumentsCompleteEvent`
+   - Performs final AI analysis of complete submission
+   - Generates evaluation results and recommendations
+   - Emits `SubmissionAnalysisCompleteEvent`
+
+#### Event Formats
+
+**SubmissionCreated**
+```json
+{
+  "id": "uuid",
+  "eventType": "SubmissionCreated",
+  "submissionId": "submission-guid",
+  "timestamp": "2025-07-07T10:00:00Z",
+  "data": {
+    "userId": "user@example.com",
+    "messageLength": 500,
+    "documentUrls": [
+      "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
+      "https://storage.blob.core.windows.net/submission-guid/document2.docx"
+    ],
+    "containerName": "submission-guid"
+  }
+}
+```
+
+**DocumentUploadedEvent**
+```json
+{
+  "id": "uuid",
+  "eventType": "DocumentUploadedEvent", 
+  "submissionId": "submission-guid",
+  "timestamp": "2025-07-07T10:00:00Z",
+  "data": {
+    "documentId": "document-guid",
+    "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
+    "fileName": "document1.pdf",
+    "mimeType": "application/pdf"
+  }
+}
+```
+
+**DocumentProcessedEvent**
+```json
+{
+  "id": "uuid",
+  "eventType": "DocumentProcessedEvent",
+  "submissionId": "submission-guid", 
+  "timestamp": "2025-07-07T10:00:00Z",
+  "data": {
+    "documentId": "document-guid",
+    "processor": "markitdown|foundry",
+    "status": "completed|failed",
+    "documentRecordId": "cosmos-document-record-id",
+    "error": "error-message-if-failed"
+  }
+}
+```
+
+**DocumentFullyProcessedEvent**
+```json
+{
+  "id": "uuid",
+  "eventType": "DocumentFullyProcessedEvent",
+  "submissionId": "submission-guid",
+  "timestamp": "2025-07-07T10:00:00Z", 
+  "data": {
+    "documentId": "document-guid",
+    "processorResults": ["markitdown", "foundry"],
+    "allProcessorsComplete": true
+  }
+}
+```
+
+**SubmissionDocumentsCompleteEvent**
+```json
+{
+  "id": "uuid",
+  "eventType": "SubmissionDocumentsCompleteEvent",
+  "submissionId": "submission-guid",
+  "timestamp": "2025-07-07T10:00:00Z",
+  "data": {
+    "totalDocuments": 3,
+    "processedDocuments": 3,
+    "allDocumentsProcessed": true
+  }
+}
+```
+
+**SubmissionAnalysisCompleteEvent**
+```json
+{
+  "id": "uuid", 
+  "eventType": "SubmissionAnalysisCompleteEvent",
+  "submissionId": "submission-guid",
+  "timestamp": "2025-07-07T10:00:00Z",
+  "data": {
+    "analysisResults": {
+      "missingInformation": ["tax_id", "supporting_documents"],
+      "recommendations": ["request_additional_docs"],
+      "confidence": 0.85
+    },
+    "status": "completed"
+  }
+}
+```
+
+#### Data Flow
+
+```
+Service Bus → submission-intake → SubmissionCreated Event
+                                 ↓
+                              DocumentUploadedEvent (per document)
+                                 ↓
+                     ┌─────────────────────────┐
+                     ↓                         ↓
+          docproc-parser-markitdown    docproc-parser-foundry
+                     ↓                         ↓
+              DocumentProcessedEvent    DocumentProcessedEvent
+                     ↓                         ↓
+                           docproc-aggregator
+                                 ↓
+                        DocumentFullyProcessedEvent
+                                 ↓
+                      SubmissionDocumentsCompleteEvent
+                                 ↓
+                          submission-analyzer
+                                 ↓
+                      SubmissionAnalysisCompleteEvent
+```
+
+#### Error Handling and Resilience
+
+- **Retry Logic:** Each service implements exponential backoff for failed operations
+- **Dead Letter Handling:** Failed events after max retries go to dead letter queue
+- **Idempotency:** All event handlers are idempotent using event IDs
+- **Compensation:** Event sourcing enables replay and compensation for failed workflows
+- **Monitoring:** Change Feed provides built-in monitoring of event processing
+
 ### Architecture Comparison
 
 **Workflow Orchestration with Logic Apps:**
