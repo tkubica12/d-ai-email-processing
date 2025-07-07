@@ -82,13 +82,49 @@ This approach uses event-driven architecture with event sourcing patterns to imp
 
 **Document Store:** Cosmos DB container for processed document results
 - Container: `documents` 
-- Partition Key: `submissionId`
-- Stores final processed text and metadata from document processors
+- Partition Key: `documentUrl` (unique identifier)
+- Document ID: `documentUrl`
+- Schema:
+  ```json
+  {
+    "id": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
+    "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
+    "content": "Full text content extracted from document...",
+    "summary": "AI-generated summary of document content...",
+    "metadata": {
+      "processingTimestamp": "2025-07-07T10:05:00Z",
+      "processorType": "markitdown",
+      "documentLength": 15000,
+      "language": "en",
+      "confidence": 0.95
+    }
+  }
+  ```
 
 **Submission Store:** Cosmos DB container for submission records
 - Container: `submissions`
 - Partition Key: `submissionId`
-- Tracks submission metadata and document URLs
+- Schema:
+  ```json
+  {
+    "id": "submission-guid",
+    "submissionId": "submission-guid", 
+    "userId": "user@example.com",
+    "submittedAt": "2025-07-07T10:00:00Z",
+    "documents": [
+      {
+        "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
+        "processed": null,
+        "type": null
+      },
+      {
+        "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document2.docx",
+        "processed": null,
+        "type": null
+      }
+    ]
+  }
+  ```
 
 **Service Architecture:**
 1. **submission-intake**
@@ -129,9 +165,9 @@ This approach uses event-driven architecture with event sourcing patterns to imp
   "id": "uuid",
   "eventType": "SubmissionCreated",
   "submissionId": "submission-guid",
+  "userId": "user@example.com",
   "timestamp": "2025-07-07T10:00:00Z",
   "data": {
-    "userId": "user@example.com",
     "messageLength": 500,
     "documentUrls": [
       "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
@@ -148,12 +184,10 @@ This approach uses event-driven architecture with event sourcing patterns to imp
   "id": "uuid",
   "eventType": "DocumentUploadedEvent", 
   "submissionId": "submission-guid",
+  "userId": "user@example.com",
   "timestamp": "2025-07-07T10:00:00Z",
   "data": {
-    "documentId": "document-guid",
-    "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
-    "fileName": "document1.pdf",
-    "mimeType": "application/pdf"
+    "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf"
   }
 }
 ```
@@ -163,14 +197,13 @@ This approach uses event-driven architecture with event sourcing patterns to imp
 {
   "id": "uuid",
   "eventType": "DocumentProcessedEvent",
-  "submissionId": "submission-guid", 
+  "submissionId": "submission-guid",
+  "userId": "user@example.com", 
   "timestamp": "2025-07-07T10:00:00Z",
   "data": {
-    "documentId": "document-guid",
-    "processor": "markitdown|foundry",
-    "status": "completed|failed",
-    "documentRecordId": "cosmos-document-record-id",
-    "error": "error-message-if-failed"
+    "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
+    "processorType": "markitdown",
+    "success": true
   }
 }
 ```
@@ -181,10 +214,10 @@ This approach uses event-driven architecture with event sourcing patterns to imp
   "id": "uuid",
   "eventType": "DocumentFullyProcessedEvent",
   "submissionId": "submission-guid",
-  "timestamp": "2025-07-07T10:00:00Z", 
+  "userId": "user@example.com",
+  "timestamp": "2025-07-07T10:00:00Z",
   "data": {
-    "documentId": "document-guid",
-    "processorResults": ["markitdown", "foundry"],
+    "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
     "allProcessorsComplete": true
   }
 }
@@ -196,11 +229,11 @@ This approach uses event-driven architecture with event sourcing patterns to imp
   "id": "uuid",
   "eventType": "SubmissionDocumentsCompleteEvent",
   "submissionId": "submission-guid",
+  "userId": "user@example.com",
   "timestamp": "2025-07-07T10:00:00Z",
   "data": {
-    "totalDocuments": 3,
-    "processedDocuments": 3,
-    "allDocumentsProcessed": true
+    "totalDocuments": 2,
+    "processedDocuments": 2
   }
 }
 ```
@@ -208,17 +241,17 @@ This approach uses event-driven architecture with event sourcing patterns to imp
 **SubmissionAnalysisCompleteEvent**
 ```json
 {
-  "id": "uuid", 
+  "id": "uuid",
   "eventType": "SubmissionAnalysisCompleteEvent",
   "submissionId": "submission-guid",
+  "userId": "user@example.com",
   "timestamp": "2025-07-07T10:00:00Z",
   "data": {
     "analysisResults": {
-      "missingInformation": ["tax_id", "supporting_documents"],
-      "recommendations": ["request_additional_docs"],
-      "confidence": 0.85
-    },
-    "status": "completed"
+      "completeness": 0.85,
+      "recommendations": ["Request additional documentation for item X"],
+      "issues": []
+    }
   }
 }
 ```
