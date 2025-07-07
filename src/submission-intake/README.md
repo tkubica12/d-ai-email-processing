@@ -45,9 +45,37 @@ Service Bus Message → Submission Record Creation → Event Emission
 ## Technology Stack
 - **Runtime**: Python 3.12+ with async/await
 - **Message Processing**: Azure Service Bus with async client
+- **Storage**: Azure Cosmos DB with async client
 - **Authentication**: DefaultAzureCredential with Managed Identity
 - **Data Validation**: Pydantic models
 - **Logging**: Python logging with structured format
+
+## Data Models
+
+### Submission Document Schema
+Following the Design.md specification:
+
+```json
+{
+  "id": "submission-guid",
+  "submissionId": "submission-guid",
+  "userId": "user@example.com",
+  "submittedAt": "2025-07-07T10:00:00Z",
+  "documents": [
+    {
+      "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
+      "processed": null,
+      "type": null
+    }
+  ]
+}
+```
+
+### Processing Flow
+1. **Message Reception**: Service Bus message with submission details
+2. **Data Validation**: Pydantic model validation of message content
+3. **Document Storage**: Create submission document in Cosmos DB
+4. **Event Emission**: (Future) Emit events for document processing pipeline
 
 ## Development Setup
 

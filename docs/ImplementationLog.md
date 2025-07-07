@@ -577,3 +577,63 @@ resource "azurerm_cosmosdb_sql_container" "submissions"
 - Implement event publishing in submission-intake service
 - Create change feed processors for document processing services
 - Add connection configuration to application services
+
+---
+
+## Phase 3: Submission-Intake Cosmos DB Integration (2025-07-07)
+
+### Cosmos DB Storage Implementation
+Implemented initial submission document storage in Cosmos DB following the exact schema defined in Design.md.
+
+### Technical Decisions
+1. **Schema Compliance**: Implemented models strictly following Design.md schema specification
+   - `SubmissionDocument`: Matches submissions container schema exactly
+   - `DocumentInfo`: Tracks document processing state with `processed` and `type` fields
+2. **Async Operations**: Full async/await pattern for Cosmos DB operations
+3. **Error Handling**: Comprehensive error handling with proper logging and message abandonment
+4. **Resource Management**: Proper initialization and cleanup of Cosmos DB connections
+
+### Implementation Details
+
+#### Data Models (`models.py`)
+```python
+class DocumentInfo(BaseModel):
+    """Document info matching Design.md schema"""
+    documentUrl: str
+    processed: Optional[datetime] = None
+    type: Optional[str] = None
+
+class SubmissionDocument(BaseModel):
+    """Submission document following Design.md schema"""
+    id: str  # Same as submissionId
+    submissionId: str  # Partition key
+    userId: str
+    submittedAt: datetime
+    documents: List[DocumentInfo]
+```
+
+#### Storage Operations (`storage.py`)
+- **CosmosDBStorage**: Async storage operations class
+- **store_submission()**: Creates submission documents from Service Bus messages
+- **get_submission()**: Retrieves submissions by ID
+- **Proper Authentication**: Uses DefaultAzureCredential for RBAC
+
+#### Service Integration (`main.py`)
+- **Integrated Storage**: Storage initialization in message processing loop
+- **Message Processing**: Store submissions immediately upon message receipt
+- **Error Handling**: Proper message acknowledgment/abandonment based on storage success
+- **Resource Cleanup**: Ensures Cosmos DB client is properly closed
+
+### Configuration Updates
+- **Environment Variables**: Added Cosmos DB endpoint and container configuration
+- **Dependencies**: Added azure-cosmos>=4.8.0 for async Cosmos DB operations
+- **Config Model**: Extended CosmosDBConfig with container name configuration
+
+### Status
+- ✅ Submission document storage implemented
+- ✅ Schema compliance with Design.md
+- ✅ Async operations with proper error handling
+- ⏳ Event emission (next phase)
+- ⏳ Document processing pipeline integration
+
+The service now successfully stores initial submission documents in Cosmos DB using the exact schema defined in the architecture design, providing the foundation for the event sourcing workflow.

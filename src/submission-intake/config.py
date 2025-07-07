@@ -36,6 +36,34 @@ class ServiceBusConfig(BaseModel):
     )
 
 
+class CosmosDBConfig(BaseModel):
+    """Configuration for Azure Cosmos DB connection."""
+    
+    endpoint: str = Field(
+        ...,
+        description="Cosmos DB account endpoint URL",
+        example="https://cosmos-email-dev-vwyh.documents.azure.com:443/"
+    )
+    
+    database_name: str = Field(
+        ...,
+        description="Cosmos DB database name",
+        example="email-processing"
+    )
+    
+    submissions_container_name: str = Field(
+        ...,
+        description="Cosmos DB submissions container name",
+        example="submissions"
+    )
+    
+    events_container_name: str = Field(
+        ...,
+        description="Cosmos DB events container name",
+        example="events"
+    )
+
+
 class LoggingConfig(BaseModel):
     """Configuration for application logging."""
     
@@ -68,6 +96,7 @@ class AppConfig(BaseModel):
     """Main application configuration."""
     
     service_bus: ServiceBusConfig
+    cosmos_db: CosmosDBConfig
     logging: LoggingConfig
     
     @classmethod
@@ -96,6 +125,19 @@ class AppConfig(BaseModel):
                 "and AZURE_SERVICE_BUS_SUBSCRIPTION_NAME environment variables."
             )
         
+        # Extract Cosmos DB configuration
+        cosmos_db_endpoint = os.getenv('AZURE_COSMOS_DB_ENDPOINT')
+        database_name = os.getenv('AZURE_COSMOS_DB_DATABASE_NAME')
+        submissions_container_name = os.getenv('AZURE_COSMOS_DB_SUBMISSIONS_CONTAINER_NAME')
+        events_container_name = os.getenv('AZURE_COSMOS_DB_EVENTS_CONTAINER_NAME')
+        
+        if not all([cosmos_db_endpoint, database_name, submissions_container_name, events_container_name]):
+            raise ValueError(
+                "Missing required Cosmos DB configuration. "
+                "Check AZURE_COSMOS_DB_ENDPOINT, AZURE_COSMOS_DB_DATABASE_NAME, "
+                "AZURE_COSMOS_DB_SUBMISSIONS_CONTAINER_NAME, and AZURE_COSMOS_DB_EVENTS_CONTAINER_NAME environment variables."
+            )
+        
         # Extract logging configuration
         log_level = os.getenv('LOG_LEVEL', 'INFO')
         
@@ -104,6 +146,12 @@ class AppConfig(BaseModel):
                 fqdn=service_bus_fqdn,
                 topic_name=topic_name,
                 subscription_name=subscription_name
+            ),
+            cosmos_db=CosmosDBConfig(
+                endpoint=cosmos_db_endpoint,
+                database_name=database_name,
+                submissions_container_name=submissions_container_name,
+                events_container_name=events_container_name
             ),
             logging=LoggingConfig(
                 level=log_level
