@@ -43,9 +43,64 @@ Service Bus Message → Submission Record Creation → Event Emission
 ```
 
 ## Technology Stack
-- **Framework**: FastAPI for REST endpoints and health checks
-- **Event Store**: Cosmos DB with Change Feed
+- **Runtime**: Python 3.12+ with async/await
+- **Message Processing**: Azure Service Bus with async client
 - **Authentication**: DefaultAzureCredential with Managed Identity
+- **Data Validation**: Pydantic models
+- **Logging**: Python logging with structured format
+
+## Development Setup
+
+### Prerequisites
+- Python 3.12+
+- Azure CLI logged in (`az login`)
+- Access to Azure Service Bus namespace
+
+### Local Development
+1. **Install dependencies**:
+   ```bash
+   cd src/submission-intake
+   pip install -e .
+   ```
+
+2. **Configure environment**:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your Azure Service Bus configuration
+   ```
+
+3. **Deploy infrastructure** (if not already deployed):
+   ```bash
+   cd infra
+   terraform plan
+   terraform apply
+   ```
+
+4. **Run the service**:
+   ```bash
+   python main.py
+   ```
+
+### Environment Variables
+- `AZURE_SERVICE_BUS_FQDN`: Service Bus namespace FQDN
+- `AZURE_SERVICE_BUS_TOPIC_NAME`: Topic name for submissions
+- `AZURE_SERVICE_BUS_SUBSCRIPTION_NAME`: Subscription name for this service
+- `LOG_LEVEL`: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+
+### Testing
+The service will log received messages and acknowledge them automatically. Monitor logs to verify message processing:
+
+```bash
+# Run with debug logging
+LOG_LEVEL=DEBUG python main.py
+```
+
+## Service Behavior
+- **Message Reception**: Receives messages from Service Bus topic
+- **Validation**: Validates message format using Pydantic models
+- **Logging**: Logs submission details and processing status
+- **Acknowledgment**: Acknowledges successful processing to prevent redelivery
+- **Error Handling**: Abandons messages on processing errors for redelivery
 - **Port**: 8001 (for local development)
 
 ## Key Features

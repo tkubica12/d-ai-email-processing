@@ -414,3 +414,113 @@ Renamed Service Bus topic from `email-events` to `new-submissions` to better ref
 - No data migration required as this is a naming change only
 
 ---
+
+## Phase 2: Submission Intake Service Implementation (2025-07-07)
+
+### Service Overview
+Implemented the submission-intake service as an async Service Bus worker that processes incoming submission messages from the client-web application.
+
+### Technical Decisions
+1. **Worker Pattern**: Designed as a background worker, not an API service
+2. **Async Processing**: Full async/await pattern for Service Bus operations
+3. **Message Acknowledgment**: Explicit acknowledgment after processing to prevent redelivery
+4. **Shared Models**: Imports SubmissionMessage model from client-web to maintain consistency
+5. **Structured Logging**: Comprehensive logging with Azure SDK noise reduction
+
+### Architecture Components
+
+#### Service Bus Integration
+- **Topic**: `new-submissions` from client-web application
+- **Subscription**: `submission-intake` for this service
+- **Client**: Azure Service Bus async client with DefaultAzureCredential
+- **Message Flow**: Receive → Validate → Log → Acknowledge
+
+#### Error Handling Strategy
+- **Validation Errors**: Log and abandon message for redelivery
+- **Processing Errors**: Log error details and abandon message
+- **Critical Errors**: Surface to main loop for service restart
+
+#### Dependencies
+```toml
+dependencies = [
+    "azure-identity>=1.23.0",
+    "azure-servicebus>=7.12.0", 
+    "pydantic>=2.10.0",
+    "python-dotenv>=1.1.1",
+]
+```
+
+### Implementation Details
+
+#### Key Features
+- **Infinite Loop**: Continuous message processing with async iteration
+- **Message Validation**: Pydantic model validation of Service Bus message content
+- **Logging Configuration**: Structured logging with Azure SDK INFO→DEBUG remapping
+- **Environment Configuration**: Secure configuration via environment variables
+
+#### File Structure
+- `main.py`: Core worker implementation with async Service Bus processing
+- `models.py`: Model imports from client-web for consistency
+- `.env.example`: Template for environment configuration
+- `pyproject.toml`: Dependencies for worker service (no FastAPI)
+
+#### Development Workflow
+1. Configure `.env` file with Service Bus connection details
+2. Authenticate with `az login` for DefaultAzureCredential
+3. Install dependencies: `pip install -e .`
+4. Run worker: `python main.py`
+5. Monitor logs for message processing status
+
+### Current State
+- ✅ Service Bus message reception and acknowledgment
+- ✅ Message validation using shared Pydantic models
+- ✅ Structured logging with appropriate levels
+- ✅ Error handling with message abandonment for redelivery
+- ⏳ **Next**: Event sourcing implementation (Cosmos DB event store)
+- ⏳ **Next**: Submission record creation and event emission
+
+### Configuration Requirements
+```env
+AZURE_SERVICE_BUS_FQDN=your-servicebus.servicebus.windows.net
+AZURE_SERVICE_BUS_TOPIC_NAME=new-submissions
+AZURE_SERVICE_BUS_SUBSCRIPTION_NAME=submission-intake
+LOG_LEVEL=INFO
+```
+
+---
+
+## Phase 2: Infrastructure Updates and Configuration Refactoring (2025-07-07)
+
+### Infrastructure Updates
+- **Service Bus Subscription**: Added Terraform configuration for `submission-intake` subscription
+  - Max delivery count: 10 attempts before dead lettering
+  - Dead lettering enabled for expired and filter evaluation errors
+  - 14-day message TTL matching topic configuration
+
+### Code Refactoring
+- **Configuration Management**: Extracted configuration into dedicated `config.py` module
+  - `AppConfig`: Main configuration class with validation
+  - `ServiceBusConfig`: Service Bus connection settings
+  - `LoggingConfig`: Structured logging configuration
+  - Environment variable validation with clear error messages
+
+- **Logging Setup**: Moved logging configuration to separate module
+  - Centralized logging setup with Pydantic validation
+  - Azure SDK noise reduction (INFO→WARNING level mapping)
+  - Configurable log levels and formats
+
+### File Structure Updates
+- `config.py`: New configuration management module
+- `main.py`: Refactored to use configuration classes
+- `service_bus.tf`: Added subscription resource
+
+### Terraform Infrastructure
+```hcl
+resource "azurerm_servicebus_subscription" "submission_intake" {
+  name                = "submission-intake"
+  topic_id            = azurerm_servicebus_topic.new_submissions.id
+  max_delivery_count  = 10
+  dead_lettering_on_message_expiration = true
+  dead_lettering_on_filter_evaluation_error = true
+}
+```

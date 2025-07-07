@@ -19,3 +19,17 @@ resource "azurerm_servicebus_topic" "new_submissions" {
   # Enable partitioning for better performance
   partitioning_enabled = true
 }
+
+# Service Bus Subscription for submission-intake service
+resource "azurerm_servicebus_subscription" "submission_intake" {
+  name                = "submission-intake"
+  topic_id            = azurerm_servicebus_topic.new_submissions.id
+  
+  # Configure subscription settings
+  max_delivery_count  = 10
+  default_message_ttl = "P14D"  # 14 days
+  
+  # Enable dead lettering for expired messages
+  dead_lettering_on_message_expiration = true
+  dead_lettering_on_filter_evaluation_error = true
+}

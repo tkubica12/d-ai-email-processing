@@ -35,6 +35,11 @@ output "service_bus_topic_name" {
   value       = azurerm_servicebus_topic.new_submissions.name
 }
 
+output "service_bus_subscription_name" {
+  description = "The name of the Service Bus subscription for submission-intake service"
+  value       = azurerm_servicebus_subscription.submission_intake.name
+}
+
 # Additional outputs for client application
 output "storage_account_blob_endpoint" {
   description = "The blob endpoint URL for the storage account"
