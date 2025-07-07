@@ -281,6 +281,46 @@ def get_styles():
             background-color: #ccc;
             cursor: not-allowed;
         }
+        
+        /* Animated progress indicators */
+        .progress-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+        
+        .progress-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            animation: spin 2s linear infinite;
+        }
+        
+        .progress-message.animated {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        
+        .progress-dots {
+            display: inline-block;
+            animation: dots 1.5s infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        @keyframes dots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
     """)
 
 @rt("/")
@@ -347,11 +387,19 @@ async def post(request):
                 Div(
                     H2("Processing Your Submission"),
                     Div(
-                        Div("This may take a few moments...", cls="progress-step"),
+                        Div("⚙️", cls="progress-icon"),
+                        Div("Processing your request", cls="progress-message animated"),
+                        Div("This may take a few moments", cls="progress-step"),
+                        Div(
+                            "Please wait",
+                            Span(cls="progress-dots"),
+                            cls="progress-step"
+                        ),
                         hx_trigger="load delay:100ms",
                         hx_get=f"/start/{submission_id}",
                         hx_target="this",
                         hx_swap="outerHTML",
+                        cls="progress-container",
                         id="progress-container"
                     ),
                     cls="container"
@@ -444,7 +492,7 @@ async def process_submission_azure(submission_id: str, email: str, message: str,
         
         # Send message to Service Bus
         logger.info(f"Preparing Service Bus message for submission {submission_id}")
-        topic_name = os.getenv("AZURE_SERVICE_BUS_TOPIC_NAME", "email-events")
+        topic_name = os.getenv("AZURE_SERVICE_BUS_TOPIC_NAME", "new-submissions")
         
         with service_bus_client:
             sender = service_bus_client.get_topic_sender(topic_name=topic_name)
@@ -532,14 +580,21 @@ def check_completion(submission_id: str):
             A("Try Again", href="/", cls="submit-btn", style="display: inline-block; text-decoration: none; margin-top: 10px;")
         )
     else:
-        # Still processing - show same message
+        # Still processing - show animated progress
         return Div(
-            Div("Processing your submission...", cls="progress-message"),
-            Div("This may take a few moments...", cls="progress-step"),
+            Div("⚙️", cls="progress-icon"),
+            Div("Processing your request", cls="progress-message animated"),
+            Div("This may take a few moments", cls="progress-step"),
+            Div(
+                "Please wait",
+                Span(cls="progress-dots"),
+                cls="progress-step"
+            ),
             hx_trigger="every 1s",
             hx_get=f"/check/{submission_id}",
             hx_target="this",
-            hx_swap="outerHTML"
+            hx_swap="outerHTML",
+            cls="progress-container"
         )
 
 @rt("/result/{submission_id}")
@@ -592,14 +647,21 @@ async def start_processing(submission_id: str):
     # Start background processing
     asyncio.create_task(process_submission_background(submission_id, email, message, attachments))
     
-    # Return polling div
+    # Return polling div with animated progress
     return Div(
-        Div("Processing your submission...", cls="progress-message"),
-        Div("This may take a few moments...", cls="progress-step"),
+        Div("⚙️", cls="progress-icon"),
+        Div("Processing your request", cls="progress-message animated"),
+        Div("This may take a few moments", cls="progress-step"),
+        Div(
+            "Please wait",
+            Span(cls="progress-dots"),
+            cls="progress-step"
+        ),
         hx_trigger="every 1s",
         hx_get=f"/check/{submission_id}",
         hx_target="this",
-        hx_swap="outerHTML"
+        hx_swap="outerHTML",
+        cls="progress-container"
     )
 
 def main():
