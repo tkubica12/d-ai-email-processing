@@ -84,12 +84,14 @@ This approach uses event-driven architecture with event sourcing patterns to imp
 **Document Store:** Cosmos DB container for processed document results
 - Container: `documents` 
 - Partition Key: `documentUrl` (unique identifier)
-- Document ID: `documentUrl`
+- Document ID: Generated GUID for each document record
 - Schema:
   ```json
   {
-    "id": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
+    "id": "550e8400-e29b-41d4-a716-446655440000",
     "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
+    "submissionId": "submission-guid",
+    "userId": "user@example.com",
     "content": "# Document Title\n\nFull markdown content extracted from document using Azure Document Intelligence...",
     "type": "invoice",
     "summary": "AI-generated summary of document content...",
@@ -100,13 +102,8 @@ This approach uses event-driven architecture with event sourcing patterns to imp
       "dueDate": "2025-08-07",
       "vendor": "Acme Corp"
     },
-    "metadata": {
-      "processingTimestamp": "2025-07-07T10:05:00Z",
-      "documentLength": 15000,
-      "language": "en",
-      "confidence": 0.95,
-      "indexed": true
-    }
+    "firstProcessedAt": "2025-07-07T10:00:00Z",
+    "lastProcessedAt": "2025-07-07T10:05:00Z",
   }
   ```
 

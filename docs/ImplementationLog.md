@@ -795,3 +795,254 @@ Updated the document processing pipeline to use Azure Document Intelligence and 
    - LLM extracts structured data based on document type
 3. Aggregator waits for all parallel processes to complete
 4. Submission analyzer evaluates complete submission with all processed documents
+
+---
+
+## Phase 5: Document Store Schema Enhancement (2025-07-08)
+
+### Added Submission Context to Document Records
+
+#### Schema Update Rationale
+Enhanced the document record schema to include submission and user context for better traceability and query capabilities:
+
+**Updated Document Record Schema**
+```python
+class DocumentRecord(BaseModel):
+    id: str  # Same as documentUrl for Cosmos DB
+    documentUrl: str  # Partition key for documents container
+    submissionId: str  # NEW: Link to parent submission
+    userId: str  # NEW: User who submitted the document
+    content: Optional[str] = None  # Null until processed
+    type: Optional[str] = None  # Null until classified
+    summary: Optional[str] = None  # Null until analyzed
+    extractedData: Optional[Dict[str, Any]] = None  # Null until processed
+    firstProcessedAt: datetime  # Set at creation time
+    lastProcessedAt: datetime  # Updated each processing step
+```
+
+#### Benefits of Enhanced Schema
+1. **Improved Traceability**: Direct links between documents and their originating submissions
+2. **User Context**: Enables user-specific queries and analytics across documents
+3. **Cross-Container Queries**: Facilitates joins between documents and submissions containers
+4. **Security & Auditing**: Clear ownership and submission context for compliance
+5. **Processing Context**: Downstream services can access submission metadata without additional lookups
+
+#### Implementation Changes
+
+**1. Model Updates**
+- Enhanced `DocumentRecord` with required `submissionId` and `userId` fields
+- Updated docstrings and examples to reflect new schema
+- Maintained backward compatibility for optional processing fields
+
+**2. Storage Logic Updates**
+- Modified `create_document_records()` to populate submission context from `SubmissionMessage`
+- Ensured consistent data population across all document records in a submission
+
+**3. Documentation Updates**
+- Updated Design.md schema documentation
+- Enhanced submission-intake README.md with complete document record example
+- Added schema examples showing the relationship between submissions and documents
+
+#### Data Flow Enhancement
+```
+Service Bus Message → Submission Record Creation → Document Records Creation
+                                                      ↓
+                                          Each document gets:
+                                          - documentUrl (partition key)
+                                          - submissionId (parent reference)
+                                          - userId (owner reference)
+                                          - Processing fields (null initially)
+```
+
+### Technical Decisions
+- **Required Fields**: Made `submissionId` and `userId` required rather than optional for data integrity
+- **Consistent Population**: Both fields populated at document creation time, not during processing
+- **Partition Key Unchanged**: Kept `documentUrl` as partition key for optimal document-centric queries
+- **Cross-Reference Design**: Enables efficient queries by submission, user, or document while maintaining container separation
+
+---
+
+## Phase 6: Cosmos DB Document ID Encoding Fix (2025-07-08)
+
+### Critical Fix: Document URL Encoding for Cosmos DB IDs
+
+#### Issue Discovery
+Discovered that forward slashes (`/`) are illegal characters in Cosmos DB document IDs. Since we were using document URLs directly as document IDs, this caused creation failures.
+
+**Error Symptoms**:
+```
+azure.core.exceptions.HttpResponseError: (BadRequest) Invalid characters in document id
+```
+
+#### Root Cause Analysis
+- Cosmos DB document IDs have strict character restrictions
+- Document URLs contain forward slashes (e.g., `https://storage.blob.core.windows.net/...`)
+- Using URLs directly as document IDs violates Cosmos DB requirements
+
+#### Solution Implementation
+
+**1. URL Encoding for Document IDs**
+```python
+import urllib.parse
+
+# URL encode the document URL for use as Cosmos DB document ID
+encoded_document_id = urllib.parse.quote(document_url, safe='')
+
+doc_record = DocumentRecord(
+    id=encoded_document_id,  # URL-encoded ID
+    documentUrl=document_url,  # Original URL as partition key
+    # ...other fields
+)
+```
+
+**2. Updated Schema Documentation**
+- Design.md: Updated to show URL-encoded document IDs in schema examples
+- Models: Updated DocumentRecord docstrings to clarify ID encoding
+- README: Added note about URL encoding requirement
+
+**3. Added Retrieval Method**
+Created `get_document_record()` method that properly encodes URLs when retrieving documents by URL.
+
+#### Architecture Impact
+
+**Document Container Schema**:
+```json
+{
+  "id": "https%3A//storage.blob.core.windows.net/submission-guid/document1.pdf",
+  "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
+  "submissionId": "submission-guid",
+  "userId": "user@example.com"
+}
+```
+
+**Key Design Decisions**:
+- **ID Field**: URL-encoded version for Cosmos DB compatibility
+- **Partition Key**: Original URL (unencoded) for intuitive queries
+- **Retrieval**: Helper method abstracts encoding logic from consumers
+
+#### Prevention Measures
+- Added comprehensive documentation in CommonErrors.md
+- Updated all schema examples to show encoded IDs
+- Created helper methods that abstract encoding complexity
+
+### Technical Debt Addressed
+This fix resolves a fundamental data storage issue that would have affected all downstream document processing services. The URL encoding approach maintains data integrity while ensuring Cosmos DB compatibility.
+
+### Next Steps
+- Downstream services (docproc-*) will need similar document querying patterns
+- Consider creating shared utility functions for consistent document operations across services
+
+---
+
+## Phase 7: Document Store Schema Simplification - GUID IDs (2025-07-08)
+
+### Architectural Decision: Generated GUID Document IDs
+
+Replaced URL-encoded document IDs with generated GUIDs for cleaner architecture and better separation of concerns.
+
+#### Implementation Changes
+```python
+# Generate GUID for document ID
+document_id = str(uuid.uuid4())
+
+doc_record = DocumentRecord(
+    id=document_id,                    # Clean GUID
+    documentUrl=document_url,          # Original URL as partition key
+    submissionId=submission_message.submissionId,
+    userId=submission_message.userId,
+)
+```
+
+#### Benefits
+- **Simplicity**: No URL encoding complexity
+- **Clean Separation**: ID and documentUrl serve distinct purposes  
+- **Future-Proof**: IDs remain stable regardless of URL changes
+- **Query Efficiency**: documentUrl as partition key enables efficient queries
+
+#### Schema Updates
+- Updated all documentation to show GUID IDs
+- Modified `get_document_record()` to query by documentUrl
+- Removed urllib.parse dependency
+- Updated CommonErrors.md to show GUID approach as preferred solution
+
+**Status**: Document store now uses clean GUID architecture with optimal query performance through partition key strategy.
+
+---
+
+## Phase 7: Document Store Schema Simplification - GUID IDs (2025-07-08)
+
+### Architectural Decision: Generated GUID Document IDs
+
+#### Design Change Rationale
+Replaced URL-encoded document IDs with generated GUIDs for cleaner architecture and better separation of concerns.
+
+**Previous Approach**: URL-encoded document URLs as document IDs
+```json
+{
+  "id": "https%3A//storage.blob.core.windows.net/submission-guid/document1.pdf",
+  "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf"
+}
+```
+
+**New Approach**: Generated GUID IDs with documentUrl as partition key
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf"
+}
+```
+
+#### Benefits of GUID Approach
+
+1. **Simplicity**: No URL encoding complexity
+2. **Clean Separation**: ID and documentUrl serve distinct purposes
+3. **Future-Proof**: IDs remain stable regardless of URL changes
+4. **Query Efficiency**: documentUrl as partition key enables efficient queries
+5. **Debugging**: Clean, readable GUIDs in logs and debugging tools
+
+#### Implementation Changes
+
+**1. Document Creation**
+```python
+# Generate GUID for document ID
+document_id = str(uuid.uuid4())
+
+doc_record = DocumentRecord(
+    id=document_id,                    # Clean GUID
+    documentUrl=document_url,          # Original URL as partition key
+    submissionId=submission_message.submissionId,
+    userId=submission_message.userId,
+    # ...other fields
+)
+```
+
+**2. Document Retrieval**
+Updated `get_document_record()` to query by `documentUrl` instead of using direct ID lookup:
+```python
+query = "SELECT * FROM c WHERE c.documentUrl = @documentUrl"
+```
+
+**3. Removed Dependencies**
+- Removed `urllib.parse` import (no longer needed)
+- Simplified document creation logic
+- Cleaner code without encoding/decoding complexity
+
+#### Schema Updates
+- **Design.md**: Updated document store schema with GUID examples
+- **Models**: Updated DocumentRecord with GUID description and examples
+- **README**: Updated schema examples to show GUID structure
+- **CommonErrors.md**: Updated to show GUID approach as preferred solution
+
+#### Query Patterns
+With this approach, documents can be efficiently queried by:
+- **By URL**: Using partition key for O(1) lookup
+- **By Submission**: Cross-partition query on submissionId
+- **By User**: Cross-partition query on userId
+- **By ID**: Direct document lookup when GUID is known
+
+### Technical Decision Impact
+This change improves code maintainability and removes the complexity of URL encoding while maintaining all required query capabilities. The partition key strategy ensures optimal performance for the most common query pattern (by document URL).
+
+### Next Steps
+- Update downstream services to use the new GUID-based approach
+- Consider adding indexes for efficient cross-partition queries if needed

@@ -67,9 +67,30 @@ Following the Design.md specification:
       "processed": null,
       "type": null
     }
-  ]
+  ],
+  "evaluationResults": null
 }
 ```
+
+### Document Record Schema
+Individual document records created in the documents container:
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
+  "submissionId": "submission-guid",
+  "userId": "user@example.com",
+  "content": null,
+  "type": null,
+  "summary": null,
+  "extractedData": null,
+  "firstProcessedAt": "2025-07-07T10:00:00Z",
+  "lastProcessedAt": "2025-07-07T10:00:00Z"
+}
+```
+
+**Note**: The `id` field is a generated GUID for each document record, while `documentUrl` serves as the partition key for efficient queries.
 
 ### Processing Flow
 1. **Message Reception**: Service Bus message with submission details

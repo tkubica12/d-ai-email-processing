@@ -51,13 +51,7 @@ resource "azurerm_cosmosdb_sql_container" "documents" {
   resource_group_name = azurerm_resource_group.main.name
   account_name        = azurerm_cosmosdb_account.main.name
   database_name       = azurerm_cosmosdb_sql_database.main.name
-  
-  partition_key_paths = ["/documentUrl"]
-
-  # Unique key constraint on document URL (also used as ID)
-  unique_key {
-    paths = ["/documentUrl"]
-  }
+  partition_key_paths = ["/submissionId"]
 }
 
 # Submissions container for submission records
@@ -66,13 +60,7 @@ resource "azurerm_cosmosdb_sql_container" "submissions" {
   resource_group_name = azurerm_resource_group.main.name
   account_name        = azurerm_cosmosdb_account.main.name
   database_name       = azurerm_cosmosdb_sql_database.main.name
-  
-  partition_key_paths = ["/submissionId"]
-
-  # Unique key constraint on submission ID
-  unique_key {
-    paths = ["/submissionId"]
-  }
+  partition_key_paths = ["/userId"]
 }
 
 # Generate UUIDs for role assignments to ensure uniqueness

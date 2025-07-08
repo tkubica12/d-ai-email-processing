@@ -6,7 +6,7 @@ in the email processing system.
 """
 
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime
 
@@ -20,7 +20,7 @@ class DocumentInfo(BaseModel):
     
     Attributes:
         documentUrl: Azure Blob Storage URL for the document
-        processed: Timestamp when document processing completed (null if not processed)
+        processed: Boolean indicating if document processing completed
         type: Document type detected during processing (null until processed)
     """
     
@@ -30,16 +30,141 @@ class DocumentInfo(BaseModel):
         example="https://storage.blob.core.windows.net/submission-guid/document1.pdf"
     )
     
-    processed: Optional[datetime] = Field(
+    processed: Optional[bool] = Field(
         None,
-        description="ISO 8601 timestamp when document processing completed",
-        example="2025-07-07T10:30:00Z"
+        description="Boolean indicating if document processing completed",
+        example=True
     )
     
     type: Optional[str] = Field(
         None,
         description="Document type detected during processing",
-        example="application_form"
+        example="invoice"
+    )
+
+
+class EvaluationResults(BaseModel):
+    """
+    Evaluation results for a submission.
+    
+    Attributes:
+        completeness: Completeness score (0.0-1.0)
+        recommendations: List of recommendations for the submission
+        issues: List of identified issues
+        analysisTimestamp: ISO 8601 timestamp when analysis was completed
+    """
+    
+    completeness: float = Field(
+        ...,
+        description="Completeness score between 0.0 and 1.0",
+        ge=0.0,
+        le=1.0,
+        example=0.85
+    )
+    
+    recommendations: List[str] = Field(
+        default_factory=list,
+        description="List of recommendations for the submission",
+        example=["Request additional documentation for item X"]
+    )
+    
+    issues: List[str] = Field(
+        default_factory=list,
+        description="List of identified issues",
+        example=[]
+    )
+    
+    analysisTimestamp: datetime = Field(
+        ...,
+        description="ISO 8601 timestamp when analysis was completed",
+        example="2025-07-07T10:15:00Z"
+    )
+
+
+class DocumentRecord(BaseModel):
+    """
+    Document record as stored in the documents container (Design.md schema).
+    
+    This represents how individual documents are stored in the Cosmos DB
+    documents container for processing and retrieval.
+    
+    Attributes:
+        id: Document ID (generated GUID for each document record)
+        documentUrl: Azure Blob Storage URL for the document (partition key)
+        submissionId: Unique identifier for the parent submission
+        userId: Email address of the user who submitted the document
+        content: Full markdown content extracted from document (null initially)
+        type: Document type detected during processing (null initially)
+        summary: AI-generated summary of document content (null initially)
+        extractedData: Structured data extracted from document (null initially)
+        firstProcessedAt: ISO 8601 timestamp when document was first processed
+        lastProcessedAt: ISO 8601 timestamp when document was last processed
+    """
+    
+    id: str = Field(
+        ...,
+        description="Document ID (generated GUID)",
+        example="550e8400-e29b-41d4-a716-446655440000"
+    )
+    
+    documentUrl: str = Field(
+        ...,
+        description="Azure Blob Storage URL for the document",
+        example="https://storage.blob.core.windows.net/submission-guid/document1.pdf"
+    )
+    
+    submissionId: str = Field(
+        ...,
+        description="Unique identifier for the parent submission",
+        example="submission-guid"
+    )
+    
+    userId: str = Field(
+        ...,
+        description="Email address of the user who submitted the document",
+        example="user@example.com"
+    )
+    
+    content: Optional[str] = Field(
+        None,
+        description="Full markdown content extracted from document",
+        example="# Document Title\n\nFull markdown content..."
+    )
+    
+    type: Optional[str] = Field(
+        None,
+        description="Document type detected during processing",
+        example="invoice"
+    )
+    
+    summary: Optional[str] = Field(
+        None,
+        description="AI-generated summary of document content",
+        example="AI-generated summary of document content..."
+    )
+    
+    extractedData: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Structured data extracted from document",
+        example={
+            "invoiceNumber": "INV-2025-001",
+            "amount": 1250.00,
+            "currency": "USD",
+            "dueDate": "2025-08-07",
+            "vendor": "Acme Corp"
+        }
+    )
+    
+    firstProcessedAt: datetime = Field(
+        ...,
+        description="ISO 8601 timestamp when document was first processed",
+        example="2025-07-07T10:00:00Z"
+    )
+    
+    lastProcessedAt: datetime = Field(
+        ...,
+        description="ISO 8601 timestamp when document was last processed",
+        example="2025-07-07T10:05:00Z"
     )
 
 
@@ -56,58 +181,42 @@ class SubmissionDocument(BaseModel):
         userId: Email address of the user who submitted
         submittedAt: ISO 8601 timestamp when the submission was created
         documents: List of document URLs with processing status
+        evaluationResults: Results of submission evaluation (null until evaluated)
     """
     
     id: str = Field(
         ...,
-        description="Document ID for Cosmos DB (same as submissionId)",
+        description="Document ID (same as submissionId)",
         example="submission-guid"
     )
     
     submissionId: str = Field(
         ...,
-        description="Unique GUID identifier for the submission (partition key)",
+        description="Unique identifier for the submission",
         example="submission-guid"
     )
     
     userId: str = Field(
         ...,
-        description="Email address of the user submitting the request",
+        description="Email address of the user who submitted",
         example="user@example.com"
     )
     
     submittedAt: datetime = Field(
         ...,
-        description="ISO 8601 timestamp when the submission was created"
+        description="ISO 8601 timestamp when the submission was created",
+        example="2025-07-07T10:00:00Z"
     )
     
     documents: List[DocumentInfo] = Field(
         default_factory=list,
-        description="List of documents in this submission with processing status"
+        description="List of document URLs with processing status"
     )
     
-    class Config:
-        """Pydantic configuration for the model."""
-        json_schema_extra = {
-            "example": {
-                "id": "submission-guid",
-                "submissionId": "submission-guid",
-                "userId": "user@example.com",
-                "submittedAt": "2025-07-07T10:00:00Z",
-                "documents": [
-                    {
-                        "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
-                        "processed": None,
-                        "type": None
-                    },
-                    {
-                        "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document2.docx",
-                        "processed": None,
-                        "type": None
-                    }
-                ]
-            }
-        }
+    evaluationResults: Optional[EvaluationResults] = Field(
+        None,
+        description="Results of submission evaluation (null until evaluated)"
+    )
 
 
 class SubmissionMessage(BaseModel):

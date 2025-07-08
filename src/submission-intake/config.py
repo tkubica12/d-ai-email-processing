@@ -62,6 +62,12 @@ class CosmosDBConfig(BaseModel):
         description="Cosmos DB events container name",
         example="events"
     )
+    
+    documents_container_name: str = Field(
+        ...,
+        description="Cosmos DB documents container name",
+        example="documents"
+    )
 
 
 class LoggingConfig(BaseModel):
@@ -130,12 +136,14 @@ class AppConfig(BaseModel):
         database_name = os.getenv('AZURE_COSMOS_DB_DATABASE_NAME')
         submissions_container_name = os.getenv('AZURE_COSMOS_DB_SUBMISSIONS_CONTAINER_NAME')
         events_container_name = os.getenv('AZURE_COSMOS_DB_EVENTS_CONTAINER_NAME')
+        documents_container_name = os.getenv('AZURE_COSMOS_DB_DOCUMENTS_CONTAINER_NAME')
         
-        if not all([cosmos_db_endpoint, database_name, submissions_container_name, events_container_name]):
+        if not all([cosmos_db_endpoint, database_name, submissions_container_name, events_container_name, documents_container_name]):
             raise ValueError(
                 "Missing required Cosmos DB configuration. "
                 "Check AZURE_COSMOS_DB_ENDPOINT, AZURE_COSMOS_DB_DATABASE_NAME, "
-                "AZURE_COSMOS_DB_SUBMISSIONS_CONTAINER_NAME, and AZURE_COSMOS_DB_EVENTS_CONTAINER_NAME environment variables."
+                "AZURE_COSMOS_DB_SUBMISSIONS_CONTAINER_NAME, AZURE_COSMOS_DB_EVENTS_CONTAINER_NAME, "
+                "and AZURE_COSMOS_DB_DOCUMENTS_CONTAINER_NAME environment variables."
             )
         
         # Extract logging configuration
@@ -151,7 +159,8 @@ class AppConfig(BaseModel):
                 endpoint=cosmos_db_endpoint,
                 database_name=database_name,
                 submissions_container_name=submissions_container_name,
-                events_container_name=events_container_name
+                events_container_name=events_container_name,
+                documents_container_name=documents_container_name
             ),
             logging=LoggingConfig(
                 level=log_level

@@ -19,6 +19,7 @@ from config import CosmosDBConfig
 from models import (
     SubmissionDocument, 
     DocumentInfo, 
+    DocumentRecord,
     SubmissionMessage,
     SubmissionCreatedEvent,
     SubmissionCreatedData,
@@ -51,6 +52,7 @@ class CosmosDBStorage:
         self._database: Optional[DatabaseProxy] = None
         self._submissions_container: Optional[ContainerProxy] = None
         self._events_container: Optional[ContainerProxy] = None
+        self._documents_container: Optional[ContainerProxy] = None
         self._credential = DefaultAzureCredential()
         
     async def initialize(self) -> None:
@@ -80,6 +82,10 @@ class CosmosDBStorage:
             
             self._events_container = self._database.get_container_client(
                 container=self.config.events_container_name
+            )
+            
+            self._documents_container = self._database.get_container_client(
+                container=self.config.documents_container_name
             )
             
             logger.info(
@@ -125,14 +131,20 @@ class CosmosDBStorage:
             submissionId=submission_message.submissionId,
             userId=submission_message.userId,
             submittedAt=submission_message.submittedAt,
-            documents=documents
+            documents=documents,
+            evaluationResults=None
         )
         
         try:
-            # Store in Cosmos DB
+            # Store submission in Cosmos DB
+            submission_json = submission_doc.model_dump(mode='json')
+            logger.debug(f"COSMOS_DB_DOCUMENT: {submission_json}")
             await self._submissions_container.create_item(
-                body=submission_doc.model_dump(mode='json')
+                body=submission_json
             )
+            
+            # Create document records for each document
+            await self.create_document_records(submission_message)
             
             logger.info(
                 f"Stored submission document: {submission_doc.submissionId} "
@@ -170,8 +182,10 @@ class CosmosDBStorage:
         
         try:
             # Store event in Cosmos DB events container
+            event_json = event.model_dump(mode='json')
+            logger.debug(f"COSMOS_DB_DOCUMENT: {event_json}")
             await self._events_container.create_item(
-                body=event.model_dump(mode='json')
+                body=event_json
             )
             
             logger.info(f"Created {event_description}: {event.id} for submission: {event.submissionId}")
@@ -267,6 +281,76 @@ class CosmosDBStorage:
         
         return events
     
+    async def create_document_records(self, submission_message: SubmissionMessage) -> List[DocumentRecord]:
+        """
+        Create document records for each document in the submission.
+        
+        This method creates initial document records in the documents container
+        with only the basic information available at intake time. Processing
+        fields (content, type, summary, extractedData) are set to null.
+        
+        Args:
+            submission_message: The submission message containing document URLs
+            
+        Returns:
+            List[DocumentRecord]: List of created document records
+            
+        Raises:
+            CosmosHttpResponseError: If any storage operation fails
+        """
+        if not self._documents_container:
+            raise RuntimeError("Storage not initialized. Call initialize() first.")
+        
+        document_records = []
+        current_time = datetime.now()
+        
+        for document_url in submission_message.documentUrls:
+            # Create document record with minimal initial data
+            # Generate a GUID for the document ID
+            document_id = str(uuid.uuid4())
+            
+            doc_record = DocumentRecord(
+                id=document_id,
+                documentUrl=document_url,
+                submissionId=submission_message.submissionId,
+                userId=submission_message.userId,
+                content=None,
+                type=None,
+                summary=None,
+                extractedData=None,
+                firstProcessedAt=current_time,
+                lastProcessedAt=current_time
+            )
+            
+            try:
+                # Store document record in Cosmos DB
+                doc_record_json = doc_record.model_dump(mode='json')
+                logger.debug(f"COSMOS_DB_DOCUMENT: {doc_record_json}")
+                await self._documents_container.create_item(
+                    body=doc_record_json
+                )
+                
+                document_records.append(doc_record)
+                
+                logger.info(
+                    f"Created document record for URL: {document_url} "
+                    f"in submission: {submission_message.submissionId}"
+                )
+                
+            except CosmosHttpResponseError as e:
+                logger.error(
+                    f"Failed to create document record for URL {document_url} "
+                    f"in submission {submission_message.submissionId}: {e}"
+                )
+                raise
+        
+        logger.info(
+            f"Created {len(document_records)} document records "
+            f"for submission: {submission_message.submissionId}"
+        )
+        
+        return document_records
+    
     async def get_submission(self, submission_id: str) -> Optional[SubmissionDocument]:
         """
         Retrieve a submission document from Cosmos DB.
@@ -296,6 +380,44 @@ class CosmosDBStorage:
             return None
         except CosmosHttpResponseError as e:
             logger.error(f"Failed to retrieve submission {submission_id}: {e}")
+            raise
+    
+    async def get_document_record(self, document_url: str) -> Optional[DocumentRecord]:
+        """
+        Retrieve a document record from Cosmos DB by document URL.
+        
+        Args:
+            document_url: The Azure Blob Storage URL of the document
+            
+        Returns:
+            DocumentRecord: The retrieved document record, or None if not found
+            
+        Raises:
+            CosmosHttpResponseError: If the retrieval operation fails
+        """
+        if not self._documents_container:
+            raise RuntimeError("Storage not initialized. Call initialize() first.")
+        
+        try:
+            # Query for document by documentUrl (partition key)
+            query = "SELECT * FROM c WHERE c.documentUrl = @documentUrl"
+            parameters = [{"name": "@documentUrl", "value": document_url}]
+            
+            items = self._documents_container.query_items(
+                query=query,
+                parameters=parameters,
+                partition_key=document_url
+            )
+            
+            # Get the first (and should be only) result
+            async for item in items:
+                return DocumentRecord(**item)
+            
+            logger.warning(f"Document record not found: {document_url}")
+            return None
+            
+        except CosmosHttpResponseError as e:
+            logger.error(f"Failed to retrieve document record {document_url}: {e}")
             raise
     
     async def close(self) -> None:

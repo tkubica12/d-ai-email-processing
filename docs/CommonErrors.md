@@ -289,6 +289,48 @@ resource "azurerm_cosmosdb_sql_container" "events" {
 
 ---
 
+## Cosmos DB Document ID Issues
+
+### Error: Invalid characters in document ID
+**Description**: Cosmos DB rejects document creation with error about invalid characters in the document ID, even when the ID appears to be a valid string.
+
+**Symptoms**:
+```
+azure.core.exceptions.HttpResponseError: (BadRequest) Invalid characters in document id
+```
+
+**Root Cause**: Forward slashes (`/`) and other special characters are illegal in Cosmos DB document IDs. Using URLs directly as document IDs will fail because URLs contain forward slashes.
+
+**Solution**:
+```python
+import uuid
+
+# ❌ Wrong - URL contains illegal forward slashes
+doc_id = "https://storage.blob.core.windows.net/submission-guid/document1.pdf"
+
+# ✅ Correct - Use generated GUID as document ID
+doc_id = str(uuid.uuid4())
+
+# Store documentUrl as separate field for queries
+doc_record = DocumentRecord(
+    id=doc_id,
+    documentUrl=document_url,  # Original URL for partition key and queries
+    # ...other fields
+)
+
+# Alternative: URL encode if you need the URL as the ID
+doc_id = urllib.parse.quote(document_url, safe='')
+```
+
+**Prevention**: 
+- Use generated GUIDs for Cosmos DB document IDs when the original string contains special characters
+- Store the original string (URL, path, etc.) as a separate field for queries
+- If you must use the original string as ID, URL encode it with `urllib.parse.quote(string, safe='')`
+
+**Key Insight**: Cosmos DB document IDs have strict character restrictions. URLs, file paths, and other strings with special characters must be encoded before use as document IDs.
+
+---
+
 ## Troubleshooting Checklist
 
 When encountering issues, check in this order:
