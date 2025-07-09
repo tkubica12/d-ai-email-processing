@@ -20,3 +20,10 @@ resource "azurerm_role_assignment" "current_user_service_bus_receiver" {
   role_definition_name = "Azure Service Bus Data Receiver"
   principal_id         = data.azurerm_client_config.current.object_id
 }
+
+# Allow current user (for local development) to use Document Intelligence service
+resource "azurerm_role_assignment" "current_user_document_intelligence_user" {
+  scope                = azurerm_cognitive_account.document_intelligence.id
+  role_definition_name = "Cognitive Services User"
+  principal_id         = data.azurerm_client_config.current.object_id
+}

@@ -969,80 +969,27 @@ doc_record = DocumentRecord(
 
 ---
 
-## Phase 7: Document Store Schema Simplification - GUID IDs (2025-07-08)
+## Phase 2: Document Intelligence Integration (2025-07-09)
 
-### Architectural Decision: Generated GUID Document IDs
+### Infrastructure Enhancement
+- **Azure Document Intelligence**: Added using azurerm provider 
+- **RBAC Configuration**: Added "Cognitive Services User" role for current user
 
-#### Design Change Rationale
-Replaced URL-encoded document IDs with generated GUIDs for cleaner architecture and better separation of concerns.
+### Technical Decisions
+1. **azurerm Provider**: Used standard azurerm_cognitive_account resource (sufficient for FormRecognizer functionality)
+2. **FormRecognizer Kind**: Specified for Document Intelligence service type
+3. **S0 SKU**: Standard pricing tier for production workloads
+4. **Custom Subdomain**: Enables better service isolation and naming
 
-**Previous Approach**: URL-encoded document URLs as document IDs
-```json
-{
-  "id": "https%3A//storage.blob.core.windows.net/submission-guid/document1.pdf",
-  "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf"
-}
-```
+### Implementation Details
+- Created `document_intelligence.tf` with azurerm_cognitive_account resource
+- Updated `rbac.tf` with role assignment for current user access
+- Added terraform outputs for service endpoint, keys, and metadata
+- Standard azurerm provider provides all needed FormRecognizer capabilities
 
-**New Approach**: Generated GUID IDs with documentUrl as partition key
-```json
-{
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf"
-}
-```
+### Development Impact
+- Applications can now process documents using Azure AI Document Intelligence
+- RBAC-based access removes need for explicit key management in local development
+- Terraform outputs provide all necessary connection details for applications
 
-#### Benefits of GUID Approach
-
-1. **Simplicity**: No URL encoding complexity
-2. **Clean Separation**: ID and documentUrl serve distinct purposes
-3. **Future-Proof**: IDs remain stable regardless of URL changes
-4. **Query Efficiency**: documentUrl as partition key enables efficient queries
-5. **Debugging**: Clean, readable GUIDs in logs and debugging tools
-
-#### Implementation Changes
-
-**1. Document Creation**
-```python
-# Generate GUID for document ID
-document_id = str(uuid.uuid4())
-
-doc_record = DocumentRecord(
-    id=document_id,                    # Clean GUID
-    documentUrl=document_url,          # Original URL as partition key
-    submissionId=submission_message.submissionId,
-    userId=submission_message.userId,
-    # ...other fields
-)
-```
-
-**2. Document Retrieval**
-Updated `get_document_record()` to query by `documentUrl` instead of using direct ID lookup:
-```python
-query = "SELECT * FROM c WHERE c.documentUrl = @documentUrl"
-```
-
-**3. Removed Dependencies**
-- Removed `urllib.parse` import (no longer needed)
-- Simplified document creation logic
-- Cleaner code without encoding/decoding complexity
-
-#### Schema Updates
-- **Design.md**: Updated document store schema with GUID examples
-- **Models**: Updated DocumentRecord with GUID description and examples
-- **README**: Updated schema examples to show GUID structure
-- **CommonErrors.md**: Updated to show GUID approach as preferred solution
-
-#### Query Patterns
-With this approach, documents can be efficiently queried by:
-- **By URL**: Using partition key for O(1) lookup
-- **By Submission**: Cross-partition query on submissionId
-- **By User**: Cross-partition query on userId
-- **By ID**: Direct document lookup when GUID is known
-
-### Technical Decision Impact
-This change improves code maintainability and removes the complexity of URL encoding while maintaining all required query capabilities. The partition key strategy ensures optimal performance for the most common query pattern (by document URL).
-
-### Next Steps
-- Update downstream services to use the new GUID-based approach
-- Consider adding indexes for efficient cross-partition queries if needed
+---

@@ -93,3 +93,8 @@ output "cosmosdb_submissions_container_name" {
   description = "The name of the submissions container"
   value       = azurerm_cosmosdb_sql_container.submissions.name
 }
+
+output "document_intelligence_endpoint" {
+  description = "The endpoint URL for the Document Intelligence service"
+  value       = azurerm_cognitive_account.document_intelligence.endpoint
+}
