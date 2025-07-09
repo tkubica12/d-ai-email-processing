@@ -798,198 +798,77 @@ Updated the document processing pipeline to use Azure Document Intelligence and 
 
 ---
 
-## Phase 5: Document Store Schema Enhancement (2025-07-08)
+## Phase 3: Document Parser Foundry Service Setup (2025-07-09)
 
-### Added Submission Context to Document Records
-
-#### Schema Update Rationale
-Enhanced the document record schema to include submission and user context for better traceability and query capabilities:
-
-**Updated Document Record Schema**
-```python
-class DocumentRecord(BaseModel):
-    id: str  # Same as documentUrl for Cosmos DB
-    documentUrl: str  # Partition key for documents container
-    submissionId: str  # NEW: Link to parent submission
-    userId: str  # NEW: User who submitted the document
-    content: Optional[str] = None  # Null until processed
-    type: Optional[str] = None  # Null until classified
-    summary: Optional[str] = None  # Null until analyzed
-    extractedData: Optional[Dict[str, Any]] = None  # Null until processed
-    firstProcessedAt: datetime  # Set at creation time
-    lastProcessedAt: datetime  # Updated each processing step
-```
-
-#### Benefits of Enhanced Schema
-1. **Improved Traceability**: Direct links between documents and their originating submissions
-2. **User Context**: Enables user-specific queries and analytics across documents
-3. **Cross-Container Queries**: Facilitates joins between documents and submissions containers
-4. **Security & Auditing**: Clear ownership and submission context for compliance
-5. **Processing Context**: Downstream services can access submission metadata without additional lookups
-
-#### Implementation Changes
-
-**1. Model Updates**
-- Enhanced `DocumentRecord` with required `submissionId` and `userId` fields
-- Updated docstrings and examples to reflect new schema
-- Maintained backward compatibility for optional processing fields
-
-**2. Storage Logic Updates**
-- Modified `create_document_records()` to populate submission context from `SubmissionMessage`
-- Ensured consistent data population across all document records in a submission
-
-**3. Documentation Updates**
-- Updated Design.md schema documentation
-- Enhanced submission-intake README.md with complete document record example
-- Added schema examples showing the relationship between submissions and documents
-
-#### Data Flow Enhancement
-```
-Service Bus Message → Submission Record Creation → Document Records Creation
-                                                      ↓
-                                          Each document gets:
-                                          - documentUrl (partition key)
-                                          - submissionId (parent reference)
-                                          - userId (owner reference)
-                                          - Processing fields (null initially)
-```
+### Service Architecture Design
+- **Event Processing**: Cosmos DB Change Feed listener for `DocumentUploadedEvent`
+- **Document Analysis**: Azure Document Intelligence Layout API integration
+- **Content Storage**: Processed documents stored in `documents` container
+- **Event Publishing**: Emits `DocumentContentExtractedEvent` upon completion
 
 ### Technical Decisions
-- **Required Fields**: Made `submissionId` and `userId` required rather than optional for data integrity
-- **Consistent Population**: Both fields populated at document creation time, not during processing
-- **Partition Key Unchanged**: Kept `documentUrl` as partition key for optimal document-centric queries
-- **Cross-Reference Design**: Enables efficient queries by submission, user, or document while maintaining container separation
-
----
-
-## Phase 6: Cosmos DB Document ID Encoding Fix (2025-07-08)
-
-### Critical Fix: Document URL Encoding for Cosmos DB IDs
-
-#### Issue Discovery
-Discovered that forward slashes (`/`) are illegal characters in Cosmos DB document IDs. Since we were using document URLs directly as document IDs, this caused creation failures.
-
-**Error Symptoms**:
-```
-azure.core.exceptions.HttpResponseError: (BadRequest) Invalid characters in document id
-```
-
-#### Root Cause Analysis
-- Cosmos DB document IDs have strict character restrictions
-- Document URLs contain forward slashes (e.g., `https://storage.blob.core.windows.net/...`)
-- Using URLs directly as document IDs violates Cosmos DB requirements
-
-#### Solution Implementation
-
-**1. URL Encoding for Document IDs**
-```python
-import urllib.parse
-
-# URL encode the document URL for use as Cosmos DB document ID
-encoded_document_id = urllib.parse.quote(document_url, safe='')
-
-doc_record = DocumentRecord(
-    id=encoded_document_id,  # URL-encoded ID
-    documentUrl=document_url,  # Original URL as partition key
-    # ...other fields
-)
-```
-
-**2. Updated Schema Documentation**
-- Design.md: Updated to show URL-encoded document IDs in schema examples
-- Models: Updated DocumentRecord docstrings to clarify ID encoding
-- README: Added note about URL encoding requirement
-
-**3. Added Retrieval Method**
-Created `get_document_record()` method that properly encodes URLs when retrieving documents by URL.
-
-#### Architecture Impact
-
-**Document Container Schema**:
-```json
-{
-  "id": "https%3A//storage.blob.core.windows.net/submission-guid/document1.pdf",
-  "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
-  "submissionId": "submission-guid",
-  "userId": "user@example.com"
-}
-```
-
-**Key Design Decisions**:
-- **ID Field**: URL-encoded version for Cosmos DB compatibility
-- **Partition Key**: Original URL (unencoded) for intuitive queries
-- **Retrieval**: Helper method abstracts encoding logic from consumers
-
-#### Prevention Measures
-- Added comprehensive documentation in CommonErrors.md
-- Updated all schema examples to show encoded IDs
-- Created helper methods that abstract encoding complexity
-
-### Technical Debt Addressed
-This fix resolves a fundamental data storage issue that would have affected all downstream document processing services. The URL encoding approach maintains data integrity while ensuring Cosmos DB compatibility.
-
-### Next Steps
-- Downstream services (docproc-*) will need similar document querying patterns
-- Consider creating shared utility functions for consistent document operations across services
-
----
-
-## Phase 7: Document Store Schema Simplification - GUID IDs (2025-07-08)
-
-### Architectural Decision: Generated GUID Document IDs
-
-Replaced URL-encoded document IDs with generated GUIDs for cleaner architecture and better separation of concerns.
-
-#### Implementation Changes
-```python
-# Generate GUID for document ID
-document_id = str(uuid.uuid4())
-
-doc_record = DocumentRecord(
-    id=document_id,                    # Clean GUID
-    documentUrl=document_url,          # Original URL as partition key
-    submissionId=submission_message.submissionId,
-    userId=submission_message.userId,
-)
-```
-
-#### Benefits
-- **Simplicity**: No URL encoding complexity
-- **Clean Separation**: ID and documentUrl serve distinct purposes  
-- **Future-Proof**: IDs remain stable regardless of URL changes
-- **Query Efficiency**: documentUrl as partition key enables efficient queries
-
-#### Schema Updates
-- Updated all documentation to show GUID IDs
-- Modified `get_document_record()` to query by documentUrl
-- Removed urllib.parse dependency
-- Updated CommonErrors.md to show GUID approach as preferred solution
-
-**Status**: Document store now uses clean GUID architecture with optimal query performance through partition key strategy.
-
----
-
-## Phase 2: Document Intelligence Integration (2025-07-09)
-
-### Infrastructure Enhancement
-- **Azure Document Intelligence**: Added using azurerm provider 
-- **RBAC Configuration**: Added "Cognitive Services User" role for current user
-
-### Technical Decisions
-1. **azurerm Provider**: Used standard azurerm_cognitive_account resource (sufficient for FormRecognizer functionality)
-2. **FormRecognizer Kind**: Specified for Document Intelligence service type
-3. **S0 SKU**: Standard pricing tier for production workloads
-4. **Custom Subdomain**: Enables better service isolation and naming
+1. **Async Framework**: Pure asyncio for Change Feed processing efficiency
+2. **Configuration Pattern**: Consistent with submission-intake service structure
+3. **Event Sourcing**: Idempotent processing using event IDs
+4. **Pydantic Models**: Comprehensive type safety for all data structures
 
 ### Implementation Details
-- Created `document_intelligence.tf` with azurerm_cognitive_account resource
-- Updated `rbac.tf` with role assignment for current user access
-- Added terraform outputs for service endpoint, keys, and metadata
-- Standard azurerm provider provides all needed FormRecognizer capabilities
 
-### Development Impact
-- Applications can now process documents using Azure AI Document Intelligence
-- RBAC-based access removes need for explicit key management in local development
-- Terraform outputs provide all necessary connection details for applications
+#### Project Structure
+```
+src/docproc-parser-foundry/
+├── config.py           # Configuration management with Pydantic
+├── models.py           # Event and document data models
+├── main.py            # Async service entry point
+├── .env               # Environment variables (actual values)
+├── .env.example       # Environment template
+├── pyproject.toml     # Dependencies and project metadata
+└── README.md          # Setup and architecture documentation
+```
 
----
+#### Key Dependencies
+- `azure-ai-documentintelligence>=1.0.0`: Latest Document Intelligence SDK
+- `azure-cosmos>=4.9.0`: Cosmos DB async operations
+- `azure-identity>=1.23.0`: DefaultAzureCredential authentication
+- `pydantic>=2.11.7`: Data validation and configuration management
+
+#### Configuration System
+- **CosmosDBConfig**: Events and documents container configuration
+- **DocumentIntelligenceConfig**: Service endpoint configuration  
+- **LoggingConfig**: Structured logging with Azure SDK noise reduction
+- **AppConfig.from_env()**: Environment-based configuration loading
+
+#### Data Models
+- **DocumentUploadedEvent**: Change Feed input event structure
+- **DocumentContentExtractedEvent**: Output event after processing
+- **DocumentRecord**: Cosmos DB document storage schema
+- **ProcessingResult**: Internal processing result wrapper
+
+### Environment Configuration
+```bash
+# Required environment variables
+AZURE_COSMOS_DB_ENDPOINT=https://cosmos-account.documents.azure.com:443/
+AZURE_COSMOS_DB_DATABASE_NAME=email-processing
+AZURE_COSMOS_DB_EVENTS_CONTAINER_NAME=events
+AZURE_COSMOS_DB_DOCUMENTS_CONTAINER_NAME=documents
+AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=https://doc-intel.cognitiveservices.azure.com/
+```
+
+### Development Status
+- [x] Basic project structure and configuration
+- [x] Environment setup and configuration loading  
+- [x] Data models for events and document processing
+- [x] Dependency installation and import verification
+- [ ] Cosmos DB Change Feed processor implementation
+- [ ] Azure Document Intelligence client integration
+- [ ] Document content extraction and Markdown conversion
+- [ ] Event publishing for processed documents
+- [ ] Error handling and retry logic
+
+### Testing Results
+- ✅ Configuration loading: Successfully loads all environment variables
+- ✅ Model imports: All Pydantic models import correctly
+- ✅ Dependency resolution: uv sync completes without errors
+- ✅ Service startup: Configuration initialization works correctly
+
+**Status**: Foundation complete with robust configuration and type-safe data models. Ready for Change Feed processor implementation.

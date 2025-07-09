@@ -28,6 +28,7 @@ The Document Parser Foundry service processes documents using Azure Document Int
    - Submits to Azure Document Intelligence Layout API
    - Converts extracted content to structured Markdown format
    - Stores result in Cosmos DB documents container
+   - Publishes `DocumentContentExtractedEvent`
 
 2. **Layout Analysis Features**:
    - Optical Character Recognition (OCR) for all text
@@ -48,6 +49,70 @@ The Document Parser Foundry service processes documents using Azure Document Int
 - Images (JPEG, PNG, BMP, TIFF)
 - Microsoft Office documents
 - Forms and structured documents
+
+## Setup
+
+### Prerequisites
+- Python 3.12+
+- Azure CLI (logged in with `az login`)
+- Access to Azure resources (Cosmos DB, Document Intelligence)
+
+### Environment Configuration
+1. Copy `.env.example` to `.env`
+2. Update environment variables with your Azure resource details:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your specific Azure resource URLs
+   ```
+
+### Installation
+```bash
+# Install dependencies using uv
+uv sync
+
+# Or using pip
+pip install -e .
+```
+
+### Running the Service
+```bash
+# Using uv
+uv run python main.py
+
+# Or directly with Python
+python main.py
+```
+
+## Configuration
+
+The service uses environment variables for configuration:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `AZURE_COSMOS_DB_ENDPOINT` | Cosmos DB account endpoint | `https://cosmos-account.documents.azure.com:443/` |
+| `AZURE_COSMOS_DB_DATABASE_NAME` | Database name | `email-processing` |
+| `AZURE_COSMOS_DB_EVENTS_CONTAINER_NAME` | Events container name | `events` |
+| `AZURE_COSMOS_DB_DOCUMENTS_CONTAINER_NAME` | Documents container name | `documents` |
+| `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` | Document Intelligence endpoint | `https://doc-intel.cognitiveservices.azure.com/` |
+| `LOG_LEVEL` | Logging level | `INFO` |
+
+## Authentication
+
+The service uses `DefaultAzureCredential` for Azure authentication:
+- **Local Development**: Use `az login` 
+- **Production**: Use Managed Identity or Service Principal
+
+## Development Status
+
+- [x] Basic project structure and configuration
+- [x] Environment setup and configuration loading
+- [x] Data models for events and document processing
+- [ ] Cosmos DB Change Feed processor implementation
+- [ ] Azure Document Intelligence integration
+- [ ] Document content extraction and storage
+- [ ] Event publishing for processed documents
+- [ ] Error handling and retry logic
+- [ ] Health checks and monitoring
 - Invoices and receipts
 - Business cards and IDs
 
