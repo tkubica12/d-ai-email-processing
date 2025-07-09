@@ -7,6 +7,13 @@ resource "azurerm_role_assignment" "current_user_storage_blob_contributor" {
   principal_id         = data.azurerm_client_config.current.object_id
 }
 
+# Allow current user (for local development) to read/write tables in the storage account
+resource "azurerm_role_assignment" "current_user_storage_table_contributor" {
+  scope                = azurerm_storage_account.main.id
+  role_definition_name = "Storage Table Data Contributor"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
 # Allow current user (for local development) to send messages to Service Bus
 resource "azurerm_role_assignment" "current_user_service_bus_sender" {
   scope                = azurerm_servicebus_namespace.main.id

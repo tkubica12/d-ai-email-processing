@@ -15,35 +15,16 @@ class DocumentUploadedEventData(BaseModel):
     """
     Data payload for DocumentUploadedEvent.
     
-    Attributes:
-        submissionId: Unique identifier for the submission
-        documentUrl: Azure Blob Storage URL for the document
-        documentType: Type of document (optional)
-        uploadedAt: ISO 8601 timestamp when document was uploaded
-    """
+    Only contains the documentUrl - other fields are at the top level.
     
-    submissionId: str = Field(
-        ...,
-        description="Unique identifier for the submission",
-        example="123e4567-e89b-12d3-a456-426614174000"
-    )
+    Attributes:
+        documentUrl: Azure Blob Storage URL for the document
+    """
     
     documentUrl: str = Field(
         ...,
         description="Azure Blob Storage URL for the document",
         example="https://storage.blob.core.windows.net/submissions/123e4567-e89b-12d3-a456-426614174000/document1.pdf"
-    )
-    
-    documentType: Optional[str] = Field(
-        None,
-        description="Type of document (optional)",
-        example="pdf"
-    )
-    
-    uploadedAt: datetime = Field(
-        ...,
-        description="ISO 8601 timestamp when document was uploaded",
-        example="2025-07-07T14:30:00.123456Z"
     )
 
 
@@ -57,9 +38,10 @@ class DocumentUploadedEvent(BaseModel):
     Attributes:
         id: Unique event identifier
         eventType: Type of event (DocumentUploadedEvent)
-        data: Event data payload
+        submissionId: Unique identifier for the submission
+        userId: User who uploaded the document
         timestamp: ISO 8601 timestamp when event was created
-        submissionId: Partition key for the event
+        data: Event data payload (contains documentUrl)
     """
     
     id: str = Field(
@@ -69,14 +51,21 @@ class DocumentUploadedEvent(BaseModel):
     )
     
     eventType: str = Field(
-        ...,
+        default="DocumentUploadedEvent",
         description="Type of event",
         example="DocumentUploadedEvent"
     )
     
-    data: DocumentUploadedEventData = Field(
+    submissionId: str = Field(
         ...,
-        description="Event data payload"
+        description="Unique identifier for the submission",
+        example="123e4567-e89b-12d3-a456-426614174000"
+    )
+    
+    userId: str = Field(
+        ...,
+        description="User who uploaded the document",
+        example="user123"
     )
     
     timestamp: datetime = Field(
@@ -85,10 +74,9 @@ class DocumentUploadedEvent(BaseModel):
         example="2025-07-07T14:30:00.123456Z"
     )
     
-    submissionId: str = Field(
+    data: DocumentUploadedEventData = Field(
         ...,
-        description="Partition key for the event",
-        example="123e4567-e89b-12d3-a456-426614174000"
+        description="Event data payload"
     )
 
 

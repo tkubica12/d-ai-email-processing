@@ -52,6 +52,28 @@ class DocumentIntelligenceConfig(BaseModel):
     )
 
 
+class TableStorageConfig(BaseModel):
+    """Configuration for Azure Table Storage."""
+    
+    account_name: str = Field(
+        ...,
+        description="Azure Storage account name",
+        example="mystorageaccount"
+    )
+    
+    table_name: str = Field(
+        default="continuationtokens",
+        description="Table name for storing continuation tokens",
+        example="continuationtokens"
+    )
+    
+    enabled: bool = Field(
+        default=False,
+        description="Enable persistent continuation token storage",
+        example=True
+    )
+
+
 class LoggingConfig(BaseModel):
     """Configuration for application logging."""
     
@@ -85,6 +107,7 @@ class AppConfig(BaseModel):
     
     cosmos_db: CosmosDBConfig
     document_intelligence: DocumentIntelligenceConfig
+    table_storage: TableStorageConfig
     logging: LoggingConfig
     
     @classmethod
@@ -124,6 +147,16 @@ class AppConfig(BaseModel):
                 "Check AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT environment variable."
             )
         
+        # Extract Table Storage configuration
+        storage_account_name = os.getenv('AZURE_STORAGE_ACCOUNT_NAME')
+        table_storage_enabled = os.getenv('AZURE_TABLE_STORAGE_ENABLED', 'false').lower() == 'true'
+        
+        if table_storage_enabled and not storage_account_name:
+            raise ValueError(
+                "Missing required Table Storage configuration. "
+                "Check AZURE_STORAGE_ACCOUNT_NAME environment variable when table storage is enabled."
+            )
+        
         # Extract logging configuration
         log_level = os.getenv('LOG_LEVEL', 'INFO')
         
@@ -136,6 +169,11 @@ class AppConfig(BaseModel):
             ),
             document_intelligence=DocumentIntelligenceConfig(
                 endpoint=document_intelligence_endpoint
+            ),
+            table_storage=TableStorageConfig(
+                account_name=storage_account_name or "",
+                table_name=os.getenv('AZURE_TABLE_STORAGE_TABLE_NAME', 'continuationtokens'),
+                enabled=table_storage_enabled
             ),
             logging=LoggingConfig(
                 level=log_level
