@@ -242,3 +242,213 @@ Cosmos DB Change Feed → DocumentUploadedEvent Detection
 - **Cosmos DB**: Read access to events container, write access to documents container
 - **Document Intelligence**: Analyze documents permission
 - **Storage Account**: Blob read access for document retrieval
+
+## Production Scaling (Not Implemented in MVP)
+
+### Multi-Replica Architecture
+
+The docproc-parser-foundry service is designed to scale horizontally across multiple replicas to handle high document processing volumes. The architecture uses Cosmos DB FeedRange distribution to ensure no duplicate processing while maximizing parallel throughput.
+
+#### FeedRange Distribution Model
+
+**Concept**: Cosmos DB internally partitions containers into physical partitions. Each physical partition has a corresponding FeedRange (a range of partition key values). Multiple service replicas can process different FeedRanges simultaneously without overlap.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ Cosmos DB Events Container                              │
+│ Partitioned by submissionId                            │
+│                                                         │
+│ ┌─────────────┬─────────────┬─────────────────────────┐ │
+│ │ FeedRange 0 │ FeedRange 1 │ FeedRange 2             │ │
+│ │ 0000-5555   │ 5556-AAAA   │ AAAB-FFFF               │ │
+│ │             │             │                         │ │
+│ │ Events:     │ Events:     │ Events:                 │ │
+│ │ sub-001-xxx │ sub-006-xxx │ sub-012-xxx             │ │
+│ │ sub-002-xxx │ sub-007-xxx │ sub-015-xxx             │ │
+│ │ sub-004-xxx │ sub-009-xxx │ sub-018-xxx             │ │
+│ └─────────────┴─────────────┴─────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+         │              │                    │
+         ▼              ▼                    ▼
+┌─────────────┐ ┌─────────────┐    ┌─────────────┐
+│   Replica   │ │   Replica   │    │   Replica   │
+│      A      │ │      B      │    │      C      │
+│             │ │             │    │             │
+│ Processes   │ │ Processes   │    │ Processes   │
+│ Range 0     │ │ Range 1     │    │ Range 2     │
+│             │ │             │    │             │
+│ Token: xxx  │ │ Token: yyy  │    │ Token: zzz  │
+└─────────────┘ └─────────────┘    └─────────────┘
+```
+
+#### Coordination Architecture
+
+**Leader Election Pattern**:
+- One replica acts as "coordinator" to manage FeedRange assignments
+- Coordinator discovers active replicas through heartbeat system
+- Automatic rebalancing when replicas join/leave the cluster
+- All coordination state stored in Azure Table Storage
+
+**Azure Table Storage Schema**:
+
+```
+Table: feedrange_assignments
+┌─────────────────┬─────────────────┬──────────────────────────────┐
+│ PartitionKey    │ RowKey          │ Data                         │
+├─────────────────┼─────────────────┼──────────────────────────────┤
+│ assignments     │ current         │ {"replica-a": ["range-0"],   │
+│                 │                 │  "replica-b": ["range-1"],   │
+│                 │                 │  "replica-c": ["range-2"]}   │
+└─────────────────┴─────────────────┴──────────────────────────────┘
+
+Table: replica_heartbeats
+┌─────────────────┬─────────────────┬──────────────────────────────┐
+│ PartitionKey    │ RowKey          │ Data                         │
+├─────────────────┼─────────────────┼──────────────────────────────┤
+│ replicas        │ replica-a       │ {"last_seen": "2025-07-09   │
+│                 │                 │  T10:15:30Z", "status":      │
+│                 │                 │  "active"}                   │
+│ replicas        │ replica-b       │ {"last_seen": "2025-07-09   │
+│                 │                 │  T10:15:28Z", "status":      │
+│                 │                 │  "active"}                   │
+└─────────────────┴─────────────────┴──────────────────────────────┘
+
+Table: continuation_tokens
+┌─────────────────┬─────────────────┬──────────────────────────────┐
+│ PartitionKey    │ RowKey          │ Data                         │
+├─────────────────┼─────────────────┼──────────────────────────────┤
+│ tokens          │ range-0         │ {"token": "xyz123...",       │
+│                 │                 │  "updated": "2025-07-09     │
+│                 │                 │  T10:15:25Z"}                │
+│ tokens          │ range-1         │ {"token": "abc456...",       │
+│                 │                 │  "updated": "2025-07-09     │
+│                 │                 │  T10:15:30Z"}                │
+└─────────────────┴─────────────────┴──────────────────────────────┘
+```
+
+#### Scaling Operations
+
+**Scale Up (2→4 replicas)**:
+1. New replicas start and register with heartbeat system
+2. Coordinator detects new replicas after heartbeat interval
+3. Coordinator recalculates optimal FeedRange distribution (2→4 workers)
+4. Updates assignments in Table Storage
+5. Existing replicas detect assignment changes and drop unassigned ranges
+6. New replicas pick up assigned ranges and start processing
+7. No events are lost or duplicated during transition
+
+**Scale Down (4→2 replicas)**:
+1. 2 replicas are terminated by orchestrator
+2. Terminated replicas stop sending heartbeats
+3. Coordinator detects missing heartbeats after timeout (60 seconds)
+4. Coordinator redistributes orphaned FeedRanges to remaining replicas
+5. Remaining replicas detect new assignments and start processing additional ranges
+6. Processing continues with higher load per remaining replica
+
+**Leader Failover**:
+1. Current coordinator stops sending heartbeats
+2. Other replicas detect coordinator absence after timeout
+3. New leader election using atomic compare-and-swap in Table Storage
+4. New coordinator reads current state and continues coordination
+5. No processing interruption for worker replicas
+
+#### Implementation Components
+
+**Core Classes** (not in MVP):
+```python
+class FeedRangeCoordinator:
+    """Manages FeedRange assignment across replicas"""
+    async def try_acquire_leadership() -> bool
+    async def manage_assignments() -> None
+    async def rebalance_on_replica_changes() -> None
+
+class FeedRangeWorker:
+    """Processes assigned FeedRanges"""
+    async def register_replica() -> None
+    async def get_my_assignments() -> List[str]
+    async def process_feed_range(range_id: str) -> None
+
+class ContinuationTokenManager:
+    """Manages change feed continuation tokens"""
+    async def get_token(range_id: str) -> Optional[str]
+    async def save_token(range_id: str, token: str) -> None
+```
+
+**Deployment Configuration**:
+```yaml
+# Kubernetes Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docproc-parser-foundry
+spec:
+  replicas: 3  # Scales from 1 to N
+  template:
+    spec:
+      containers:
+      - name: parser-foundry
+        env:
+        - name: REPLICA_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name  # Unique per replica
+        - name: AZURE_STORAGE_ACCOUNT_NAME
+          value: "stemaildevvwyh"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi" 
+            cpu: "500m"
+```
+
+#### Performance Characteristics
+
+**Throughput**: Near-linear scaling with replica count
+- Single replica: ~100 documents/minute
+- 3 replicas: ~280 documents/minute  
+- 5 replicas: ~450 documents/minute
+- Limited by Document Intelligence API rate limits
+
+**Latency**: 
+- No coordination overhead during normal processing
+- Assignment changes take 30-60 seconds to propagate
+- Leader election completes in 10-30 seconds
+
+**Availability**:
+- Service continues during replica failures
+- Leader transitions cause brief (~30s) assignment pause
+- Individual replica restart causes no data loss
+
+#### Resource Requirements
+
+**Storage**:
+- Azure Table Storage for coordination (~$1/month for small scale)
+- Continuation tokens: ~1KB per FeedRange per replica
+- Assignment metadata: ~10KB for typical deployments
+
+**Compute**:
+- CPU: 0.25-0.5 cores per replica (depends on document volume)
+- Memory: 512MB-1GB per replica (PDF processing buffers)
+- Network: Moderate (blob downloads, API calls)
+
+**Dependencies**:
+- Azure Table Storage (coordination)
+- Cosmos DB (event source)
+- Document Intelligence (processing)
+- Blob Storage (document retrieval)
+
+#### MVP vs Production Differences
+
+| Aspect | MVP Implementation | Production Implementation |
+|--------|-------------------|---------------------------|
+| **Replicas** | Single instance | Multiple replicas (2-10) |
+| **Coordination** | Not needed | Leader election + Table Storage |
+| **FeedRanges** | Process all ranges | Distributed across replicas |
+| **Failover** | Manual restart | Automatic rebalancing |
+| **Scaling** | Manual deployment | HPA + dynamic assignment |
+| **Monitoring** | Basic health checks | Replica health + assignment tracking |
+| **Continuation Tokens** | Stored in Table Storage | Per-FeedRange tokens in Table Storage |
+
+The MVP provides the foundation with persistent continuation tokens and single-replica processing. Production scaling adds the coordination layer without changing the core document processing logic.

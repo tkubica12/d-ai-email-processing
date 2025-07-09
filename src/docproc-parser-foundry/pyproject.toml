@@ -1,12 +1,11 @@
 [project]
 name = "docproc-parser-foundry"
 version = "0.1.0"
-description = "Document processing service using Azure Document Intelligence for enterprise-grade document analysis"
+description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aiohttp>=3.12.13",
-    "azure-ai-documentintelligence>=1.0.0",
     "azure-cosmos>=4.9.0",
     "azure-identity>=1.23.0",
     "pydantic>=2.11.7",

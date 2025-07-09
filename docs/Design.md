@@ -456,3 +456,110 @@ graph TD
 - ❌ Complex to write and troubleshoot
 
 **Key Trade-off:** Simplicity vs. Control
+
+## Service Scaling and High Availability
+
+### Document Processing Service Scaling
+
+The document processing services (docproc-parser-foundry, docproc-classifier, etc.) are designed to scale horizontally to handle increased document processing load. The architecture supports multiple replicas of each service processing events in parallel.
+
+#### Change Feed Distribution Strategy
+
+**FeedRange-Based Parallelization:**
+- Each Cosmos DB container is internally partitioned into physical partitions
+- Each physical partition has a corresponding FeedRange that represents a range of partition keys
+- Multiple service replicas can process different FeedRanges simultaneously
+- No overlap between FeedRanges ensures no duplicate processing
+
+**Scaling Architecture:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Cosmos DB Container (events)                                │
+│ ┌─────────────┬─────────────┬─────────────┬─────────────┐   │
+│ │ FeedRange 0 │ FeedRange 1 │ FeedRange 2 │ FeedRange 3 │   │
+│ │ Partition   │ Partition   │ Partition   │ Partition   │   │
+│ │ 0000-3FFF   │ 4000-7FFF   │ 8000-BFFF   │ C000-FFFF   │   │
+│ └─────────────┴─────────────┴─────────────┴─────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+         │              │              │              │
+         ▼              ▼              ▼              ▼
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│   Replica   │ │   Replica   │ │   Replica   │ │   Replica   │
+│      A      │ │      B      │ │      C      │ │      D      │
+│             │ │             │ │             │ │             │
+│ Processes   │ │ Processes   │ │ Processes   │ │ Processes   │
+│ FeedRange 0 │ │ FeedRange 1 │ │ FeedRange 2 │ │ FeedRange 3 │
+└─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘
+```
+
+#### Coordination and Leadership
+
+**Leader Election Pattern:**
+- One replica becomes the "leader" responsible for FeedRange assignment coordination
+- Leader maintains mapping of replicas to FeedRanges in Azure Table Storage
+- Leader monitors replica health through heartbeat mechanism
+- Automatic rebalancing when replicas join or leave the cluster
+
+**Assignment Distribution:**
+```
+Azure Table Storage - FeedRange Assignments
+┌──────────────────────────────────────────────────────────┐
+│ Assignments Table                                        │
+│ ┌─────────────┬─────────────────────────────────────────┐ │
+│ │ Replica ID  │ Assigned FeedRanges                     │ │
+│ ├─────────────┼─────────────────────────────────────────┤ │
+│ │ replica-a   │ ["feedrange-0", "feedrange-1"]          │ │
+│ │ replica-b   │ ["feedrange-2"]                         │ │
+│ │ replica-c   │ ["feedrange-3"]                         │ │
+│ └─────────────┴─────────────────────────────────────────┘ │
+│                                                          │
+│ Replicas Table (Heartbeats)                             │
+│ ┌─────────────┬─────────────────────────────────────────┐ │
+│ │ Replica ID  │ Last Heartbeat                          │ │
+│ ├─────────────┼─────────────────────────────────────────┤ │
+│ │ replica-a   │ 2025-07-09T10:15:30Z                    │ │
+│ │ replica-b   │ 2025-07-09T10:15:28Z                    │ │
+│ │ replica-c   │ 2025-07-09T10:15:32Z                    │ │
+│ └─────────────┴─────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────┘
+```
+
+#### Scaling Scenarios
+
+**Scale Up (2→4 replicas):**
+1. New replicas start and register with heartbeat system
+2. Leader detects additional active replicas
+3. Leader redistributes FeedRanges across 4 replicas instead of 2
+4. Each replica polls for updated assignments and begins processing new FeedRanges
+
+**Scale Down (4→2 replicas):**
+1. 2 replicas are terminated (stop sending heartbeats)
+2. Leader detects missing heartbeats after timeout period
+3. Leader reassigns orphaned FeedRanges to remaining 2 replicas
+4. Remaining replicas pick up additional FeedRanges automatically
+
+**Leader Failure:**
+1. Current leader stops sending heartbeats
+2. Other replicas detect leader absence after timeout
+3. New leader election using atomic operations in Table Storage
+4. New leader takes over assignment coordination seamlessly
+
+#### Performance Characteristics
+
+**Throughput:** Linear scaling with number of replicas (limited by physical partitions)
+**Latency:** No coordination overhead during normal processing
+**Availability:** Service continues operating even during leader transitions
+**Consistency:** Each document processed exactly once due to FeedRange isolation
+
+#### MVP vs Production
+
+**MVP Implementation:**
+- Single replica deployment for simplicity
+- Continuation tokens stored in Azure Table Storage for restart resilience
+- Manual scaling by adjusting replica count
+
+**Production Implementation:**
+- Multiple replicas with automatic FeedRange distribution
+- Leader election and coordination via Azure Table Storage
+- Container orchestration (Kubernetes, Container Apps) for automatic scaling
+- Health checks and monitoring for replica management
