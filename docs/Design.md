@@ -93,7 +93,7 @@ This approach uses event-driven architecture with event sourcing patterns to imp
     "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
     "submissionId": "submission-guid",
     "userId": "user@example.com",
-    "content": "# Document Title\n\nFull markdown content extracted from document using Azure Document Intelligence...",
+    "content": "Full text content extracted from document using Azure Document Intelligence...",
     "type": "invoice",
     "summary": "AI-generated summary of document content...",
     "extractedData": {
@@ -104,9 +104,11 @@ This approach uses event-driven architecture with event sourcing patterns to imp
       "vendor": "Acme Corp"
     },
     "firstProcessedAt": "2025-07-07T10:00:00Z",
-    "lastProcessedAt": "2025-07-07T10:05:00Z",
+    "lastProcessedAt": "2025-07-07T10:05:00Z"
   }
   ```
+  
+  Note: Cosmos DB automatically adds internal fields like `_rid`, `_self`, `_etag`, `_attachments`, and `_ts` which should be ignored by client applications when parsing the document model.
 
 **Submission Store:** Cosmos DB container for submission records
 - Container: `submissions`
@@ -246,7 +248,6 @@ This approach uses event-driven architecture with event sourcing patterns to imp
     "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
     "documentId": "550e8400-e29b-41d4-a716-446655440000",
     "documentType": "invoice",
-    "confidence": 0.95,
     "success": true
   }
 }

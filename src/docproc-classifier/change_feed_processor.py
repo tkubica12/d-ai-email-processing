@@ -14,8 +14,9 @@ from azure.identity.aio import DefaultAzureCredential
 from azure.core.exceptions import HttpResponseError, ClientAuthenticationError
 
 from config import AppConfig
-from models import DocumentContentExtractedEvent
+from models import DocumentContentExtractedEvent, DocumentRecord
 from continuation_token_storage import ContinuationTokenStorage
+from document_classifier import DocumentClassifier
 
 
 class ChangeFeedProcessor:
@@ -39,6 +40,7 @@ class ChangeFeedProcessor:
         self.continuation_token: Optional[str] = None
         self.token_storage: Optional[ContinuationTokenStorage] = None
         self.processor_id = "docproc-classifier"  # Consistent processor ID for single-instance service
+        self.document_classifier: Optional[DocumentClassifier] = None
         
     async def initialize(self) -> None:
         """
@@ -57,6 +59,12 @@ class ChangeFeedProcessor:
             # Initialize continuation token storage
             self.token_storage = ContinuationTokenStorage(self.config.table_storage)
             await self.token_storage.initialize()
+            
+            # Initialize document classifier
+            self.document_classifier = DocumentClassifier(
+                openai_config=self.config.openai,
+                cosmos_config=self.config.cosmos_db
+            )
             
             # Load persisted continuation token if available
             if self.token_storage.config.enabled:
@@ -179,7 +187,7 @@ class ChangeFeedProcessor:
     
     async def _handle_document_content_extracted_event(self, event: DocumentContentExtractedEvent) -> None:
         """
-        Handle a DocumentContentExtractedEvent by logging it for now.
+        Handle a DocumentContentExtractedEvent by fetching the document and classifying it.
         
         Args:
             event: Validated DocumentContentExtractedEvent to process
@@ -193,13 +201,67 @@ class ChangeFeedProcessor:
             f"timestamp: {event.timestamp}"
         )
         
-        # For now, just log the event details
-        self.logger.info(f"DocumentContentExtractedEvent processed: {event.id}")
+        try:
+            # Fetch the document record from the documents container
+            document_record = await self._fetch_document_record(event.data.documentId, event.submissionId)
+            
+            if not document_record:
+                self.logger.warning(f"Document record not found for ID: {event.data.documentId}")
+                return
+            
+            # Classify the document and update Cosmos DB record
+            self.logger.info(f"Classifying document {event.data.documentId}")
+            classification_result = await self.document_classifier.classify_and_update_document(document_record)
+            
+            # Log the classification result
+            self.logger.debug(f"Classification result for document {event.data.documentId}: {classification_result}")
+            
+            self.logger.info(f"Document {event.data.documentId} classified and updated successfully: type={classification_result.type}, summary_length={len(classification_result.summary)}")
+            
+            self.logger.info(f"DocumentContentExtractedEvent processed successfully: {event.id}")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to process DocumentContentExtractedEvent {event.id}: {e}")
+            raise
+    
+    async def _fetch_document_record(self, document_id: str, submission_id: str) -> Optional[DocumentRecord]:
+        """
+        Fetch document record from the documents container.
+        
+        Args:
+            document_id: ID of the document record
+            submission_id: Submission ID (partition key)
+            
+        Returns:
+            DocumentRecord if found, None otherwise
+        """
+        try:
+            database = self.cosmos_client.get_database_client(self.config.cosmos_db.database_name)
+            container = database.get_container_client(self.config.cosmos_db.documents_container_name)
+            
+            # Query for the document record
+            item = await container.read_item(
+                item=document_id,
+                partition_key=submission_id
+            )
+            
+            # Parse the document record
+            document_record = DocumentRecord(**item)
+            self.logger.debug(f"Fetched document record: {document_id} with content length: {len(document_record.content)}")
+            
+            return document_record
+            
+        except Exception as e:
+            self.logger.error(f"Failed to fetch document record {document_id}: {e}")
+            return None
     
     async def close(self) -> None:
         """
         Close all Azure clients and connections.
         """
+        if self.document_classifier:
+            await self.document_classifier.close()
+            
         if self.token_storage:
             await self.token_storage.close()
             

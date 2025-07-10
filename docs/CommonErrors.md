@@ -206,6 +206,49 @@ class DocumentUploadedEventData(BaseModel):
 
 ---
 
+---
+
+## 13. Document Classification Service
+
+**Description**: Issues with document classification service implementation.
+
+**Common Errors**:
+- **Object of type datetime is not JSON serializable**
+  - *Cause*: Attempting to serialize Pydantic models with datetime fields using `model_dump()` instead of `model_dump_json()`
+  - *Fix*: Use `model_dump_json()` for JSON serialization or configure JSON serialization properly
+- **'AppConfig' object has no attribute 'azure_openai'**
+  - *Cause*: Mismatch between config field names in model definition and access patterns
+  - *Fix*: Ensure config field names match between `AppConfig` model and service initialization
+- **Import "azure.core.exceptions" could not be resolved**
+  - *Cause*: Missing Azure SDK dependencies in `pyproject.toml`
+  - *Fix*: Add required Azure SDK packages (`azure-cosmos`, `azure-identity`, `azure-data-tables`)
+
+**Examples**:
+```python
+# Wrong - causes datetime serialization error
+event_dict = event.model_dump()
+await container.create_item(body=event_dict)
+
+# Correct - properly serializes datetime objects
+event_json = event.model_dump_json()
+event_dict = json.loads(event_json)
+await container.create_item(body=event_dict)
+
+# Config field name consistency
+class AppConfig(BaseModel):
+    openai: AzureOpenAIConfig  # Field name is 'openai'
+
+# Access must match field name
+classifier = DocumentClassifier(
+    openai_config=config.openai,  # Not config.azure_openai
+    cosmos_config=config.cosmos_db
+)
+```
+
+**Prevention**: Use proper Pydantic serialization methods; ensure config field names are consistent throughout codebase.
+
+---
+
 ## Troubleshooting Checklist
 
 When encountering issues, check in this order:

@@ -42,17 +42,18 @@ class CosmosDBConfig(BaseModel):
     )
 
 
-class OpenAIConfig(BaseModel):
-    """Configuration for OpenAI API service."""
+class AzureOpenAIConfig(BaseModel):
+    """Configuration for Azure OpenAI service."""
     
-    api_key: str = Field(
+    endpoint: str = Field(
         ...,
-        description="OpenAI API key"
+        description="Azure OpenAI service endpoint URL",
+        example="https://your-openai-instance.openai.azure.com/"
     )
     
     model: str = Field(
         default="gpt-4o-mini",
-        description="OpenAI model to use for classification",
+        description="Azure OpenAI model to use for classification",
         example="gpt-4o-mini"
     )
 
@@ -111,7 +112,7 @@ class AppConfig(BaseModel):
     """Main application configuration."""
     
     cosmos_db: CosmosDBConfig
-    openai: OpenAIConfig
+    openai: AzureOpenAIConfig
     table_storage: TableStorageConfig
     logging: LoggingConfig
     
@@ -143,13 +144,13 @@ class AppConfig(BaseModel):
                 "and AZURE_COSMOS_DB_DOCUMENTS_CONTAINER_NAME environment variables."
             )
         
-        # Extract OpenAI configuration
-        openai_api_key = os.getenv('OPENAI_API_KEY')
+        # Extract Azure OpenAI configuration
+        azure_openai_endpoint = os.getenv('AZURE_OPENAI_ENDPOINT')
         
-        if not openai_api_key:
+        if not azure_openai_endpoint:
             raise ValueError(
-                "Missing required OpenAI configuration. "
-                "Check OPENAI_API_KEY environment variable."
+                "Missing required Azure OpenAI configuration. "
+                "Check AZURE_OPENAI_ENDPOINT environment variable."
             )
         
         # Extract Table Storage configuration
@@ -172,9 +173,9 @@ class AppConfig(BaseModel):
                 events_container_name=events_container_name,
                 documents_container_name=documents_container_name
             ),
-            openai=OpenAIConfig(
-                api_key=openai_api_key,
-                model=os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
+            openai=AzureOpenAIConfig(
+                endpoint=azure_openai_endpoint,
+                model=os.getenv('AZURE_OPENAI_MODEL', 'gpt-4o-mini')
             ),
             table_storage=TableStorageConfig(
                 account_name=storage_account_name or "",

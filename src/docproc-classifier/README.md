@@ -1,13 +1,15 @@
 # Document Classifier Service
 
-This service processes document classification by listening to Cosmos DB Change Feed for `DocumentContentExtractedEvent` events. It classifies documents using OpenAI API and updates document records with classification results.
+This service processes document classification by listening to Cosmos DB Change Feed for `DocumentContentExtractedEvent` events. It classifies documents using Azure OpenAI API and updates document records with classification results.
 
 ## Features
 
 - Listens to Cosmos DB Change Feed for `DocumentContentExtractedEvent` events
-- Classifies documents using OpenAI API with predefined document types
+- Classifies documents using Azure OpenAI API with predefined document types
+- Emits `DocumentClassifiedEvent` after successful classification
 - Stores continuation tokens in Azure Table Storage for stateful processing
 - Supports graceful shutdown and error handling
+- Uses structured outputs to ensure consistent classification results
 
 ## Configuration
 
@@ -23,8 +25,8 @@ Required environment variables:
 - `AZURE_COSMOS_DB_EVENTS_CONTAINER_NAME`: Events container name
 - `AZURE_COSMOS_DB_DOCUMENTS_CONTAINER_NAME`: Documents container name
 - `AZURE_STORAGE_ACCOUNT_NAME`: Storage account name
-- `OPENAI_API_KEY`: OpenAI API key
-- `OPENAI_MODEL`: OpenAI model (default: gpt-4o-mini)
+- `AZURE_OPENAI_ENDPOINT`: Azure OpenAI service endpoint
+- `AZURE_OPENAI_MODEL`: Azure OpenAI model deployment name (default: gpt-4o-mini)
 
 ## Running the Service
 
@@ -33,9 +35,14 @@ Required environment variables:
 uv sync
 ```
 
-2. Set up environment variables in `.env` file
+2. Ensure you are authenticated with Azure:
+```bash
+az login
+```
 
-3. Run the service:
+3. Set up environment variables in `.env` file
+
+4. Run the service:
 ```bash
 uv run python main.py
 ```
@@ -43,16 +50,24 @@ uv run python main.py
 ## Document Types
 
 The service classifies documents into the following types:
-- `invoice`: Invoice documents
+- `invoice`: Invoice documents  
 - `contract`: Contract documents
 - `bankStatement`: Bank statement documents
 - `submissionNotes`: Submission notes
 - `other`: Other document types
 
+## Event Flow
+
+1. Service listens for `DocumentContentExtractedEvent` events
+2. Fetches document content from Cosmos DB documents container
+3. Classifies document using Azure OpenAI with system prompt template
+4. Updates document record with classification results (`type` and `summary` fields)
+5. Emits `DocumentClassifiedEvent` for downstream processing
+
 ## Logging
 
 The service uses structured logging with configurable log levels. Set `LOG_LEVEL` environment variable to control verbosity:
-- `DEBUG`: Detailed debug information
+- `DEBUG`: Detailed debug information including OpenAI API calls
 - `INFO`: General information (default)
 - `WARNING`: Warning messages
 - `ERROR`: Error messages
