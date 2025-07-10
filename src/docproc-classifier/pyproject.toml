@@ -7,7 +7,9 @@ requires-python = ">=3.12"
 dependencies = [
     "aiohttp>=3.12.13",
     "azure-cosmos>=4.9.0",
+    "azure-data-tables>=12.7.0",
     "azure-identity>=1.23.0",
+    "jinja2>=3.1.4",
     "openai>=1.93.3",
     "pydantic>=2.11.7",
     "python-dotenv>=1.1.1",
