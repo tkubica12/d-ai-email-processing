@@ -85,6 +85,7 @@ This approach uses event-driven architecture with event sourcing patterns to imp
 - Container: `documents` 
 - Partition Key: `submissionId` (groups documents by submission)
 - Document ID: Generated GUID for each document record
+- Type: `type` field to indicate document type and it is enum: `invoice`, `contract`, `bankStatement`, `submissionNotes`, `other`, 
 - Schema:
   ```json
   {

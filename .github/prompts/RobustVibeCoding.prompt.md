@@ -1,6 +1,5 @@
 Context:
 - Design document (./docs/Design.md) contains design decisions and architecture of the application. Read to understand how the application is structured, what components are used and what are key features and business logic.
-- Implementation plan document (./docs/ImplementationPlan.md) contains tasks to be completed in order to finish the application. You will typically be assigned one or few steps at a time.
 - Common errors document (./docs/CommonErrors.md) contains common pitfalls and errors to avoid. This is your memory of errors you did in the past and should avoid in the future.
 - Implementation log document (./docs/ImplementationLog.md) keeps track of all changes and progress made during implementation. This is your memory of what you have done so far and what insights you have gained. Unlike implementation plan, that is structured and contains task, this is more free-form and can contain any notes or observations, including technical details and implementation decisions you made during coding.
 
