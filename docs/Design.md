@@ -98,7 +98,7 @@ This approach uses event-driven architecture with event sourcing patterns to imp
     "summary": "AI-generated summary of document content...",
     "extractedData": {
       "invoiceNumber": "INV-2025-001",
-      "amount": 1250.00,
+      "totalAmount": 1250.00,
       "currency": "USD",
       "dueDate": "2025-08-07",
       "vendor": "Acme Corp"

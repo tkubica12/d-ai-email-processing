@@ -1,316 +1,172 @@
 # Common Errors and Solutions
 
-This document tracks common errors encountered during development, grouped by category for quick reference.
+Quick reference for common development errors, grouped by category.
 
 ---
 
-## 1. Azure Authentication & Permissions
+## Azure Authentication & Permissions
 
-**Description**: Issues authenticating with Azure services or lacking required permissions.
+**Errors**:
+- **DefaultAzureCredential failed** → `az login`, `az account set --subscription <id>`
+- **AuthorizationFailed** → Check RBAC roles, re-apply Terraform
 
-**Common Errors**:
-- **DefaultAzureCredential failed to retrieve a token**
-  - *Cause*: Not logged in, wrong subscription.
-  - *Fix*: `az login`, `az account set --subscription <id>`
-- **AuthorizationFailed - This request is not authorized**
-  - *Cause*: Missing RBAC roles.
-  - *Fix*: Check role assignments, re-apply Terraform.
-
-**Prevention**: Always verify authentication and RBAC before running the app.
+**Prevention**: Verify authentication and RBAC before app startup.
 
 ---
 
-## 2. Environment & Configuration
+## Environment & Configuration
 
-**Description**: Problems due to missing or incorrect environment variables.
-
-**Common Errors**:
-- **Missing required environment variables**
-  - *Symptoms*: App fails accessing Azure resources.
-  - *Fix*: Update `.env` with Terraform outputs.
+**Errors**:
+- **Missing environment variables** → Update `.env` with Terraform outputs
+- **Config field name mismatch** → Ensure field names match between model and access
 
 **Prevention**: Validate environment at startup.
 
 ---
 
-## 3. Dependency & Package Management
+## Dependencies & Imports
 
-**Description**: Python package import errors or missing dependencies.
+**Errors**:
+- **Import could not be resolved** → `uv sync`, use `uv run`
+- **Missing Azure SDK packages** → Add to `pyproject.toml` (azure-cosmos, azure-identity, azure-data-tables)
 
-**Common Errors**:
-- **Import could not be resolved**
-  - *Cause*: Dependencies not installed or venv not activated.
-  - *Fix*: `uv sync`, use `uv run`.
-
-**Prevention**: Always sync and activate environment.
+**Prevention**: Always sync dependencies and activate environment.
 
 ---
 
-## 4. Terraform & Azure Resource Management
+## Terraform & Azure Resources
 
-**Description**: Issues with resource creation, state, or configuration.
-
-**Common Errors**:
-- **Resource already exists**
-  - *Fix*: Import resource or destroy/recreate.
-- **RBAC not applied**
-  - *Fix*: Check `terraform plan`, re-apply if needed.
+**Errors**:
+- **Resource already exists** → Import resource or destroy/recreate
+- **RBAC not applied** → Check `terraform plan`, re-apply if needed
 
 **Prevention**: Use consistent naming and manage state carefully.
 
 ---
 
-## 5. File Upload & Blob Storage
+## Azure Storage & File Handling
 
-**Description**: File uploads not appearing in Azure Storage.
-
-**Common Errors**:
-- **File upload fails silently**
-  - *Causes*: Input mishandling, permissions, file size.
-  - *Fix*: Check input handling, permissions, add logging.
+**Errors**:
+- **File upload fails silently** → Check input handling, permissions, add logging
+- **Invalid file format** → Validate file extensions before processing
 
 **Prevention**: Add logging and error handling for uploads.
 
 ---
 
-## 6. Containerization & Docker
+## Service Bus & Messaging
 
-**Description**: Docker build or run failures.
-
-**Common Errors**:
-- **Container build fails**
-  - *Causes*: Missing lock file, platform issues, network.
-  - *Fix*: Ensure `uv.lock` exists, check connectivity.
-
-**Prevention**: Commit lock files, test builds locally.
-
----
-
-## 7. Service Bus Messaging
-
-**Description**: Issues sending or receiving Service Bus messages.
-
-**Common Errors**:
-- **Message publishing fails**
-  - *Causes*: Permissions, missing topic, bad format.
-  - *Fix*: Verify topic, permissions, message format.
-
-**Prevention**: Health checks for Service Bus.
-
----
-
-## 8. Development Environment
-
-**Description**: Local development issues.
-
-**Common Errors**:
-- **Port already in use**
-  - *Fix*: Kill process or use different port.
-
-**Prevention**: Check port before starting app.
-
----
-
-## 9. FastHTML Framework Usage
-
-**Description**: Type errors in route parameters.
-
-**Common Errors**:
-- **Type List cannot be instantiated**
-  - *Cause*: Using `typing.List` instead of `list`.
-  - *Fix*: Use built-in `list` or manual form parsing.
-
-**Example**:
-```python
-# Wrong
-async def post(attachments: Optional[List] = None):
-# Correct
-async def post(attachments: Optional[list] = None):
-```
-
-**Prevention**: Use built-in types for FastHTML routes.
-
----
-
-## 10. Cosmos DB Issues
-
-**Description**: Document creation/read errors due to misconfigured keys, invalid IDs, or SDK usage.
-
-**Common Errors**:
-- **Entity with specified id already exists (409)**
-  - *Cause*: Unique key constraint mismatch.
-  - *Fix*: Match unique key paths to schema.
-- **Entity with specified id does not exist (404)**
-  - *Cause*: Wrong partition key used in read.
-  - *Fix*: Use correct partition key from container config.
-- **Invalid characters in document ID**
-  - *Cause*: Using URLs/strings with `/` as IDs.
-  - *Fix*: Use UUIDs or URL-encode.
-- **Unexpected keyword argument 'partition_key'**
-  - *Cause*: Passing partition_key in async SDK.
-  - *Fix*: Remove explicit partition_key, let SDK extract from body.
-
-**Examples**:
-```python
-# Partition key mismatch
-container.read_item(item=id, partition_key=wrong_value)  # Wrong
-container.read_item(item=id, partition_key=correct_value)  # Correct
-
-# Invalid ID
-doc_id = str(uuid.uuid4())  # Good
-doc_id = urllib.parse.quote(url, safe='')  # If needed
-
-# Async SDK
-await container.create_item(body=data)  # Correct
-```
-
-**Prevention**: Sync schema, Terraform, and code; never use raw URLs as IDs; check SDK docs.
-
----
-
-## 11. Document Intelligence API
-
-**Description**: File format or output issues with Document Intelligence.
-
-**Common Errors**:
-- **Invalid request - file format unsupported**
-  - *Cause*: Unsupported file type (e.g., `.txt`).
-  - *Fix*: Check extension before processing.
-- **Markdown output contains HTML tags**
-  - *Note*: This is expected for complex structures.
-
-**Example**:
-```python
-def _is_supported_document_format(url): ...
-```
-
-**Reference**: [Document Intelligence Markdown Elements](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/concept/markdown-elements?view=doc-intel-4.0.0)
-
----
-
-## 12. Architecture & Event Design
-
-**Description**: Data duplication due to missing context in events.
-
-**Common Errors**:
-- **Duplicate records instead of updates**
-  - *Cause*: Event missing document ID.
-  - *Fix*: Include documentId in events for direct updates.
+**Errors**:
+- **Message publishing fails** → Verify topic, permissions, message format
+- **Event missing document ID** → Include documentId in events for direct updates
 
 **Example**:
 ```python
 class DocumentUploadedEventData(BaseModel):
     documentUrl: str
-    documentId: str  # Needed for updates
+    documentId: str  # Required for updates
 ```
 
 ---
 
----
+## Cosmos DB Operations
 
-## 13. Document Classification Service
-
-**Description**: Issues with document classification service implementation.
-
-**Common Errors**:
-- **Object of type datetime is not JSON serializable**
-  - *Cause*: Attempting to serialize Pydantic models with datetime fields using `model_dump()` instead of `model_dump_json()`
-  - *Fix*: Use `model_dump_json()` for JSON serialization or configure JSON serialization properly
-- **'AppConfig' object has no attribute 'azure_openai'**
-  - *Cause*: Mismatch between config field names in model definition and access patterns
-  - *Fix*: Ensure config field names match between `AppConfig` model and service initialization
-- **Import "azure.core.exceptions" could not be resolved**
-  - *Cause*: Missing Azure SDK dependencies in `pyproject.toml`
-  - *Fix*: Add required Azure SDK packages (`azure-cosmos`, `azure-identity`, `azure-data-tables`)
+**Errors**:
+- **Entity already exists (409)** → Match unique key paths to schema
+- **Entity not found (404)** → Use correct partition key from container config
+- **Invalid document ID** → Use UUIDs, not URLs with `/`
+- **Unexpected keyword 'partition_key'** → Remove explicit partition_key in async SDK
 
 **Examples**:
 ```python
-# Wrong - causes datetime serialization error
-event_dict = event.model_dump()
-await container.create_item(body=event_dict)
+# Correct partition key usage
+container.read_item(item=id, partition_key=correct_value)
 
-# Correct - properly serializes datetime objects
+# Valid document ID
+doc_id = str(uuid.uuid4())
+
+# Async SDK - let SDK extract partition key
+await container.create_item(body=data)
+```
+
+---
+
+## FastHTML Framework
+
+**Errors**:
+- **Type List cannot be instantiated** → Use `list` instead of `typing.List`
+
+**Example**:
+```python
+# Correct
+async def post(attachments: Optional[list] = None):
+```
+
+---
+
+## OpenAI Structured Outputs
+
+**Errors**:
+- **400 BadRequest with empty body** → Flatten nested Pydantic models to avoid schema issues
+- **Schema additionalProperties error** → Avoid nested objects with `$ref`
+
+**Example**:
+```python
+# Problem - Nested structure
+class LLMResponse(BaseModel):
+    type: DocumentType
+    extractedData: ExtractedData  # Causes schema issues
+
+# Solution - Flattened structure
+class LLMResponse(BaseModel):
+    invoiceNumber: Optional[str] = Field(None, description="Invoice number")
+    totalAmount: Optional[float] = Field(None, description="Total amount")
+```
+
+**API Usage**: Use stable versions like `2024-06-01` instead of preview versions.
+
+---
+
+## Document Classification Service
+
+**Errors**:
+- **datetime not JSON serializable** → Use `model_dump_json()` instead of `model_dump()`
+
+**Example**:
+```python
+# Correct
 event_json = event.model_dump_json()
 event_dict = json.loads(event_json)
 await container.create_item(body=event_dict)
-
-# Config field name consistency
-class AppConfig(BaseModel):
-    openai: AzureOpenAIConfig  # Field name is 'openai'
-
-# Access must match field name
-classifier = DocumentClassifier(
-    openai_config=config.openai,  # Not config.azure_openai
-    cosmos_config=config.cosmos_db
-)
 ```
-
-**Prevention**: Use proper Pydantic serialization methods; ensure config field names are consistent throughout codebase.
 
 ---
 
-## Troubleshooting Checklist
+## Development Environment
 
-When encountering issues, check in this order:
+**Errors**:
+- **Port already in use** → Kill process or use different port
+- **Container build fails** → Ensure `uv.lock` exists, check connectivity
 
-### 1. Authentication
-- [ ] `az login` completed successfully
-- [ ] Correct Azure subscription selected
-- [ ] User has appropriate permissions
-
-### 2. Environment Configuration
-- [ ] `.env` file exists and populated
-- [ ] Required environment variables set
-- [ ] Terraform outputs match `.env` values
-
-### 3. Dependencies
-- [ ] `uv sync` completed successfully
-- [ ] Virtual environment activated
-- [ ] All required packages installed
-
-### 4. Azure Resources
-- [ ] Storage account exists and accessible
-- [ ] Service Bus namespace and topic exist
-- [ ] RBAC role assignments applied
-
-### 5. Application
-- [ ] Port 8000 available
-- [ ] No syntax errors in code
-- [ ] Proper error handling in place
+**Prevention**: Check port availability, commit lock files.
 
 ---
 
-## Debug Commands
+## Quick Troubleshooting
 
-### Azure Resource Verification
+1. **Authentication**: `az login`, check subscription and RBAC
+2. **Environment**: Verify `.env` matches Terraform outputs
+3. **Dependencies**: `uv sync`, activate virtual environment
+4. **Resources**: Check storage account, Service Bus, role assignments
+
+**Debug Commands**:
 ```powershell
-# Check storage account
-az storage account show --name <storage-account-name> --resource-group <rg-name>
-
-# Check service bus
-az servicebus namespace show --name <namespace-name> --resource-group <rg-name>
-
-# Check role assignments
-az role assignment list --assignee $(az account show --query user.name -o tsv)
-```
-
-### Application Debug
-```powershell
-# Check dependencies
-uv pip list
-
-# Test Azure connection
+# Check Azure connection
 uv run python -c "from azure.identity import DefaultAzureCredential; DefaultAzureCredential().get_token('https://storage.azure.com/.default')"
 
-# Check environment
-uv run python -c "import os; print(os.getenv('AZURE_STORAGE_ACCOUNT_NAME'))"
-```
-
-### Network and Process Debug
-```powershell
 # Check port usage
 netstat -ano | findstr :8000
 
-# Check running Python processes
-tasklist | findstr python
+# Verify environment
+uv run python -c "import os; print(os.getenv('AZURE_STORAGE_ACCOUNT_NAME'))"
 ```
