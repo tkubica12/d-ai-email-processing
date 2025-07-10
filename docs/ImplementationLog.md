@@ -884,13 +884,6 @@ The service now has basic Change Feed monitoring capability:
 4. **Maintains continuation tokens** for resilient restart
 5. **Handles shutdown gracefully** with proper cleanup
 
-### Next Steps
-- Add Azure Document Intelligence client integration
-- Implement document download from blob storage
-- Add document content extraction and processing
-- Store results in Cosmos DB documents container
-- Emit DocumentContentExtractedEvent
-
 **Status**: MVP Change Feed processing operational. Service successfully monitors events and filters for document uploads.
 
 ---
@@ -1045,3 +1038,109 @@ AZURE_STORAGE_ACCOUNT_NAME=stemaildevvwyhemail
 5. Emit DocumentContentExtractedEvent
 
 **Status**: Sequential Change Feed processing with persistent continuation tokens operational. Service maintains processing state across restarts and handles events reliably.
+
+---
+
+## Phase 3: Document Processing Service (2025-07-10)
+
+### docproc-parser-foundry Service Implementation
+
+#### Status: Core Implementation Complete
+
+#### Components Implemented
+- **Change Feed Processing**: Cosmos DB change feed listener for DocumentUploadedEvent
+- **Azure Document Intelligence**: Integration with prebuilt-layout model
+- **Azure Blob Storage**: Document download functionality
+- **Markdown Extraction**: Document content extraction to markdown format
+
+#### Technical Decisions
+- **Authentication**: DefaultAzureCredential for all Azure services
+- **Document Format**: Document Intelligence prebuilt-layout model with markdown output
+- **Error Handling**: Comprehensive error handling with debug logging
+- **Package Management**: uv for dependency management
+- **Async Operations**: Full async/await implementation
+
+#### Key Implementation Details
+- Document Intelligence API using `azure-ai-documentintelligence` package
+- Blob storage async operations with `azure-storage-blob`
+- Document content passed as `bytes_source` to `AnalyzeDocumentRequest`
+- Markdown content extraction with debug logging
+- Proper resource cleanup with async context managers
+
+#### Document Intelligence Markdown Output Format
+- **Expected Behavior**: Output contains HTML-like elements (`<table>`, `<figure>` tags)
+- **Reason**: Document Intelligence uses HTML table syntax for maximum fidelity
+- **Standard Markdown**: Cannot preserve complex table structures and merged cells
+- **HTML in Markdown**: Preserves table captions, rowspan/colspan, and figure semantic meaning
+- **Reference**: [Microsoft Documentation](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/concept/markdown-elements?view=doc-intel-4.0.0)
+
+#### Import and API Resolution
+- Fixed import error: `ContentFormat` → `DocumentContentFormat` 
+- Fixed API usage: `AnalyzeDocumentRequest(base64Source=...)` → `AnalyzeDocumentRequest(); req.bytes_source = bytes`
+- Fixed method call: `analyze_request=request` → `body=request`
+- Validated all dependencies in pyproject.toml
+- Confirmed uv package manager compatibility
+
+#### Configuration Added
+- Document Intelligence endpoint configuration
+- Storage account name configuration
+- Debug logging for document content output
+
+#### Architecture Notes
+- Service listens to Cosmos DB change feed
+- Downloads documents from blob storage on DocumentUploadedEvent
+- Processes documents through Document Intelligence API
+- Logs extracted markdown content for debugging
+- Maintains proper error handling and resource management
+
+### Final Implementation Complete (2025-07-10)
+
+#### Document Storage and Event Emission
+- **Document Storage**: Implemented storage of extracted content in Cosmos DB documents container
+- **Event Emission**: Implemented DocumentContentExtractedEvent emission to events container
+- **Text File Handling**: Added support for text files without Document Intelligence processing
+- **File Format Detection**: Implemented file format validation for Document Intelligence compatibility
+
+#### Core Features Completed
+✅ **Document Download**: Azure Blob Storage document retrieval
+✅ **Document Intelligence**: PDF, Word, Excel, PowerPoint, and image processing
+✅ **Text File Support**: Direct text file content extraction without Document Intelligence
+✅ **Content Storage**: DocumentRecord creation and storage in Cosmos DB documents container
+✅ **Event Emission**: DocumentContentExtractedEvent publishing to events container
+✅ **Error Handling**: Comprehensive retry logic with tenacity for transient errors
+✅ **Authentication**: DefaultAzureCredential integration for all Azure services
+
+#### Technical Architecture
+- **Supported Formats**: PDF, DOCX, XLSX, PPTX, JPG, PNG, BMP, TIFF, HEIF, HTML, TXT
+- **Processing Pipeline**: 
+  1. Document Intelligence for supported formats (PDF, images, Office docs)
+  2. Direct text reading for unsupported formats (TXT files)
+  3. Content storage in documents container with DocumentRecord schema
+  4. Event emission with DocumentContentExtractedEvent schema
+- **Error Handling**: Retry logic for authentication, rate limiting, and transient failures
+- **Logging**: Debug-level content logging, structured error logging
+
+#### Data Models Aligned
+- **DocumentRecord**: Matches Design.md schema with all required fields
+- **DocumentContentExtractedEvent**: Matches Design.md event schema
+- **DocumentContentExtractedEventData**: Correct data payload structure
+
+#### Code Quality
+- **Async Operations**: Full async/await implementation
+- **Resource Management**: Proper client cleanup and connection management
+- **Error Recovery**: Tenacity-based retry with exponential backoff
+- **Logging**: Structured logging with appropriate levels
+- **Documentation**: Comprehensive docstrings for all methods
+
+#### Integration Points
+- **Input**: DocumentUploadedEvent from Cosmos DB change feed
+- **Output**: DocumentContentExtractedEvent to events container
+- **Storage**: DocumentRecord in documents container
+- **Dependencies**: Azure Document Intelligence, Blob Storage, Cosmos DB
+
+#### Ready for Testing
+The docproc-parser-foundry service is now complete and ready for end-to-end testing with:
+- Document upload events from submission-intake service
+- Document Intelligence processing for supported formats
+- Text file processing for unsupported formats
+- Content storage and event emission for downstream services

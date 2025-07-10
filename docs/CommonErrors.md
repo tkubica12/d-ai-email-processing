@@ -331,6 +331,41 @@ doc_id = urllib.parse.quote(document_url, safe='')
 
 ---
 
+## Document Intelligence Markdown Output Format
+
+### Issue: Output looks like HTML instead of pure markdown
+
+**Problem**: When using Document Intelligence with `output_content_format=DocumentContentFormat.MARKDOWN`, the output contains HTML-like elements such as `<table>`, `<tr>`, `<th>`, `<td>`, and `<figure>` tags.
+
+**Root Cause**: This is the **correct and expected behavior**. Document Intelligence intentionally uses HTML table syntax and figure tags within its markdown output to preserve complex document structures that standard markdown cannot handle.
+
+**Solution**: No fix needed. According to Microsoft documentation:
+- **Tables**: Uses full HTML table markup (`<table>`, `<tr>`, `<th>`, `<td>`) rather than standard Markdown tables for maximum fidelity
+- **Figures**: Uses `<figure>` tags to maintain semantic distinction from surrounding text  
+- **Complex structures**: HTML elements preserve merged cells, table captions, and other complex formatting
+
+**Reference**: [Document Intelligence Markdown Elements Documentation](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/concept/markdown-elements?view=doc-intel-4.0.0)
+
+**Example Output** (correct format):
+```markdown
+<figure>
+PUMA Europe
+</figure>
+
+<table>
+<tr>
+<th>Header</th>
+<th>Value</th>
+</tr>
+<tr>
+<td>Date</td>
+<td>05 Jul 2025</td>
+</tr>
+</table>
+```
+
+---
+
 ## Troubleshooting Checklist
 
 When encountering issues, check in this order:
@@ -396,3 +431,151 @@ netstat -ano | findstr :8000
 # Check running Python processes
 tasklist | findstr python
 ```
+
+---
+
+## Azure Document Intelligence API Issues
+
+### Error: Invalid request - file format unsupported
+
+**Problem**: Document Intelligence returns HTTP 400 error with message "The file is corrupted or format is unsupported" when processing certain file types like `.txt` files.
+
+**Root Cause**: Document Intelligence only supports specific file formats (PDF, images, Office documents, HTML) and cannot process plain text files.
+
+**Solution**: Implement format detection and handle unsupported formats separately:
+```python
+def _is_supported_document_format(self, document_url: str) -> bool:
+    """Check if document format is supported by Document Intelligence."""
+    supported_extensions = {
+        '.pdf', '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', 
+        '.heif', '.docx', '.xlsx', '.pptx', '.html'
+    }
+    
+    file_path = urlparse(document_url).path.lower()
+    return any(file_path.endswith(ext) for ext in supported_extensions)
+
+# Process supported formats with Document Intelligence
+if self._is_supported_document_format(document_url):
+    markdown_content = await self._process_document_with_intelligence(document_content)
+else:
+    # Handle text files directly
+    markdown_content = document_content.decode('utf-8')
+```
+
+**Prevention**: Always validate file formats before sending to Document Intelligence. Handle unsupported formats with alternative processing methods.
+
+---
+
+## Cosmos DB Partition Key Mismatches
+
+### Error: Entity with specified id does not exist (404)
+
+**Problem**: Cosmos DB returns "NotFound" error when trying to read documents that definitely exist in the container.
+
+**Root Cause**: Using incorrect partition key value when reading documents. The partition key used in the read operation must exactly match the partition key of the stored document.
+
+**Common Scenarios**:
+- Design documentation specifies one partition key but infrastructure uses another
+- Application code uses wrong field as partition key value
+
+**Example Error**:
+```
+(NotFound) Entity with the specified id does not exist in the system
+Code: NotFound
+```
+
+**Solution**: Verify the actual partition key configuration and use correct field:
+```python
+# ❌ Wrong - using documentUrl when container uses submissionId as partition key
+existing_doc = await container.read_item(
+    item=document_id,
+    partition_key=event.data.documentUrl  # Wrong partition key!
+)
+
+# ✅ Correct - match the container's actual partition key configuration
+existing_doc = await container.read_item(
+    item=document_id,
+    partition_key=event.submissionId  # Correct partition key
+)
+```
+
+**Debug Steps**:
+1. Check Terraform configuration for actual partition key:
+   ```terraform
+   resource "azurerm_cosmosdb_sql_container" "documents" {
+     partition_key_paths = ["/submissionId"]  # Actual partition key
+   }
+   ```
+2. Verify document structure in Azure Portal
+3. Update application code to use correct partition key field
+
+**Prevention**: 
+- Keep Design.md documentation in sync with Terraform infrastructure
+- Test document operations with actual container configuration
+- Add logging to show partition key values being used
+
+---
+
+## Azure SDK Async API Usage Issues
+
+### Error: Unexpected keyword argument 'partition_key'
+
+**Problem**: Cosmos DB operations fail with error about unexpected `partition_key` parameter.
+
+**Root Cause**: In the async version of Azure Cosmos DB SDK, partition keys are automatically extracted from the document body based on container configuration, not passed as separate parameters.
+
+**Solution**: Remove explicit partition_key parameters from create_item calls:
+```python
+# ❌ Wrong - explicit partition key parameter
+await container.create_item(
+    body=document_data,
+    partition_key=partition_value  # This causes the error
+)
+
+# ✅ Correct - partition key extracted from document body
+await container.create_item(
+    body=document_data  # Partition key auto-extracted from body
+)
+```
+
+**Key Insight**: The async Cosmos DB SDK behaves differently from the sync version regarding partition key handling. Always check SDK documentation for the specific version being used.
+
+---
+
+## Document Processing Architecture Patterns
+
+### Issue: Creating duplicate records instead of updating existing ones
+
+**Problem**: Document processing service creates new document records instead of updating existing ones, leading to data duplication and inconsistency.
+
+**Root Cause**: Missing document ID in event data, forcing services to either search for existing records (inefficient) or create new ones (incorrect).
+
+**Solution**: Include document ID in events for direct record updates:
+```python
+# ❌ Wrong - event only contains URL, requires search or creates duplicate
+class DocumentUploadedEventData(BaseModel):
+    documentUrl: str
+
+# ✅ Correct - event includes document ID for direct updates
+class DocumentUploadedEventData(BaseModel):
+    documentUrl: str
+    documentId: str  # Enables direct document updates
+
+# Update existing document instead of creating new one
+existing_doc = await container.read_item(
+    item=event.data.documentId,
+    partition_key=event.submissionId
+)
+existing_doc['content'] = extracted_content
+await container.replace_item(item=event.data.documentId, body=existing_doc)
+```
+
+**Architectural Flow**:
+1. submission-intake creates initial DocumentRecord with empty content
+2. submission-intake emits DocumentUploadedEvent with documentId
+3. docproc-parser-foundry updates existing DocumentRecord with extracted content
+4. Other services continue updating the same record
+
+**Prevention**: Design events to include sufficient context for efficient operations. Avoid forcing downstream services to search for related records.
+
+---

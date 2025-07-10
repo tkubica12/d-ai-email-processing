@@ -15,16 +15,21 @@ class DocumentUploadedEventData(BaseModel):
     """
     Data payload for DocumentUploadedEvent.
     
-    Only contains the documentUrl - other fields are at the top level.
-    
     Attributes:
         documentUrl: Azure Blob Storage URL for the document
+        documentId: ID of the document record in the documents container
     """
     
     documentUrl: str = Field(
         ...,
         description="Azure Blob Storage URL for the document",
         example="https://storage.blob.core.windows.net/submissions/123e4567-e89b-12d3-a456-426614174000/document1.pdf"
+    )
+    
+    documentId: str = Field(
+        ...,
+        description="ID of the document record in the documents container",
+        example="550e8400-e29b-41d4-a716-446655440000"
     )
 
 
@@ -65,13 +70,12 @@ class DocumentUploadedEvent(BaseModel):
     userId: str = Field(
         ...,
         description="User who uploaded the document",
-        example="user123"
+        example="user@example.com"
     )
     
     timestamp: datetime = Field(
         ...,
-        description="ISO 8601 timestamp when event was created",
-        example="2025-07-07T14:30:00.123456Z"
+        description="ISO 8601 timestamp when event was created"
     )
     
     data: DocumentUploadedEventData = Field(
@@ -85,19 +89,10 @@ class DocumentContentExtractedEventData(BaseModel):
     Data payload for DocumentContentExtractedEvent.
     
     Attributes:
-        submissionId: Unique identifier for the submission
         documentUrl: Azure Blob Storage URL for the document
-        extractedContent: Extracted content in Markdown format
-        extractedAt: ISO 8601 timestamp when content was extracted
-        processingDuration: Processing duration in seconds
-        documentType: Detected document type
+        contentLength: Length of extracted content in characters
+        success: Whether content extraction was successful
     """
-    
-    submissionId: str = Field(
-        ...,
-        description="Unique identifier for the submission",
-        example="123e4567-e89b-12d3-a456-426614174000"
-    )
     
     documentUrl: str = Field(
         ...,
@@ -105,72 +100,67 @@ class DocumentContentExtractedEventData(BaseModel):
         example="https://storage.blob.core.windows.net/submissions/123e4567-e89b-12d3-a456-426614174000/document1.pdf"
     )
     
-    extractedContent: str = Field(
+    contentLength: int = Field(
         ...,
-        description="Extracted content in Markdown format",
-        example="# Document Title\n\nThis is the extracted content..."
+        description="Length of extracted content in characters",
+        example=15000
     )
     
-    extractedAt: datetime = Field(
+    success: bool = Field(
         ...,
-        description="ISO 8601 timestamp when content was extracted",
-        example="2025-07-07T14:35:00.123456Z"
-    )
-    
-    processingDuration: float = Field(
-        ...,
-        description="Processing duration in seconds",
-        example=5.234
-    )
-    
-    documentType: Optional[str] = Field(
-        None,
-        description="Detected document type",
-        example="invoice"
+        description="Whether content extraction was successful",
+        example=True
     )
 
 
 class DocumentContentExtractedEvent(BaseModel):
     """
-    Event model for document content extraction completion.
+    Event model emitted after document content extraction is complete.
     
-    This event is emitted after successful processing of a document
-    using Azure Document Intelligence.
+    This event is triggered when Document Intelligence has successfully
+    extracted content from a document and stored it in the documents container.
     
     Attributes:
         id: Unique event identifier
         eventType: Type of event (DocumentContentExtractedEvent)
-        data: Event data payload
+        submissionId: Unique identifier for the submission
+        userId: User who uploaded the document
         timestamp: ISO 8601 timestamp when event was created
-        submissionId: Partition key for the event
+        data: Event data payload
     """
     
     id: str = Field(
         ...,
         description="Unique event identifier",
-        example="evt_456e7890-f12a-34b5-c678-901234567890"
+        example="evt_123e4567-e89b-12d3-a456-426614174000"
     )
     
     eventType: str = Field(
         default="DocumentContentExtractedEvent",
-        description="Type of event"
+        description="Type of event",
+        example="DocumentContentExtractedEvent"
+    )
+    
+    submissionId: str = Field(
+        ...,
+        description="Unique identifier for the submission",
+        example="123e4567-e89b-12d3-a456-426614174000"
+    )
+    
+    userId: str = Field(
+        ...,
+        description="User who uploaded the document",
+        example="user@example.com"
+    )
+    
+    timestamp: datetime = Field(
+        ...,
+        description="ISO 8601 timestamp when event was created"
     )
     
     data: DocumentContentExtractedEventData = Field(
         ...,
         description="Event data payload"
-    )
-    
-    timestamp: datetime = Field(
-        ...,
-        description="ISO 8601 timestamp when event was created",
-        example="2025-07-07T14:35:00.123456Z"
-    )
-    
-    submissionId: str = Field(
-        ...,
-        description="Partition key for the event",
-        example="123e4567-e89b-12d3-a456-426614174000"
     )
 
 
@@ -181,66 +171,76 @@ class DocumentRecord(BaseModel):
     This represents the processed document content and metadata
     stored after successful extraction.
     
-    Attributes:
-        id: Document identifier (derived from documentUrl)
-        documentUrl: Azure Blob Storage URL for the document (partition key)
-        submissionId: Unique identifier for the submission
-        content: Extracted content in Markdown format
-        processedAt: ISO 8601 timestamp when document was processed
-        processingDuration: Processing duration in seconds
-        documentType: Detected document type
-        extractionMetadata: Additional metadata from extraction process
+    Schema matches Design.md specification:
+    - Container: documents
+    - Partition Key: documentUrl (unique identifier)
+    - Document ID: Generated GUID for each document record
     """
     
     id: str = Field(
         ...,
-        description="Document identifier (derived from documentUrl)",
-        example="doc_123e4567-e89b-12d3-a456-426614174000"
+        description="Generated GUID for document record",
+        example="550e8400-e29b-41d4-a716-446655440000"
     )
     
     documentUrl: str = Field(
         ...,
         description="Azure Blob Storage URL for the document (partition key)",
-        example="https://storage.blob.core.windows.net/submissions/123e4567-e89b-12d3-a456-426614174000/document1.pdf"
+        example="https://storage.blob.core.windows.net/submission-guid/document1.pdf"
     )
     
     submissionId: str = Field(
         ...,
         description="Unique identifier for the submission",
-        example="123e4567-e89b-12d3-a456-426614174000"
+        example="submission-guid"
+    )
+    
+    userId: str = Field(
+        ...,
+        description="User who uploaded the document",
+        example="user@example.com"
     )
     
     content: str = Field(
         ...,
-        description="Extracted content in Markdown format",
-        example="# Document Title\n\nThis is the extracted content..."
+        description="Full markdown content extracted from document using Azure Document Intelligence",
+        example="# Document Title\n\nFull markdown content extracted from document using Azure Document Intelligence..."
     )
     
-    processedAt: datetime = Field(
+    firstProcessedAt: datetime = Field(
         ...,
-        description="ISO 8601 timestamp when document was processed",
-        example="2025-07-07T14:35:00.123456Z"
+        description="ISO 8601 timestamp when document was first processed",
+        example="2025-07-07T10:00:00Z"
     )
     
-    processingDuration: float = Field(
+    lastProcessedAt: datetime = Field(
         ...,
-        description="Processing duration in seconds",
-        example=5.234
+        description="ISO 8601 timestamp when document was last processed",
+        example="2025-07-07T10:05:00Z"
     )
     
-    documentType: Optional[str] = Field(
+    # Optional fields that will be populated by other services
+    type: Optional[str] = Field(
         None,
-        description="Detected document type",
+        description="Document type (populated by classifier service)",
         example="invoice"
     )
     
-    extractionMetadata: Dict[str, Any] = Field(
+    summary: Optional[str] = Field(
+        None,
+        description="AI-generated summary of document content (populated by classifier service)",
+        example="AI-generated summary of document content..."
+    )
+    
+    extractedData: Dict[str, Any] = Field(
         default_factory=dict,
-        description="Additional metadata from extraction process",
+        description="Structured data extracted from document (populated by data extractor service)",
         example={
-            "pageCount": 3,
-            "confidence": 0.95,
-            "apiVersion": "2023-07-31"
+            "invoiceNumber": "INV-2025-001",
+            "amount": 1250.00,
+            "currency": "USD",
+            "dueDate": "2025-08-07",
+            "vendor": "Acme Corp"
         }
     )
 

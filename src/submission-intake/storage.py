@@ -143,9 +143,6 @@ class CosmosDBStorage:
                 body=submission_json
             )
             
-            # Create document records for each document
-            await self.create_document_records(submission_message)
-            
             logger.info(
                 f"Stored submission document: {submission_doc.submissionId} "
                 f"for user: {submission_doc.userId} "
@@ -249,12 +246,24 @@ class CosmosDBStorage:
         Raises:
             CosmosHttpResponseError: If any storage operation fails
         """
+        # First, create document records to get the document IDs
+        document_records = await self.create_document_records(submission_message)
+        
+        # Create a mapping from document URL to document ID
+        url_to_id = {doc.documentUrl: doc.id for doc in document_records}
+        
         events = []
         
         for document_url in submission_message.documentUrls:
+            # Get the document ID for this URL
+            document_id = url_to_id.get(document_url)
+            if not document_id:
+                raise RuntimeError(f"Document ID not found for URL: {document_url}")
+            
             # Create event data for this document
             event_data = DocumentUploadedEventData(
-                documentUrl=document_url
+                documentUrl=document_url,
+                documentId=document_id
             )
             
             # Create the event

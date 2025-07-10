@@ -381,12 +381,19 @@ class DocumentUploadedEventData(BaseModel):
     
     Attributes:
         documentUrl: Azure Blob Storage URL for the uploaded document
+        documentId: ID of the document record in the documents container
     """
     
     documentUrl: str = Field(
         ...,
         description="Azure Blob Storage URL for the uploaded document",
         example="https://storage.blob.core.windows.net/submission-guid/document1.pdf"
+    )
+    
+    documentId: str = Field(
+        ...,
+        description="ID of the document record in the documents container",
+        example="550e8400-e29b-41d4-a716-446655440000"
     )
 
 

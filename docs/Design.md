@@ -83,7 +83,7 @@ This approach uses event-driven architecture with event sourcing patterns to imp
 
 **Document Store:** Cosmos DB container for processed document results
 - Container: `documents` 
-- Partition Key: `documentUrl` (unique identifier)
+- Partition Key: `submissionId` (groups documents by submission)
 - Document ID: Generated GUID for each document record
 - Schema:
   ```json
@@ -210,7 +210,8 @@ This approach uses event-driven architecture with event sourcing patterns to imp
   "userId": "user@example.com",
   "timestamp": "2025-07-07T10:00:00Z",
   "data": {
-    "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf"
+    "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
+    "documentId": "550e8400-e29b-41d4-a716-446655440000"
   }
 }
 ```
