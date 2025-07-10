@@ -227,6 +227,7 @@ This approach uses event-driven architecture with event sourcing patterns to imp
   "timestamp": "2025-07-07T10:02:00Z",
   "data": {
     "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
+    "documentId": "550e8400-e29b-41d4-a716-446655440000",
     "contentLength": 15000,
     "success": true
   }
@@ -243,6 +244,7 @@ This approach uses event-driven architecture with event sourcing patterns to imp
   "timestamp": "2025-07-07T10:05:00Z",
   "data": {
     "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
+    "documentId": "550e8400-e29b-41d4-a716-446655440000",
     "documentType": "invoice",
     "confidence": 0.95,
     "success": true
@@ -260,6 +262,7 @@ This approach uses event-driven architecture with event sourcing patterns to imp
   "timestamp": "2025-07-07T10:04:00Z",
   "data": {
     "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
+    "documentId": "550e8400-e29b-41d4-a716-446655440000",
     "searchIndexId": "doc-uuid-in-search",
     "success": true
   }
@@ -276,7 +279,7 @@ This approach uses event-driven architecture with event sourcing patterns to imp
   "timestamp": "2025-07-07T10:06:00Z",
   "data": {
     "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
-    "extractedFields": ["invoiceNumber", "amount", "currency", "dueDate", "vendor"],
+    "documentId": "550e8400-e29b-41d4-a716-446655440000",
     "success": true
   }
 }

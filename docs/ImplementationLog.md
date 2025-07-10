@@ -124,4 +124,41 @@ class SubmissionMessage(BaseModel):
 
 ---
 
+## 2025-07-10 - Fixed docproc-parser-foundry DocumentContentExtractedEvent and partition key issues
+
+### Issues Fixed
+
+1. **Missing documentId in DocumentContentExtractedEvent data**: Added `documentId` field to `DocumentContentExtractedEventData` model and updated the change feed processor to include it when emitting events.
+
+2. **Partition key inconsistency**: Fixed inconsistency between Design document, Terraform configuration, and DocumentRecord model:
+   - Terraform specifies `/submissionId` as partition key for documents container
+   - Updated DocumentRecord model to correctly reflect `submissionId` as partition key (was incorrectly showing `documentUrl`)
+   - Updated change feed processor to use correct partition key when reading/writing documents
+
+3. **Event ID generation syntax error**: Fixed malformed UUID generation in event creation (`uuid.uuid4()"` → `str(uuid.uuid4())`)
+
+### Technical Details
+
+- **DocumentContentExtractedEventData**: Now includes both `documentUrl` and `documentId` fields, matching the design specification
+- **DocumentRecord**: Updated model documentation to reflect correct partition key (`submissionId`)
+- **Change Feed Processor**: Updated to use `submissionId` as partition key when interacting with documents container
+- **Event Generation**: Fixed event ID format to use clean UUID without prefix
+
+### contentLength Calculation
+
+The contentLength calculation (`len(markdown_content)`) appears to be correct. If contentLength is still showing as 0, it could be due to:
+1. Document Intelligence service not extracting content (unreadable documents)
+2. Processing failures resulting in empty content
+3. Actually empty documents
+
+The system properly handles both success and failure cases:
+- Success: `contentLength = len(markdown_content)`
+- Failure: `contentLength = 0` with `success = false`
+
+### Architecture Impact
+
+This ensures consistency across all document events (DocumentContentExtractedEvent, DocumentClassifiedEvent, DocumentIndexedEvent) - all now properly include `documentId` in their data payloads, enabling downstream services to efficiently identify and process specific documents. Event IDs are now clean UUIDs without prefixes.
+
+---
+
 **This log is now streamlined for quick reference. For detailed code or configuration, see the relevant source files and documentation.**

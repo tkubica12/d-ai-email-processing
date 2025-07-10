@@ -447,13 +447,14 @@ class ChangeFeedProcessor:
             # Create event data
             event_data = DocumentContentExtractedEventData(
                 documentUrl=event.data.documentUrl,
+                documentId=event.data.documentId,
                 contentLength=len(markdown_content) if success else 0,
                 success=success
             )
             
             # Create event
             content_extracted_event = DocumentContentExtractedEvent(
-                id=f"evt_{uuid.uuid4()}",
+                id=str(uuid.uuid4()),
                 eventType="DocumentContentExtractedEvent",
                 submissionId=event.submissionId,
                 userId=event.userId,

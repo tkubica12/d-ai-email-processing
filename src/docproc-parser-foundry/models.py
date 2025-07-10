@@ -90,6 +90,7 @@ class DocumentContentExtractedEventData(BaseModel):
     
     Attributes:
         documentUrl: Azure Blob Storage URL for the document
+        documentId: ID of the document record in the documents container
         contentLength: Length of extracted content in characters
         success: Whether content extraction was successful
     """
@@ -98,6 +99,12 @@ class DocumentContentExtractedEventData(BaseModel):
         ...,
         description="Azure Blob Storage URL for the document",
         example="https://storage.blob.core.windows.net/submissions/123e4567-e89b-12d3-a456-426614174000/document1.pdf"
+    )
+    
+    documentId: str = Field(
+        ...,
+        description="ID of the document record in the documents container",
+        example="550e8400-e29b-41d4-a716-446655440000"
     )
     
     contentLength: int = Field(
@@ -132,7 +139,7 @@ class DocumentContentExtractedEvent(BaseModel):
     id: str = Field(
         ...,
         description="Unique event identifier",
-        example="evt_123e4567-e89b-12d3-a456-426614174000"
+        example="123e4567-e89b-12d3-a456-426614174000"
     )
     
     eventType: str = Field(
@@ -173,7 +180,7 @@ class DocumentRecord(BaseModel):
     
     Schema matches Design.md specification:
     - Container: documents
-    - Partition Key: documentUrl (unique identifier)
+    - Partition Key: submissionId (groups documents by submission)
     - Document ID: Generated GUID for each document record
     """
     
@@ -185,13 +192,13 @@ class DocumentRecord(BaseModel):
     
     documentUrl: str = Field(
         ...,
-        description="Azure Blob Storage URL for the document (partition key)",
+        description="Azure Blob Storage URL for the document",
         example="https://storage.blob.core.windows.net/submission-guid/document1.pdf"
     )
     
     submissionId: str = Field(
         ...,
-        description="Unique identifier for the submission",
+        description="Unique identifier for the submission (partition key)",
         example="submission-guid"
     )
     
