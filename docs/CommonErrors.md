@@ -1,367 +1,207 @@
 # Common Errors and Solutions
 
-## Email Processing System - Client Web Application
-
-This document tracks common errors encountered during development and their solutions.
+This document tracks common errors encountered during development, grouped by category for quick reference.
 
 ---
 
-## Azure Authentication Issues
+## 1. Azure Authentication & Permissions
 
-### Error: DefaultAzureCredential failed to retrieve a token
-**Description**: Application fails to authenticate with Azure services during local development.
+**Description**: Issues authenticating with Azure services or lacking required permissions.
 
-**Symptoms**:
-```
-azure.core.exceptions.ClientAuthenticationError: DefaultAzureCredential failed to retrieve a token from the included credentials.
-```
+**Common Errors**:
+- **DefaultAzureCredential failed to retrieve a token**
+  - *Cause*: Not logged in, wrong subscription.
+  - *Fix*: `az login`, `az account set --subscription <id>`
+- **AuthorizationFailed - This request is not authorized**
+  - *Cause*: Missing RBAC roles.
+  - *Fix*: Check role assignments, re-apply Terraform.
 
-**Root Cause**: User not authenticated with Azure CLI or using wrong subscription.
-
-**Solution**:
-1. Run `az login` to authenticate
-2. Verify subscription: `az account show`
-3. Set correct subscription: `az account set --subscription <subscription-id>`
-
-**Prevention**: Include authentication check in application startup
+**Prevention**: Always verify authentication and RBAC before running the app.
 
 ---
 
-## Environment Configuration
+## 2. Environment & Configuration
 
-### Error: Missing required environment variables
-**Description**: Application starts but fails when trying to access Azure services.
+**Description**: Problems due to missing or incorrect environment variables.
 
-**Symptoms**:
-```
-ValueError: Missing required environment variables: AZURE_STORAGE_ACCOUNT_NAME, AZURE_SERVICE_BUS_FQDN
-```
+**Common Errors**:
+- **Missing required environment variables**
+  - *Symptoms*: App fails accessing Azure resources.
+  - *Fix*: Update `.env` with Terraform outputs.
 
-**Root Cause**: `.env` file not configured with Azure resource names.
-
-**Solution**:
-1. Manually update `.env` file with values from Terraform outputs
-2. Verify Terraform outputs: `terraform output -json`
-3. Verify `.env` file has correct values
-
-**Prevention**: Include environment validation in application startup
+**Prevention**: Validate environment at startup.
 
 ---
 
-## Permission Issues
+## 3. Dependency & Package Management
 
-### Error: AuthorizationFailed - This request is not authorized
-**Description**: Azure services reject requests due to insufficient permissions.
+**Description**: Python package import errors or missing dependencies.
 
-**Symptoms**:
-```
-azure.core.exceptions.HttpResponseError: (AuthorizationFailed) This request is not authorized to perform this operation.
-```
+**Common Errors**:
+- **Import could not be resolved**
+  - *Cause*: Dependencies not installed or venv not activated.
+  - *Fix*: `uv sync`, use `uv run`.
 
-**Root Cause**: RBAC role assignments not applied or user lacks permissions.
-
-**Solution**:
-1. Verify Terraform applied RBAC: `terraform plan` should show no changes
-2. Check role assignments: `az role assignment list --assignee $(az account show --query user.name -o tsv)`
-3. Re-apply Terraform: `terraform apply`
-
-**Prevention**: Include RBAC verification in infrastructure deployment
+**Prevention**: Always sync and activate environment.
 
 ---
 
-## Dependency and Package Issues
+## 4. Terraform & Azure Resource Management
 
-### Error: Import could not be resolved
-**Description**: Python imports fail for Azure or FastHTML packages.
+**Description**: Issues with resource creation, state, or configuration.
 
-**Symptoms**:
-```
-Import "fasthtml.common" could not be resolved
-Import "azure.storage.blob" could not be resolved
-```
+**Common Errors**:
+- **Resource already exists**
+  - *Fix*: Import resource or destroy/recreate.
+- **RBAC not applied**
+  - *Fix*: Check `terraform plan`, re-apply if needed.
 
-**Root Cause**: Dependencies not installed or virtual environment not activated.
-
-**Solution**:
-1. Install dependencies: `uv sync`
-2. Verify installation: `uv pip list`
-3. Use `uv run` to ensure correct environment: `uv run python main.py`
+**Prevention**: Use consistent naming and manage state carefully.
 
 ---
 
-## Terraform Issues
+## 5. File Upload & Blob Storage
 
-### Error: Resource already exists
-**Description**: Terraform fails because resources already exist in Azure.
+**Description**: File uploads not appearing in Azure Storage.
 
-**Symptoms**:
-```
-Error: A resource with the ID already exists
-```
+**Common Errors**:
+- **File upload fails silently**
+  - *Causes*: Input mishandling, permissions, file size.
+  - *Fix*: Check input handling, permissions, add logging.
 
-**Root Cause**: Previous deployment not properly cleaned up or state file issues.
-
-**Solution**:
-1. Import existing resource: `terraform import <resource_type>.<name> <azure_resource_id>`
-2. Or destroy and recreate: `terraform destroy` then `terraform apply`
-3. Check state file: `terraform state list`
-
-**Prevention**: Use consistent resource naming and proper state management
+**Prevention**: Add logging and error handling for uploads.
 
 ---
 
-## File Upload Issues
+## 6. Containerization & Docker
 
-### Error: File upload fails silently
-**Description**: Form submission works but files don't appear in blob storage.
+**Description**: Docker build or run failures.
 
-**Symptoms**: Success message shown but no blobs created in Azure Storage.
+**Common Errors**:
+- **Container build fails**
+  - *Causes*: Missing lock file, platform issues, network.
+  - *Fix*: Ensure `uv.lock` exists, check connectivity.
 
-**Root Cause**: 
-- File input not properly handled in FastHTML
-- Blob storage permissions
-- File size limitations
-
-**Solution**:
-1. Check file input handling in `main.py`
-2. Verify blob storage permissions
-3. Check file size limits in Azure Storage
-4. Add logging to track upload process
-
-**Prevention**: Add comprehensive logging and error handling for file operations
+**Prevention**: Commit lock files, test builds locally.
 
 ---
 
-## Container and Docker Issues
+## 7. Service Bus Messaging
 
-### Error: Container build fails
-**Description**: Docker build process fails when creating container image.
+**Description**: Issues sending or receiving Service Bus messages.
 
-**Symptoms**:
-```
-ERROR: failed to solve: process "/bin/sh -c uv sync --frozen" did not complete successfully
-```
+**Common Errors**:
+- **Message publishing fails**
+  - *Causes*: Permissions, missing topic, bad format.
+  - *Fix*: Verify topic, permissions, message format.
 
-**Root Cause**: 
-- Missing `uv.lock` file
-- Platform-specific dependencies
-- Network issues during build
-
-**Solution**:
-1. Ensure `uv.lock` exists: `uv lock`
-2. Use multi-stage build for platform compatibility
-3. Check network connectivity during build
-
-**Prevention**: Include lock file in version control and test builds locally
+**Prevention**: Health checks for Service Bus.
 
 ---
 
-## Service Bus Message Issues
+## 8. Development Environment
 
-### Error: Message publishing fails
-**Description**: Blob storage works but Service Bus messages not sent.
+**Description**: Local development issues.
 
-**Symptoms**: Containers created but no messages in Service Bus topic.
+**Common Errors**:
+- **Port already in use**
+  - *Fix*: Kill process or use different port.
 
-**Root Cause**:
-- Service Bus permissions
-- Topic doesn't exist
-- Message format issues
-
-**Solution**:
-1. Verify topic exists: `az servicebus topic show --name new-submissions --namespace-name <namespace>`
-2. Check Service Bus permissions in Azure Portal
-3. Validate message JSON format
-4. Add error handling for Service Bus operations
-
-**Prevention**: Include Service Bus verification in health checks
+**Prevention**: Check port before starting app.
 
 ---
 
-## Development Environment Issues
+## 9. FastHTML Framework Usage
 
-### Error: Port already in use
-**Description**: Application fails to start because port 8000 is occupied.
+**Description**: Type errors in route parameters.
 
-**Symptoms**:
-```
-OSError: [Errno 48] Address already in use
-```
+**Common Errors**:
+- **Type List cannot be instantiated**
+  - *Cause*: Using `typing.List` instead of `list`.
+  - *Fix*: Use built-in `list` or manual form parsing.
 
-**Root Cause**: Another process using port 8000 or previous application instance still running.
-
-**Solution**:
-1. Kill existing process: `netstat -ano | findstr :8000` then `taskkill /F /PID <pid>`
-2. Use different port: Set `PORT=8001` in `.env`
-3. Check for background processes
-
-**Prevention**: Check port availability before starting application
-
----
-
-## FastHTML Framework Issues
-
-### Error: Type List cannot be instantiated
-**Description**: FastHTML application crashes with type instantiation error during form submission with file uploads.
-
-**Symptoms**:
-```
-TypeError: Type List cannot be instantiated; use list() instead
-```
-
-**Root Cause**: Using `typing.List` instead of built-in `list` in route function parameters. FastHTML's request parameter injection tries to instantiate the type annotation directly.
-
-**Solution**:
+**Example**:
 ```python
-# ❌ Wrong - causes instantiation error
-@rt("/submit", methods=["POST"])
-async def post(email: str, message: str, attachments: Optional[List] = None):
-
-# ✅ Correct - use built-in list type
-@rt("/submit", methods=["POST"])  
-async def post(email: str, message: str, attachments: Optional[list] = None):
-
-# ✅ Better - use manual form parsing for complex uploads
-@rt("/submit", methods=["POST"])
-async def post(request):
-    form = await request.form()
-    attachments = form.getlist("attachments")
+# Wrong
+async def post(attachments: Optional[List] = None):
+# Correct
+async def post(attachments: Optional[list] = None):
 ```
 
-**Prevention**: 
-- Use built-in types (`list`, `dict`) instead of `typing` module types for FastHTML routes
-- For complex file uploads, use manual form parsing with `request.form()`
+**Prevention**: Use built-in types for FastHTML routes.
 
 ---
 
-## Cosmos DB Configuration Issues
+## 10. Cosmos DB Issues
 
-### Error: Entity with the specified id already exists in the system
-**Description**: Cosmos DB returns conflict error (409) when creating documents, even though document IDs are unique UUIDs.
+**Description**: Document creation/read errors due to misconfigured keys, invalid IDs, or SDK usage.
 
-**Symptoms**:
-```
-azure.core.exceptions.HttpResponseError: (Conflict) Entity with the specified id already exists in the system.
-RequestStartTime: 2025-07-07T15:19:16.3732535Z, RequestEndTime: 2025-07-07T15:19:16.3747973Z, Number of regions attempted:1
-Code: Conflict
-Message: Entity with the specified id already exists in the system.
-```
+**Common Errors**:
+- **Entity with specified id already exists (409)**
+  - *Cause*: Unique key constraint mismatch.
+  - *Fix*: Match unique key paths to schema.
+- **Entity with specified id does not exist (404)**
+  - *Cause*: Wrong partition key used in read.
+  - *Fix*: Use correct partition key from container config.
+- **Invalid characters in document ID**
+  - *Cause*: Using URLs/strings with `/` as IDs.
+  - *Fix*: Use UUIDs or URL-encode.
+- **Unexpected keyword argument 'partition_key'**
+  - *Cause*: Passing partition_key in async SDK.
+  - *Fix*: Remove explicit partition_key, let SDK extract from body.
 
-**Root Cause**: Misconfigured unique key constraints in Terraform Cosmos DB container configuration. The container had a unique key constraint on a field that doesn't exist in the document schema.
-
-**Example Problem**:
-```terraform
-resource "azurerm_cosmosdb_sql_container" "events" {
-  name                = "events"
-  partition_key_paths = ["/submissionId"]
-  
-  # ❌ Wrong - field doesn't exist in documents
-  unique_key {
-    paths = ["/eventId"]  # This field doesn't exist!
-  }
-}
-```
-
-**Solution**:
-1. Review Cosmos DB container configuration in Terraform
-2. Verify unique key constraints match actual document schema
-3. Remove invalid unique key constraints
-4. Apply Terraform changes: `terraform plan` and `terraform apply`
-
-**Correct Configuration**:
-```terraform
-resource "azurerm_cosmosdb_sql_container" "events" {
-  name                = "events"
-  partition_key_paths = ["/submissionId"]
-  
-  # No unique key constraints needed for events container
-  # Documents use random UUIDs as IDs which are inherently unique
-}
-```
-
-**Prevention**: 
-- Always verify unique key paths exist in document schema before configuring
-- Test container configuration with sample documents
-- Use descriptive field names that match the actual data model
-- Review Design.md schema when configuring Cosmos DB containers
-
-**Key Insight**: Cosmos DB conflict errors can be caused by infrastructure configuration issues, not just application code. Always check Terraform configuration when debugging "entity already exists" errors, especially unique key constraints and partition key configuration.
-
----
-
-## Cosmos DB Document ID Issues
-
-### Error: Invalid characters in document ID
-**Description**: Cosmos DB rejects document creation with error about invalid characters in the document ID, even when the ID appears to be a valid string.
-
-**Symptoms**:
-```
-azure.core.exceptions.HttpResponseError: (BadRequest) Invalid characters in document id
-```
-
-**Root Cause**: Forward slashes (`/`) and other special characters are illegal in Cosmos DB document IDs. Using URLs directly as document IDs will fail because URLs contain forward slashes.
-
-**Solution**:
+**Examples**:
 ```python
-import uuid
+# Partition key mismatch
+container.read_item(item=id, partition_key=wrong_value)  # Wrong
+container.read_item(item=id, partition_key=correct_value)  # Correct
 
-# ❌ Wrong - URL contains illegal forward slashes
-doc_id = "https://storage.blob.core.windows.net/submission-guid/document1.pdf"
+# Invalid ID
+doc_id = str(uuid.uuid4())  # Good
+doc_id = urllib.parse.quote(url, safe='')  # If needed
 
-# ✅ Correct - Use generated GUID as document ID
-doc_id = str(uuid.uuid4())
-
-# Store documentUrl as separate field for queries
-doc_record = DocumentRecord(
-    id=doc_id,
-    documentUrl=document_url,  # Original URL for partition key and queries
-    # ...other fields
-)
-
-# Alternative: URL encode if you need the URL as the ID
-doc_id = urllib.parse.quote(document_url, safe='')
+# Async SDK
+await container.create_item(body=data)  # Correct
 ```
 
-**Prevention**: 
-- Use generated GUIDs for Cosmos DB document IDs when the original string contains special characters
-- Store the original string (URL, path, etc.) as a separate field for queries
-- If you must use the original string as ID, URL encode it with `urllib.parse.quote(string, safe='')`
-
-**Key Insight**: Cosmos DB document IDs have strict character restrictions. URLs, file paths, and other strings with special characters must be encoded before use as document IDs.
+**Prevention**: Sync schema, Terraform, and code; never use raw URLs as IDs; check SDK docs.
 
 ---
 
-## Document Intelligence Markdown Output Format
+## 11. Document Intelligence API
 
-### Issue: Output looks like HTML instead of pure markdown
+**Description**: File format or output issues with Document Intelligence.
 
-**Problem**: When using Document Intelligence with `output_content_format=DocumentContentFormat.MARKDOWN`, the output contains HTML-like elements such as `<table>`, `<tr>`, `<th>`, `<td>`, and `<figure>` tags.
+**Common Errors**:
+- **Invalid request - file format unsupported**
+  - *Cause*: Unsupported file type (e.g., `.txt`).
+  - *Fix*: Check extension before processing.
+- **Markdown output contains HTML tags**
+  - *Note*: This is expected for complex structures.
 
-**Root Cause**: This is the **correct and expected behavior**. Document Intelligence intentionally uses HTML table syntax and figure tags within its markdown output to preserve complex document structures that standard markdown cannot handle.
+**Example**:
+```python
+def _is_supported_document_format(url): ...
+```
 
-**Solution**: No fix needed. According to Microsoft documentation:
-- **Tables**: Uses full HTML table markup (`<table>`, `<tr>`, `<th>`, `<td>`) rather than standard Markdown tables for maximum fidelity
-- **Figures**: Uses `<figure>` tags to maintain semantic distinction from surrounding text  
-- **Complex structures**: HTML elements preserve merged cells, table captions, and other complex formatting
+**Reference**: [Document Intelligence Markdown Elements](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/concept/markdown-elements?view=doc-intel-4.0.0)
 
-**Reference**: [Document Intelligence Markdown Elements Documentation](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/concept/markdown-elements?view=doc-intel-4.0.0)
+---
 
-**Example Output** (correct format):
-```markdown
-<figure>
-PUMA Europe
-</figure>
+## 12. Architecture & Event Design
 
-<table>
-<tr>
-<th>Header</th>
-<th>Value</th>
-</tr>
-<tr>
-<td>Date</td>
-<td>05 Jul 2025</td>
-</tr>
-</table>
+**Description**: Data duplication due to missing context in events.
+
+**Common Errors**:
+- **Duplicate records instead of updates**
+  - *Cause*: Event missing document ID.
+  - *Fix*: Include documentId in events for direct updates.
+
+**Example**:
+```python
+class DocumentUploadedEventData(BaseModel):
+    documentUrl: str
+    documentId: str  # Needed for updates
 ```
 
 ---
@@ -431,151 +271,3 @@ netstat -ano | findstr :8000
 # Check running Python processes
 tasklist | findstr python
 ```
-
----
-
-## Azure Document Intelligence API Issues
-
-### Error: Invalid request - file format unsupported
-
-**Problem**: Document Intelligence returns HTTP 400 error with message "The file is corrupted or format is unsupported" when processing certain file types like `.txt` files.
-
-**Root Cause**: Document Intelligence only supports specific file formats (PDF, images, Office documents, HTML) and cannot process plain text files.
-
-**Solution**: Implement format detection and handle unsupported formats separately:
-```python
-def _is_supported_document_format(self, document_url: str) -> bool:
-    """Check if document format is supported by Document Intelligence."""
-    supported_extensions = {
-        '.pdf', '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', 
-        '.heif', '.docx', '.xlsx', '.pptx', '.html'
-    }
-    
-    file_path = urlparse(document_url).path.lower()
-    return any(file_path.endswith(ext) for ext in supported_extensions)
-
-# Process supported formats with Document Intelligence
-if self._is_supported_document_format(document_url):
-    markdown_content = await self._process_document_with_intelligence(document_content)
-else:
-    # Handle text files directly
-    markdown_content = document_content.decode('utf-8')
-```
-
-**Prevention**: Always validate file formats before sending to Document Intelligence. Handle unsupported formats with alternative processing methods.
-
----
-
-## Cosmos DB Partition Key Mismatches
-
-### Error: Entity with specified id does not exist (404)
-
-**Problem**: Cosmos DB returns "NotFound" error when trying to read documents that definitely exist in the container.
-
-**Root Cause**: Using incorrect partition key value when reading documents. The partition key used in the read operation must exactly match the partition key of the stored document.
-
-**Common Scenarios**:
-- Design documentation specifies one partition key but infrastructure uses another
-- Application code uses wrong field as partition key value
-
-**Example Error**:
-```
-(NotFound) Entity with the specified id does not exist in the system
-Code: NotFound
-```
-
-**Solution**: Verify the actual partition key configuration and use correct field:
-```python
-# ❌ Wrong - using documentUrl when container uses submissionId as partition key
-existing_doc = await container.read_item(
-    item=document_id,
-    partition_key=event.data.documentUrl  # Wrong partition key!
-)
-
-# ✅ Correct - match the container's actual partition key configuration
-existing_doc = await container.read_item(
-    item=document_id,
-    partition_key=event.submissionId  # Correct partition key
-)
-```
-
-**Debug Steps**:
-1. Check Terraform configuration for actual partition key:
-   ```terraform
-   resource "azurerm_cosmosdb_sql_container" "documents" {
-     partition_key_paths = ["/submissionId"]  # Actual partition key
-   }
-   ```
-2. Verify document structure in Azure Portal
-3. Update application code to use correct partition key field
-
-**Prevention**: 
-- Keep Design.md documentation in sync with Terraform infrastructure
-- Test document operations with actual container configuration
-- Add logging to show partition key values being used
-
----
-
-## Azure SDK Async API Usage Issues
-
-### Error: Unexpected keyword argument 'partition_key'
-
-**Problem**: Cosmos DB operations fail with error about unexpected `partition_key` parameter.
-
-**Root Cause**: In the async version of Azure Cosmos DB SDK, partition keys are automatically extracted from the document body based on container configuration, not passed as separate parameters.
-
-**Solution**: Remove explicit partition_key parameters from create_item calls:
-```python
-# ❌ Wrong - explicit partition key parameter
-await container.create_item(
-    body=document_data,
-    partition_key=partition_value  # This causes the error
-)
-
-# ✅ Correct - partition key extracted from document body
-await container.create_item(
-    body=document_data  # Partition key auto-extracted from body
-)
-```
-
-**Key Insight**: The async Cosmos DB SDK behaves differently from the sync version regarding partition key handling. Always check SDK documentation for the specific version being used.
-
----
-
-## Document Processing Architecture Patterns
-
-### Issue: Creating duplicate records instead of updating existing ones
-
-**Problem**: Document processing service creates new document records instead of updating existing ones, leading to data duplication and inconsistency.
-
-**Root Cause**: Missing document ID in event data, forcing services to either search for existing records (inefficient) or create new ones (incorrect).
-
-**Solution**: Include document ID in events for direct record updates:
-```python
-# ❌ Wrong - event only contains URL, requires search or creates duplicate
-class DocumentUploadedEventData(BaseModel):
-    documentUrl: str
-
-# ✅ Correct - event includes document ID for direct updates
-class DocumentUploadedEventData(BaseModel):
-    documentUrl: str
-    documentId: str  # Enables direct document updates
-
-# Update existing document instead of creating new one
-existing_doc = await container.read_item(
-    item=event.data.documentId,
-    partition_key=event.submissionId
-)
-existing_doc['content'] = extracted_content
-await container.replace_item(item=event.data.documentId, body=existing_doc)
-```
-
-**Architectural Flow**:
-1. submission-intake creates initial DocumentRecord with empty content
-2. submission-intake emits DocumentUploadedEvent with documentId
-3. docproc-parser-foundry updates existing DocumentRecord with extracted content
-4. Other services continue updating the same record
-
-**Prevention**: Design events to include sufficient context for efficient operations. Avoid forcing downstream services to search for related records.
-
----

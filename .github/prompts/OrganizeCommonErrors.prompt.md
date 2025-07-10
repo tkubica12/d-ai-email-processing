@@ -5,3 +5,5 @@ File docs/CommonErrors.md contains common pitfalls and errors to avoid. This is 
 - The goal is to make it easier to find and reference common errors in the future. 
 - Make sure to keep the descriptions concise and relevant to the errors listed. 
 - Make information condensed, brief and to the point.
+- Provide clear examples of each error and how to avoid them.
+- Fully consolidate whole document, delete content that is not relevant to the errors.
