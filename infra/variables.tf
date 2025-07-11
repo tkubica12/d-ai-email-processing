@@ -21,3 +21,21 @@ variable "email_mailbox" {
   type        = string
   default     = ""
 }
+
+variable "github_repository" {
+  description = "The GitHub repository name in the format owner/repo"
+  type        = string
+  default     = "tkubica12/d-ai-email-processing"
+}
+
+variable "container_app_cooldown_period" {
+  description = "The cooldown period for container app scaling"
+  type        = string
+  default     = "300s"
+}
+
+variable "container_app_min_replicas" {
+  description = "The minimum number of replicas for container apps"
+  type        = number
+  default     = 0
+}

@@ -98,3 +98,8 @@ output "document_intelligence_endpoint" {
   description = "The endpoint URL for the Document Intelligence service"
   value       = azurerm_cognitive_account.document_intelligence.endpoint
 }
+
+# output "company_apis_url" {
+#   description = "The URL for the Company APIs service"
+#   value       = "https://${azapi_resource.company_apis.output.fqdn}"
+# }

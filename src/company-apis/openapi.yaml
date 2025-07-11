@@ -2,9 +2,10 @@ openapi: "3.0.3"
 info:
   title: Company APIs
   description: |
-    Business-specific APIs providing internal company data and functionality.
+    Anonymous business APIs providing internal company data and functionality.
     This service generates mock data for demonstration purposes and exposes 
     internal company information through RESTful APIs for use by AI agents.
+    No authentication required.
   version: "1.0.0"
   contact:
     name: Company APIs Team
@@ -50,8 +51,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-      security:
-        - bearerAuth: []
   /api/v1/users/{userId}/financial-score:
     get:
       summary: Get user financial score
@@ -105,8 +104,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-      security:
-        - bearerAuth: []
   /api/v1/users/{userId}/income:
     get:
       summary: Get user income data
@@ -175,8 +172,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-      security:
-        - bearerAuth: []
 components:
   schemas:
     UserProductsResponse:
@@ -526,14 +521,6 @@ components:
               type: string
               description: Detailed error message
               example: "User with ID 'john.doe@example.com' was not found in the system"
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: Azure AD Bearer token for authentication
-security:
-  - bearerAuth: []
 tags:
   - name: Users
     description: User-related endpoints

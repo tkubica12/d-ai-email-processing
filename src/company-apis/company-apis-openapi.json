@@ -1,739 +1,711 @@
 {
-    "openapi": "3.0.3",
-    "info": {
-        "title": "Company APIs",
-        "description": "Business-specific APIs providing internal company data and functionality.\nThis service generates mock data for demonstration purposes and exposes \ninternal company information through RESTful APIs for use by AI agents.\n",
-        "version": "1.0.0",
-        "contact": {
-            "name": "Company APIs Team",
-            "email": "support@example.com"
-        }
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Company APIs",
+    "description": "Anonymous business APIs providing internal company data and functionality.\nThis service generates mock data for demonstration purposes and exposes \ninternal company information through RESTful APIs for use by AI agents.\nNo authentication required.\n",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Company APIs Team",
+      "email": "support@example.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8003",
+      "description": "Local development server"
     },
-    "servers": [
-        {
-            "url": "http://localhost:8003",
-            "description": "Local development server"
-        },
-        {
-            "url": "https://company-apis.example.com",
-            "description": "Production server"
+    {
+      "url": "https://company-apis.example.com",
+      "description": "Production server"
+    }
+  ],
+  "paths": {
+    "/api/v1/users/{userId}/products": {
+      "get": {
+        "summary": "Get user products",
+        "description": "Retrieves a list of products and services that the user is currently \nsubscribed to or using.\n",
+        "operationId": "getUserProducts",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user's unique identifier (email address)",
+            "schema": {
+              "type": "string",
+              "format": "email",
+              "example": "john.doe@example.com"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved user products",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProductsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
-    ],
-    "paths": {
-        "/api/v1/users/{userId}/products": {
-            "get": {
-                "summary": "Get user products",
-                "description": "Retrieves a list of products and services that the user is currently \nsubscribed to or using.\n",
-                "operationId": "getUserProducts",
-                "parameters": [
-                    {
-                        "name": "userId",
-                        "in": "path",
-                        "required": true,
-                        "description": "The user's unique identifier (email address)",
-                        "schema": {
-                            "type": "string",
-                            "format": "email",
-                            "example": "john.doe@example.com"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Successfully retrieved user products",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/UserProductsResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "User not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/v1/users/{userId}/financial-score": {
-            "get": {
-                "summary": "Get user financial score",
-                "description": "Returns the user's financial score based on various scoring methodologies.\n",
-                "operationId": "getUserFinancialScore",
-                "parameters": [
-                    {
-                        "name": "userId",
-                        "in": "path",
-                        "required": true,
-                        "description": "The user's unique identifier (email address)",
-                        "schema": {
-                            "type": "string",
-                            "format": "email",
-                            "example": "john.doe@example.com"
-                        }
-                    },
-                    {
-                        "name": "scoreType",
-                        "in": "query",
-                        "required": false,
-                        "description": "Type of financial score to retrieve",
-                        "schema": {
-                            "type": "string",
-                            "enum": [
-                                "composite",
-                                "creditworthiness",
-                                "liquidity",
-                                "stability",
-                                "growth"
-                            ],
-                            "default": "composite"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Successfully retrieved user financial score",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/FinancialScoreResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid score type",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "User not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/v1/users/{userId}/income": {
-            "get": {
-                "summary": "Get user income data",
-                "description": "Returns aggregated income data for the user over a specified time period.\n",
-                "operationId": "getUserIncome",
-                "parameters": [
-                    {
-                        "name": "userId",
-                        "in": "path",
-                        "required": true,
-                        "description": "The user's unique identifier (email address)",
-                        "schema": {
-                            "type": "string",
-                            "format": "email",
-                            "example": "john.doe@example.com"
-                        }
-                    },
-                    {
-                        "name": "startDate",
-                        "in": "query",
-                        "required": true,
-                        "description": "Start date for income period (ISO 8601 format)",
-                        "schema": {
-                            "type": "string",
-                            "format": "date-time",
-                            "example": "2025-01-01T00:00:00Z"
-                        }
-                    },
-                    {
-                        "name": "endDate",
-                        "in": "query",
-                        "required": true,
-                        "description": "End date for income period (ISO 8601 format)",
-                        "schema": {
-                            "type": "string",
-                            "format": "date-time",
-                            "example": "2025-07-31T23:59:59Z"
-                        }
-                    },
-                    {
-                        "name": "granularity",
-                        "in": "query",
-                        "required": false,
-                        "description": "Aggregation granularity",
-                        "schema": {
-                            "type": "string",
-                            "enum": [
-                                "daily",
-                                "weekly",
-                                "monthly",
-                                "yearly"
-                            ],
-                            "default": "monthly"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Successfully retrieved user income data",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/IncomeResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid date range or granularity",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "User not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        }
+      }
     },
-    "components": {
-        "schemas": {
-            "UserProductsResponse": {
-                "type": "object",
-                "required": [
-                    "userId",
-                    "products",
-                    "totalActiveSubscriptions",
-                    "totalMonthlyFees"
-                ],
-                "properties": {
-                    "userId": {
-                        "type": "string",
-                        "format": "email",
-                        "description": "The user's unique identifier",
-                        "example": "john.doe@example.com"
-                    },
-                    "products": {
-                        "type": "array",
-                        "description": "List of user's active products and services",
-                        "items": {
-                            "$ref": "#/components/schemas/Product"
-                        }
-                    },
-                    "totalActiveSubscriptions": {
-                        "type": "integer",
-                        "description": "Total number of active subscriptions",
-                        "minimum": 0,
-                        "example": 2
-                    },
-                    "totalMonthlyFees": {
-                        "type": "number",
-                        "format": "double",
-                        "description": "Total monthly fees for all subscriptions",
-                        "minimum": 0,
-                        "example": 79.98
-                    }
-                }
-            },
-            "Product": {
-                "type": "object",
-                "required": [
-                    "id",
-                    "name",
-                    "type",
-                    "status",
-                    "monthlyFee",
-                    "startDate"
-                ],
-                "properties": {
-                    "id": {
-                        "type": "string",
-                        "description": "Unique product identifier",
-                        "example": "prod_123456"
-                    },
-                    "name": {
-                        "type": "string",
-                        "description": "Product name",
-                        "example": "Premium Banking Package"
-                    },
-                    "type": {
-                        "type": "string",
-                        "description": "Product category",
-                        "enum": [
-                            "banking",
-                            "insurance",
-                            "investment",
-                            "loan",
-                            "credit",
-                            "other"
-                        ],
-                        "example": "banking"
-                    },
-                    "status": {
-                        "type": "string",
-                        "description": "Current product status",
-                        "enum": [
-                            "active",
-                            "inactive",
-                            "suspended",
-                            "pending"
-                        ],
-                        "example": "active"
-                    },
-                    "monthlyFee": {
-                        "type": "number",
-                        "format": "double",
-                        "description": "Monthly fee for the product",
-                        "minimum": 0,
-                        "example": 29.99
-                    },
-                    "startDate": {
-                        "type": "string",
-                        "format": "date-time",
-                        "description": "Product subscription start date",
-                        "example": "2024-01-15T00:00:00Z"
-                    },
-                    "endDate": {
-                        "type": "string",
-                        "format": "date-time",
-                        "description": "Product subscription end date (if applicable)",
-                        "example": "2025-01-15T00:00:00Z"
-                    },
-                    "features": {
-                        "type": "array",
-                        "description": "List of product features",
-                        "items": {
-                            "type": "string"
-                        },
-                        "example": [
-                            "Unlimited transactions",
-                            "24/7 customer support",
-                            "Mobile banking app"
-                        ]
-                    }
-                }
-            },
-            "FinancialScoreResponse": {
-                "type": "object",
-                "required": [
-                    "userId",
-                    "scoreType",
-                    "score",
-                    "maxScore",
-                    "scoreDate",
-                    "factors",
-                    "recommendations"
-                ],
-                "properties": {
-                    "userId": {
-                        "type": "string",
-                        "format": "email",
-                        "description": "The user's unique identifier",
-                        "example": "john.doe@example.com"
-                    },
-                    "scoreType": {
-                        "type": "string",
-                        "description": "Type of financial score",
-                        "enum": [
-                            "composite",
-                            "creditworthiness",
-                            "liquidity",
-                            "stability",
-                            "growth"
-                        ],
-                        "example": "composite"
-                    },
-                    "score": {
-                        "type": "integer",
-                        "description": "Financial score value",
-                        "minimum": 0,
-                        "maximum": 100,
-                        "example": 82
-                    },
-                    "maxScore": {
-                        "type": "integer",
-                        "description": "Maximum possible score",
-                        "example": 100
-                    },
-                    "scoreDate": {
-                        "type": "string",
-                        "format": "date-time",
-                        "description": "Date when the score was calculated",
-                        "example": "2025-07-11T00:00:00Z"
-                    },
-                    "factors": {
-                        "type": "array",
-                        "description": "Factors contributing to the score",
-                        "items": {
-                            "$ref": "#/components/schemas/ScoreFactor"
-                        }
-                    },
-                    "recommendations": {
-                        "type": "array",
-                        "description": "Recommendations for improving the score",
-                        "items": {
-                            "type": "string"
-                        },
-                        "example": [
-                            "Consider increasing monthly savings contributions",
-                            "Explore debt consolidation options to improve debt-to-income ratio"
-                        ]
-                    }
-                }
-            },
-            "ScoreFactor": {
-                "type": "object",
-                "required": [
-                    "name",
-                    "value",
-                    "weight",
-                    "impact"
-                ],
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "description": "Name of the scoring factor",
-                        "example": "Debt-to-Income Ratio"
-                    },
-                    "value": {
-                        "type": "number",
-                        "format": "double",
-                        "description": "Current value of the factor",
-                        "example": 0.35
-                    },
-                    "weight": {
-                        "type": "number",
-                        "format": "double",
-                        "description": "Weight of this factor in overall score (0-1)",
-                        "minimum": 0,
-                        "maximum": 1,
-                        "example": 0.25
-                    },
-                    "impact": {
-                        "type": "string",
-                        "description": "Impact of this factor on the score",
-                        "enum": [
-                            "positive",
-                            "negative",
-                            "neutral"
-                        ],
-                        "example": "negative"
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Description of the factor",
-                        "example": "Current debt payments represent 35% of monthly income"
-                    }
-                }
-            },
-            "IncomeResponse": {
-                "type": "object",
-                "required": [
-                    "userId",
-                    "startDate",
-                    "endDate",
-                    "granularity",
-                    "totalIncome",
-                    "averageIncome",
-                    "incomeEntries",
-                    "incomeGrowth",
-                    "incomeStability"
-                ],
-                "properties": {
-                    "userId": {
-                        "type": "string",
-                        "format": "email",
-                        "description": "The user's unique identifier",
-                        "example": "john.doe@example.com"
-                    },
-                    "startDate": {
-                        "type": "string",
-                        "format": "date-time",
-                        "description": "Start date of the income period",
-                        "example": "2025-01-01T00:00:00Z"
-                    },
-                    "endDate": {
-                        "type": "string",
-                        "format": "date-time",
-                        "description": "End date of the income period",
-                        "example": "2025-07-31T23:59:59Z"
-                    },
-                    "granularity": {
-                        "type": "string",
-                        "description": "Aggregation granularity used",
-                        "enum": [
-                            "daily",
-                            "weekly",
-                            "monthly",
-                            "yearly"
-                        ],
-                        "example": "monthly"
-                    },
-                    "totalIncome": {
-                        "type": "number",
-                        "format": "double",
-                        "description": "Total income for the period",
-                        "minimum": 0,
-                        "example": 42000
-                    },
-                    "averageIncome": {
-                        "type": "number",
-                        "format": "double",
-                        "description": "Average income per period",
-                        "minimum": 0,
-                        "example": 6000
-                    },
-                    "incomeEntries": {
-                        "type": "array",
-                        "description": "Individual income entries for each period",
-                        "items": {
-                            "$ref": "#/components/schemas/IncomeEntry"
-                        }
-                    },
-                    "incomeGrowth": {
-                        "type": "number",
-                        "format": "double",
-                        "description": "Income growth rate (as decimal percentage)",
-                        "example": 0.05
-                    },
-                    "incomeStability": {
-                        "type": "number",
-                        "format": "double",
-                        "description": "Income stability score (0-1, where 1 is most stable)",
-                        "minimum": 0,
-                        "maximum": 1,
-                        "example": 0.88
-                    }
-                }
-            },
-            "IncomeEntry": {
-                "type": "object",
-                "required": [
-                    "period",
-                    "periodStart",
-                    "periodEnd",
-                    "totalIncome",
-                    "sources"
-                ],
-                "properties": {
-                    "period": {
-                        "type": "string",
-                        "description": "Period identifier (e.g., \"2025-01\", \"2025-W01\")",
-                        "example": "2025-01"
-                    },
-                    "periodStart": {
-                        "type": "string",
-                        "format": "date-time",
-                        "description": "Start date of the period",
-                        "example": "2025-01-01T00:00:00Z"
-                    },
-                    "periodEnd": {
-                        "type": "string",
-                        "format": "date-time",
-                        "description": "End date of the period",
-                        "example": "2025-01-31T23:59:59Z"
-                    },
-                    "totalIncome": {
-                        "type": "number",
-                        "format": "double",
-                        "description": "Total income for this period",
-                        "minimum": 0,
-                        "example": 6000
-                    },
-                    "sources": {
-                        "type": "array",
-                        "description": "Income sources for this period",
-                        "items": {
-                            "$ref": "#/components/schemas/IncomeSource"
-                        }
-                    }
-                }
-            },
-            "IncomeSource": {
-                "type": "object",
-                "required": [
-                    "source",
-                    "amount",
-                    "type"
-                ],
-                "properties": {
-                    "source": {
-                        "type": "string",
-                        "description": "Name of the income source",
-                        "example": "Acme Corp Salary"
-                    },
-                    "amount": {
-                        "type": "number",
-                        "format": "double",
-                        "description": "Amount from this source",
-                        "minimum": 0,
-                        "example": 5500
-                    },
-                    "type": {
-                        "type": "string",
-                        "description": "Type of income",
-                        "enum": [
-                            "salary",
-                            "bonus",
-                            "commission",
-                            "freelance",
-                            "investment",
-                            "rental",
-                            "other"
-                        ],
-                        "example": "salary"
-                    },
-                    "frequency": {
-                        "type": "string",
-                        "description": "Frequency of this income",
-                        "enum": [
-                            "one-time",
-                            "weekly",
-                            "bi-weekly",
-                            "monthly",
-                            "quarterly",
-                            "annually"
-                        ],
-                        "example": "monthly"
-                    }
-                }
-            },
-            "ErrorResponse": {
-                "type": "object",
-                "required": [
-                    "error"
-                ],
-                "properties": {
-                    "error": {
-                        "type": "object",
-                        "required": [
-                            "code",
-                            "details"
-                        ],
-                        "properties": {
-                            "code": {
-                                "type": "string",
-                                "description": "Error code",
-                                "enum": [
-                                    "USER_NOT_FOUND",
-                                    "INVALID_DATE_RANGE",
-                                    "INVALID_SCORE_TYPE",
-                                    "INVALID_GRANULARITY",
-                                    "INTERNAL_ERROR"
-                                ],
-                                "example": "USER_NOT_FOUND"
-                            },
-                            "details": {
-                                "type": "string",
-                                "description": "Detailed error message",
-                                "example": "User with ID 'john.doe@example.com' was not found in the system"
-                            }
-                        }
-                    }
-                }
+    "/api/v1/users/{userId}/financial-score": {
+      "get": {
+        "summary": "Get user financial score",
+        "description": "Returns the user's financial score based on various scoring methodologies.\n",
+        "operationId": "getUserFinancialScore",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user's unique identifier (email address)",
+            "schema": {
+              "type": "string",
+              "format": "email",
+              "example": "john.doe@example.com"
             }
-        },
-        "securitySchemes": {
-            "bearerAuth": {
-                "type": "http",
-                "scheme": "bearer",
-                "bearerFormat": "JWT",
-                "description": "Azure AD Bearer token for authentication"
+          },
+          {
+            "name": "scoreType",
+            "in": "query",
+            "required": false,
+            "description": "Type of financial score to retrieve",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "composite",
+                "creditworthiness",
+                "liquidity",
+                "stability",
+                "growth"
+              ],
+              "default": "composite"
             }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved user financial score",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinancialScoreResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid score type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
+      }
     },
-    "security": [
-        {
-            "bearerAuth": []
+    "/api/v1/users/{userId}/income": {
+      "get": {
+        "summary": "Get user income data",
+        "description": "Returns aggregated income data for the user over a specified time period.\n",
+        "operationId": "getUserIncome",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user's unique identifier (email address)",
+            "schema": {
+              "type": "string",
+              "format": "email",
+              "example": "john.doe@example.com"
+            }
+          },
+          {
+            "name": "startDate",
+            "in": "query",
+            "required": true,
+            "description": "Start date for income period (ISO 8601 format)",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "example": "2025-01-01T00:00:00Z"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": true,
+            "description": "End date for income period (ISO 8601 format)",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "example": "2025-07-31T23:59:59Z"
+            }
+          },
+          {
+            "name": "granularity",
+            "in": "query",
+            "required": false,
+            "description": "Aggregation granularity",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly",
+                "yearly"
+              ],
+              "default": "monthly"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved user income data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncomeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid date range or granularity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
-    ],
-    "tags": [
-        {
-            "name": "Users",
-            "description": "User-related endpoints"
-        },
-        {
-            "name": "Products",
-            "description": "Product and subscription management"
-        },
-        {
-            "name": "Financial",
-            "description": "Financial scoring and analysis"
-        },
-        {
-            "name": "Income",
-            "description": "Income data and analytics"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "UserProductsResponse": {
+        "type": "object",
+        "required": [
+          "userId",
+          "products",
+          "totalActiveSubscriptions",
+          "totalMonthlyFees"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "email",
+            "description": "The user's unique identifier",
+            "example": "john.doe@example.com"
+          },
+          "products": {
+            "type": "array",
+            "description": "List of user's active products and services",
+            "items": {
+              "$ref": "#/components/schemas/Product"
+            }
+          },
+          "totalActiveSubscriptions": {
+            "type": "integer",
+            "description": "Total number of active subscriptions",
+            "minimum": 0,
+            "example": 2
+          },
+          "totalMonthlyFees": {
+            "type": "number",
+            "format": "double",
+            "description": "Total monthly fees for all subscriptions",
+            "minimum": 0,
+            "example": 79.98
+          }
         }
-    ]
+      },
+      "Product": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "type",
+          "status",
+          "monthlyFee",
+          "startDate"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique product identifier",
+            "example": "prod_123456"
+          },
+          "name": {
+            "type": "string",
+            "description": "Product name",
+            "example": "Premium Banking Package"
+          },
+          "type": {
+            "type": "string",
+            "description": "Product category",
+            "enum": [
+              "banking",
+              "insurance",
+              "investment",
+              "loan",
+              "credit",
+              "other"
+            ],
+            "example": "banking"
+          },
+          "status": {
+            "type": "string",
+            "description": "Current product status",
+            "enum": [
+              "active",
+              "inactive",
+              "suspended",
+              "pending"
+            ],
+            "example": "active"
+          },
+          "monthlyFee": {
+            "type": "number",
+            "format": "double",
+            "description": "Monthly fee for the product",
+            "minimum": 0,
+            "example": 29.99
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Product subscription start date",
+            "example": "2024-01-15T00:00:00Z"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Product subscription end date (if applicable)",
+            "example": "2025-01-15T00:00:00Z"
+          },
+          "features": {
+            "type": "array",
+            "description": "List of product features",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "Unlimited transactions",
+              "24/7 customer support",
+              "Mobile banking app"
+            ]
+          }
+        }
+      },
+      "FinancialScoreResponse": {
+        "type": "object",
+        "required": [
+          "userId",
+          "scoreType",
+          "score",
+          "maxScore",
+          "scoreDate",
+          "factors",
+          "recommendations"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "email",
+            "description": "The user's unique identifier",
+            "example": "john.doe@example.com"
+          },
+          "scoreType": {
+            "type": "string",
+            "description": "Type of financial score",
+            "enum": [
+              "composite",
+              "creditworthiness",
+              "liquidity",
+              "stability",
+              "growth"
+            ],
+            "example": "composite"
+          },
+          "score": {
+            "type": "integer",
+            "description": "Financial score value",
+            "minimum": 0,
+            "maximum": 100,
+            "example": 82
+          },
+          "maxScore": {
+            "type": "integer",
+            "description": "Maximum possible score",
+            "example": 100
+          },
+          "scoreDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date when the score was calculated",
+            "example": "2025-07-11T00:00:00Z"
+          },
+          "factors": {
+            "type": "array",
+            "description": "Factors contributing to the score",
+            "items": {
+              "$ref": "#/components/schemas/ScoreFactor"
+            }
+          },
+          "recommendations": {
+            "type": "array",
+            "description": "Recommendations for improving the score",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "Consider increasing monthly savings contributions",
+              "Explore debt consolidation options to improve debt-to-income ratio"
+            ]
+          }
+        }
+      },
+      "ScoreFactor": {
+        "type": "object",
+        "required": [
+          "name",
+          "value",
+          "weight",
+          "impact"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the scoring factor",
+            "example": "Debt-to-Income Ratio"
+          },
+          "value": {
+            "type": "number",
+            "format": "double",
+            "description": "Current value of the factor",
+            "example": 0.35
+          },
+          "weight": {
+            "type": "number",
+            "format": "double",
+            "description": "Weight of this factor in overall score (0-1)",
+            "minimum": 0,
+            "maximum": 1,
+            "example": 0.25
+          },
+          "impact": {
+            "type": "string",
+            "description": "Impact of this factor on the score",
+            "enum": [
+              "positive",
+              "negative",
+              "neutral"
+            ],
+            "example": "negative"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the factor",
+            "example": "Current debt payments represent 35% of monthly income"
+          }
+        }
+      },
+      "IncomeResponse": {
+        "type": "object",
+        "required": [
+          "userId",
+          "startDate",
+          "endDate",
+          "granularity",
+          "totalIncome",
+          "averageIncome",
+          "incomeEntries",
+          "incomeGrowth",
+          "incomeStability"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "email",
+            "description": "The user's unique identifier",
+            "example": "john.doe@example.com"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start date of the income period",
+            "example": "2025-01-01T00:00:00Z"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "End date of the income period",
+            "example": "2025-07-31T23:59:59Z"
+          },
+          "granularity": {
+            "type": "string",
+            "description": "Aggregation granularity used",
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly",
+              "yearly"
+            ],
+            "example": "monthly"
+          },
+          "totalIncome": {
+            "type": "number",
+            "format": "double",
+            "description": "Total income for the period",
+            "minimum": 0,
+            "example": 42000.0
+          },
+          "averageIncome": {
+            "type": "number",
+            "format": "double",
+            "description": "Average income per period",
+            "minimum": 0,
+            "example": 6000.0
+          },
+          "incomeEntries": {
+            "type": "array",
+            "description": "Individual income entries for each period",
+            "items": {
+              "$ref": "#/components/schemas/IncomeEntry"
+            }
+          },
+          "incomeGrowth": {
+            "type": "number",
+            "format": "double",
+            "description": "Income growth rate (as decimal percentage)",
+            "example": 0.05
+          },
+          "incomeStability": {
+            "type": "number",
+            "format": "double",
+            "description": "Income stability score (0-1, where 1 is most stable)",
+            "minimum": 0,
+            "maximum": 1,
+            "example": 0.88
+          }
+        }
+      },
+      "IncomeEntry": {
+        "type": "object",
+        "required": [
+          "period",
+          "periodStart",
+          "periodEnd",
+          "totalIncome",
+          "sources"
+        ],
+        "properties": {
+          "period": {
+            "type": "string",
+            "description": "Period identifier (e.g., \"2025-01\", \"2025-W01\")",
+            "example": "2025-01"
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start date of the period",
+            "example": "2025-01-01T00:00:00Z"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date-time",
+            "description": "End date of the period",
+            "example": "2025-01-31T23:59:59Z"
+          },
+          "totalIncome": {
+            "type": "number",
+            "format": "double",
+            "description": "Total income for this period",
+            "minimum": 0,
+            "example": 6000.0
+          },
+          "sources": {
+            "type": "array",
+            "description": "Income sources for this period",
+            "items": {
+              "$ref": "#/components/schemas/IncomeSource"
+            }
+          }
+        }
+      },
+      "IncomeSource": {
+        "type": "object",
+        "required": [
+          "source",
+          "amount",
+          "type"
+        ],
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "Name of the income source",
+            "example": "Acme Corp Salary"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double",
+            "description": "Amount from this source",
+            "minimum": 0,
+            "example": 5500.0
+          },
+          "type": {
+            "type": "string",
+            "description": "Type of income",
+            "enum": [
+              "salary",
+              "bonus",
+              "commission",
+              "freelance",
+              "investment",
+              "rental",
+              "other"
+            ],
+            "example": "salary"
+          },
+          "frequency": {
+            "type": "string",
+            "description": "Frequency of this income",
+            "enum": [
+              "one-time",
+              "weekly",
+              "bi-weekly",
+              "monthly",
+              "quarterly",
+              "annually"
+            ],
+            "example": "monthly"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "details"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code",
+                "enum": [
+                  "USER_NOT_FOUND",
+                  "INVALID_DATE_RANGE",
+                  "INVALID_SCORE_TYPE",
+                  "INVALID_GRANULARITY",
+                  "INTERNAL_ERROR"
+                ],
+                "example": "USER_NOT_FOUND"
+              },
+              "details": {
+                "type": "string",
+                "description": "Detailed error message",
+                "example": "User with ID 'john.doe@example.com' was not found in the system"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Users",
+      "description": "User-related endpoints"
+    },
+    {
+      "name": "Products",
+      "description": "Product and subscription management"
+    },
+    {
+      "name": "Financial",
+      "description": "Financial scoring and analysis"
+    },
+    {
+      "name": "Income",
+      "description": "Income data and analytics"
+    }
+  ]
 }

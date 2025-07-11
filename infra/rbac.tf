@@ -34,3 +34,24 @@ resource "azurerm_role_assignment" "current_user_document_intelligence_user" {
   role_definition_name = "Cognitive Services User"
   principal_id         = data.azurerm_client_config.current.object_id
 }
+
+# Managed Identity for Company APIs service
+resource "azurerm_user_assigned_identity" "company_apis" {
+  location            = azurerm_resource_group.main.location
+  name                = "id-company-apis-${local.prefix}"
+  resource_group_name = azurerm_resource_group.main.name
+}
+
+# Allow Company APIs service to read/write blobs in the storage account
+resource "azurerm_role_assignment" "company_apis_storage_blob_contributor" {
+  scope                = azurerm_storage_account.main.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.company_apis.principal_id
+}
+
+# Allow Company APIs service to read/write tables in the storage account
+resource "azurerm_role_assignment" "company_apis_storage_table_contributor" {
+  scope                = azurerm_storage_account.main.id
+  role_definition_name = "Storage Table Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.company_apis.principal_id
+}

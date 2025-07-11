@@ -11,8 +11,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException, Depends, Security, Query, Path
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import FastAPI, HTTPException, Query, Path
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, EmailStr
 from dotenv import load_dotenv
@@ -70,30 +69,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Security scheme
-security = HTTPBearer()
-
-def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)) -> str:
-    """
-    Verify JWT token - simplified for mock service
-    
-    Args:
-        credentials: HTTP Bearer token credentials
-        
-    Returns:
-        User ID extracted from token
-        
-    Raises:
-        HTTPException: If token is invalid
-    """
-    # For mock implementation, accept any token and extract user ID
-    # In production, this would validate JWT and extract user claims
-    if not credentials.credentials:
-        raise HTTPException(status_code=401, detail="Missing authentication token")
-    
-    # Mock token validation - in production, validate JWT signature and claims
-    return "mock_user_id"
 
 class MockDataGenerator:
     """Mock data generator for company APIs"""
@@ -444,8 +419,7 @@ async def health_check():
 
 @app.get("/api/v1/users/{user_id}/products", response_model=UserProductsResponse)
 async def get_user_products(
-    user_id: str = Path(..., description="The user's unique identifier"),
-    _: str = Depends(verify_token)
+    user_id: str = Path(..., description="The user's unique identifier")
 ) -> UserProductsResponse:
     """
     Get user products and subscriptions
@@ -483,8 +457,7 @@ async def get_user_products(
 @app.get("/api/v1/users/{user_id}/financial-score", response_model=FinancialScoreResponse)
 async def get_user_financial_score(
     user_id: str = Path(..., description="The user's unique identifier"),
-    score_type: ScoreType = Query(ScoreType.composite, description="Type of financial score to retrieve"),
-    _: str = Depends(verify_token)
+    score_type: ScoreType = Query(ScoreType.composite, description="Type of financial score to retrieve")
 ) -> FinancialScoreResponse:
     """
     Get user financial score
@@ -525,8 +498,7 @@ async def get_user_income(
     user_id: str = Path(..., description="The user's unique identifier"),
     startDate: datetime = Query(..., description="Start date for income period (ISO 8601 format)"),
     endDate: datetime = Query(..., description="End date for income period (ISO 8601 format)"),
-    granularity: Granularity = Query(Granularity.monthly, description="Aggregation granularity"),
-    _: str = Depends(verify_token)
+    granularity: Granularity = Query(Granularity.monthly, description="Aggregation granularity")
 ) -> IncomeResponse:
     """
     Get user income data

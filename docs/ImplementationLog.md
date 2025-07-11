@@ -206,6 +206,24 @@ Implemented a FastAPI-based service that provides mock business data for AI agen
 # Install uv → Copy project files → Install dependencies → Copy app code → Configure runtime
 ```
 
+**Company APIs Container App Configuration:**
+- Created managed identity `company_apis` with Storage Blob/Table Data Contributor roles
+- Configured container app to run on port 8003 with proper scaling rules
+- Added environment variables for Azure Client ID, logging, and Application Insights
+- Uses GitHub Container Registry image: `ghcr.io/${var.github_repository}/company-apis:latest`
+- Configured HTTP ingress with external access for API endpoints
+
+**Terraform Infrastructure Updates:**
+- Added `github_repository`, `container_app_cooldown_period`, and `container_app_min_replicas` variables
+- Added `base_name` local variable for consistent naming
+- Added `company_apis_url` output for accessing the deployed service
+- Updated tfvars with GitHub repository configuration
+- Fixed output attribute path from `body.properties.configuration.ingress.fqdn` to `output.fqdn` for azapi_resource
+
+**Container App Environment Dependencies:**
+- Container App Environment configured with Log Analytics workspace integration
+- Monitoring and Application Insights already configured in infrastructure
+
 ---
 
 **This log focuses on architectural decisions, critical fixes, and lessons learned. For detailed implementation, see source code and service-specific documentation.**
