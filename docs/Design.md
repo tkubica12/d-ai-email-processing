@@ -163,6 +163,7 @@ This approach uses event-driven architecture with event sourcing patterns to imp
 4. **docproc-search-indexer**
    - Listens to Change Feed for `DocumentContentExtractedEvent`
    - Ingests document content into Azure AI Search with metadata
+   - Includes userId as filtering metadata for security trimming
    - Emits `DocumentIndexedEvent`
 
 5. **docproc-data-extractor**
@@ -171,18 +172,21 @@ This approach uses event-driven architecture with event sourcing patterns to imp
    - Updates document record with extractedData
    - Emits `DocumentDataExtractedEvent`
 
-6. **docproc-aggregator**
-   - Listens to Change Feed for `DocumentClassifiedEvent` and `DocumentDataExtractedEvent`
-   - Tracks completion of classification and data extraction for each document
-   - Emits `DocumentFullyProcessedEvent` when both are complete
-   - Emits `SubmissionDocumentsCompleteEvent` when all documents in submission are processed
-
-7. **submission-analyzer**
-   - Listens to Change Feed for `SubmissionDocumentsCompleteEvent`
-   - Updates submission record with processed flags and types for each document
-   - Performs final AI analysis of complete submission
+6. **submission-analyzer**
+   - Listens to Change Feed for `DocumentDataExtractedEvent` and `DocumentClassifiedEvent`
+   - AI Foundry agent with advanced capabilities:
+     - RAG search into Azure AI Search for user documents and previous conversations (with security trimming by userId)
+     - Web search for investigating entities (e.g., invoice vendors, companies)
+     - Integration with company-apis for internal business logic
+   - Tracks completion of all document processing steps
+   - Performs comprehensive AI analysis of complete submission
    - Updates submission record with evaluation results
    - Emits `SubmissionAnalysisCompleteEvent`
+
+7. **company-apis**
+   - REST API service providing business-specific tools for submission-analyzer
+   - Mock data generation for demonstration purposes
+   - Exposes internal company APIs as HTTP endpoints
 
 #### Event Formats
 
@@ -296,40 +300,8 @@ This approach uses event-driven architecture with event sourcing patterns to imp
   "timestamp": "2025-07-07T10:07:00Z",
   "data": {
     "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
-    "processingStepsComplete": ["classification", "dataExtraction"],
+    "processingStepsComplete": ["classification", "dataExtraction", "indexing"],
     "success": true
-  }
-}
-```
-
-**DocumentFullyProcessedEvent**
-```json
-{
-  "id": "uuid",
-  "eventType": "DocumentFullyProcessedEvent",
-  "submissionId": "submission-guid",
-  "userId": "user@example.com",
-  "timestamp": "2025-07-07T10:08:00Z",
-  "data": {
-    "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
-    "allProcessingComplete": true,
-    "documentType": "invoice"
-  }
-}
-```
-
-**SubmissionDocumentsCompleteEvent**
-```json
-{
-  "id": "uuid",
-  "eventType": "SubmissionDocumentsCompleteEvent",
-  "submissionId": "submission-guid",
-  "userId": "user@example.com",
-  "timestamp": "2025-07-07T10:10:00Z",
-  "data": {
-    "totalDocuments": 2,
-    "processedDocuments": 2,
-    "documentTypes": ["invoice", "contract"]
   }
 }
 ```
@@ -369,13 +341,7 @@ Service Bus → submission-intake → SubmissionCreated Event
               ↓                  ↓                  ↓
   DocumentClassifiedEvent  DocumentIndexedEvent  DocumentDataExtractedEvent
               ↓                                   ↓
-              └─────────────→ docproc-aggregator ←┘
-                                 ↓
-                        DocumentFullyProcessedEvent
-                                 ↓
-                      SubmissionDocumentsCompleteEvent
-                                 ↓
-                          submission-analyzer
+              └─────────────→ submission-analyzer ←┘
                                  ↓
                       SubmissionAnalysisCompleteEvent
 ```
@@ -404,28 +370,26 @@ graph TD
     O --> P[Emit DocumentClassifiedEvent]
     
     L --> Q[Azure AI Search]
-    Q --> R[Index document content]
+    Q --> R[Index document with userId metadata]
     R --> S[Emit DocumentIndexedEvent]
     
     M --> T[LLM Data Extraction]
     T --> U[Update document with extractedData]
     U --> V[Emit DocumentDataExtractedEvent]
     
-    P --> W[docproc-aggregator]
+    P --> W[submission-analyzer]
     V --> W
-    W --> X{All processing complete?}
-    X -->|Yes| Y[Emit DocumentFullyProcessedEvent]
-    X -->|No| Z[Wait for remaining events]
-    Z --> W
-    
-    Y --> AA{All documents processed?}
-    AA -->|Yes| BB[Emit SubmissionDocumentsCompleteEvent]
-    AA -->|No| CC[Wait for more documents]
-    CC --> AA
-    
-    BB --> DD[submission-analyzer]
-    DD --> EE[Update submission with processed flags]
-    EE --> FF[LLM Analysis]
+    W --> X[AI Foundry Agent Analysis]
+    X --> Y[RAG Search with Security Trimming]
+    X --> Z[Web Search for Entity Investigation]
+    X --> AA[Company APIs Integration]
+    AA --> BB[company-apis Service]
+    BB --> CC[User Products API]
+    BB --> DD[User Financial Score API]
+    BB --> EE[User Income API]
+    Y --> FF[Comprehensive Analysis]
+    Z --> FF
+    AA --> FF
     FF --> GG[Update submission with evaluation results]
     GG --> HH[Emit SubmissionAnalysisCompleteEvent]
     
@@ -434,7 +398,8 @@ graph TD
     style N fill:#e8f5e8
     style Q fill:#fff3e0
     style T fill:#e8f5e8
-    style FF fill:#e8f5e8
+    style X fill:#e8f5e8
+    style BB fill:#f3e5f5
 ```
 
 #### Error Handling and Resilience
@@ -462,6 +427,400 @@ graph TD
 - ❌ Complex to write and troubleshoot
 
 **Key Trade-off:** Simplicity vs. Control
+
+## Company APIs Service
+
+The Company APIs service provides business-specific functionality as HTTP endpoints that can be consumed by the submission-analyzer AI agent. This service generates mock data for demonstration purposes and exposes internal company information through RESTful APIs.
+
+### API Endpoints
+
+#### 1. User Products API
+
+**Endpoint:** `GET /api/v1/users/{userId}/products`
+
+**Description:** Retrieves a list of products and services that the user is currently subscribed to or using.
+
+**Parameters:**
+- `userId` (path parameter, required): The user's unique identifier (email address)
+
+**Response Schema:**
+```json
+{
+  "userId": "string",
+  "products": [
+    {
+      "productId": "string",
+      "productName": "string",
+      "productType": "string",
+      "subscriptionStatus": "string",
+      "subscriptionDate": "string",
+      "monthlyFee": "number",
+      "features": ["string"]
+    }
+  ],
+  "totalActiveSubscriptions": "number",
+  "totalMonthlyFees": "number"
+}
+```
+
+**Example Request:**
+```
+GET /api/v1/users/john.doe@example.com/products
+```
+
+**Example Response:**
+```json
+{
+  "userId": "john.doe@example.com",
+  "products": [
+    {
+      "productId": "PRD-001",
+      "productName": "Premium Business Account",
+      "productType": "banking",
+      "subscriptionStatus": "active",
+      "subscriptionDate": "2024-01-15T00:00:00Z",
+      "monthlyFee": 29.99,
+      "features": ["unlimited_transactions", "priority_support", "advanced_analytics"]
+    },
+    {
+      "productId": "PRD-002",
+      "productName": "Investment Portfolio Management",
+      "productType": "investment",
+      "subscriptionStatus": "active",
+      "subscriptionDate": "2024-03-20T00:00:00Z",
+      "monthlyFee": 49.99,
+      "features": ["portfolio_tracking", "risk_assessment", "automated_rebalancing"]
+    }
+  ],
+  "totalActiveSubscriptions": 2,
+  "totalMonthlyFees": 79.98
+}
+```
+
+#### 2. User Financial Score API
+
+**Endpoint:** `GET /api/v1/users/{userId}/financial-score`
+
+**Description:** Returns the user's financial score based on various scoring methodologies.
+
+**Parameters:**
+- `userId` (path parameter, required): The user's unique identifier (email address)
+- `scoreType` (query parameter, optional): Type of financial score to retrieve. Defaults to "composite"
+  - `composite`: Overall financial health score (default)
+  - `creditworthiness`: Credit-based scoring
+  - `liquidity`: Cash flow and liquidity assessment
+  - `stability`: Income and expense stability
+  - `growth`: Financial growth trajectory
+
+**Response Schema:**
+```json
+{
+  "userId": "string",
+  "scoreType": "string",
+  "score": "number",
+  "maxScore": "number",
+  "scoreDate": "string",
+  "factors": [
+    {
+      "factor": "string",
+      "weight": "number",
+      "score": "number",
+      "description": "string"
+    }
+  ],
+  "recommendations": ["string"]
+}
+```
+
+**Example Request:**
+```
+GET /api/v1/users/john.doe@example.com/financial-score?scoreType=composite
+```
+
+**Example Response:**
+```json
+{
+  "userId": "john.doe@example.com",
+  "scoreType": "composite",
+  "score": 82,
+  "maxScore": 100,
+  "scoreDate": "2025-07-11T00:00:00Z",
+  "factors": [
+    {
+      "factor": "payment_history",
+      "weight": 0.35,
+      "score": 88,
+      "description": "Consistent on-time payments with minimal late fees"
+    },
+    {
+      "factor": "debt_to_income_ratio",
+      "weight": 0.25,
+      "score": 75,
+      "description": "Moderate debt levels relative to income"
+    },
+    {
+      "factor": "account_age",
+      "weight": 0.20,
+      "score": 90,
+      "description": "Long-standing customer with mature account history"
+    },
+    {
+      "factor": "cash_reserves",
+      "weight": 0.20,
+      "score": 78,
+      "description": "Adequate emergency fund and savings balance"
+    }
+  ],
+  "recommendations": [
+    "Consider increasing monthly savings contributions",
+    "Explore debt consolidation options to improve debt-to-income ratio"
+  ]
+}
+```
+
+#### 3. User Income API
+
+**Endpoint:** `GET /api/v1/users/{userId}/income`
+
+**Description:** Returns aggregated income data for the user over a specified time period.
+
+**Parameters:**
+- `userId` (path parameter, required): The user's unique identifier (email address)
+- `startDate` (query parameter, required): Start date for income period (ISO 8601 format)
+- `endDate` (query parameter, required): End date for income period (ISO 8601 format)
+- `granularity` (query parameter, optional): Aggregation granularity. Defaults to "monthly"
+  - `daily`: Daily income aggregation
+  - `weekly`: Weekly income aggregation
+  - `monthly`: Monthly income aggregation (default)
+  - `yearly`: Yearly income aggregation
+
+**Response Schema:**
+```json
+{
+  "userId": "string",
+  "startDate": "string",
+  "endDate": "string",
+  "granularity": "string",
+  "totalIncome": "number",
+  "averageIncome": "number",
+  "incomeEntries": [
+    {
+      "period": "string",
+      "totalAmount": "number",
+      "sources": [
+        {
+          "sourceType": "string",
+          "sourceName": "string",
+          "amount": "number",
+          "frequency": "string"
+        }
+      ]
+    }
+  ],
+  "incomeGrowth": "number",
+  "incomeStability": "number"
+}
+```
+
+**Example Request:**
+```
+GET /api/v1/users/john.doe@example.com/income?startDate=2025-01-01&endDate=2025-07-31&granularity=monthly
+```
+
+**Example Response:**
+```json
+{
+  "userId": "john.doe@example.com",
+  "startDate": "2025-01-01T00:00:00Z",
+  "endDate": "2025-07-31T23:59:59Z",
+  "granularity": "monthly",
+  "totalIncome": 42000.00,
+  "averageIncome": 6000.00,
+  "incomeEntries": [
+    {
+      "period": "2025-01",
+      "totalAmount": 6200.00,
+      "sources": [
+        {
+          "sourceType": "salary",
+          "sourceName": "Primary Employer",
+          "amount": 5500.00,
+          "frequency": "monthly"
+        },
+        {
+          "sourceType": "freelance",
+          "sourceName": "Consulting Work",
+          "amount": 700.00,
+          "frequency": "irregular"
+        }
+      ]
+    },
+    {
+      "period": "2025-02",
+      "totalAmount": 5800.00,
+      "sources": [
+        {
+          "sourceType": "salary",
+          "sourceName": "Primary Employer",
+          "amount": 5500.00,
+          "frequency": "monthly"
+        },
+        {
+          "sourceType": "investment",
+          "sourceName": "Dividend Income",
+          "amount": 300.00,
+          "frequency": "quarterly"
+        }
+      ]
+    }
+  ],
+  "incomeGrowth": 0.05,
+  "incomeStability": 0.88
+}
+```
+
+### Error Handling
+
+All endpoints follow consistent error response format:
+
+```json
+{
+  "error": {
+    "code": "string",
+    "message": "string",
+    "details": "string"
+  }
+}
+```
+
+Common error codes:
+- `USER_NOT_FOUND`: User ID does not exist in the system
+- `INVALID_DATE_RANGE`: Invalid or malformed date parameters
+- `INVALID_SCORE_TYPE`: Unsupported financial score type
+- `INVALID_GRANULARITY`: Unsupported aggregation granularity
+- `INTERNAL_ERROR`: Server-side processing error
+
+### Security
+
+- All endpoints require authentication via Azure AD Bearer token
+- User context is validated to ensure users can only access their own data
+- Rate limiting applied per user to prevent abuse
+- Input validation and sanitization on all parameters
+
+## AI Foundry Agent Architecture
+
+The submission-analyzer service implements an AI Foundry agent with sophisticated capabilities for analyzing user submissions. The agent combines multiple AI techniques and data sources to provide comprehensive analysis and recommendations.
+
+### Agent Capabilities
+
+#### 1. RAG (Retrieval-Augmented Generation) with Security Trimming
+
+**Purpose:** Search and retrieve relevant information from the user's document history and previous conversations.
+
+**Implementation:**
+- Queries Azure AI Search index containing all user documents
+- Applies security trimming by filtering results where `userId == currentUser`
+- Retrieves contextually relevant documents based on semantic similarity
+- Provides document context to the AI agent for informed decision making
+
+**Security Features:**
+- Row-level security through userId filtering
+- Encrypted search queries and results
+- Audit logging of all search operations
+- Access control validation for each query
+
+#### 2. Web Search for Entity Investigation
+
+**Purpose:** Investigate external entities mentioned in documents (e.g., invoice vendors, business partners, organizations).
+
+**Implementation:**
+- Integrates with Azure Cognitive Search Web API or Bing Search API
+- Automatically extracts entity names from documents (companies, vendors, organizations)
+- Performs targeted web searches to gather public information
+- Analyzes search results to identify potential risks or opportunities
+
+**Use Cases:**
+- Vendor verification and reputation checking
+- Business legitimacy validation
+- Risk assessment for new business relationships
+- Market intelligence gathering
+
+#### 3. Company APIs Integration
+
+**Purpose:** Access internal company data and business logic through standardized APIs.
+
+**Implementation:**
+- HTTP client integration with company-apis service
+- Automatic user context propagation for personalized data retrieval
+- Structured data integration into agent reasoning process
+- Error handling and fallback mechanisms
+
+**Available Tools:**
+- User product portfolio analysis
+- Financial health assessment
+- Income trend analysis
+- Risk scoring and profiling
+
+### Agent Workflow
+
+```mermaid
+graph TD
+    A[Document Processing Events] --> B[submission-analyzer Agent]
+    B --> C{Analysis Strategy Selection}
+    
+    C --> D[RAG Search]
+    D --> E[Query User Documents]
+    E --> F[Security Trimming Filter]
+    F --> G[Retrieve Relevant Context]
+    
+    C --> H[Entity Extraction]
+    H --> I[Web Search Investigation]
+    I --> J[Entity Verification]
+    J --> K[Risk Assessment]
+    
+    C --> L[Company APIs Query]
+    L --> M[User Products API]
+    L --> N[Financial Score API]
+    L --> O[Income Analysis API]
+    
+    G --> P[Comprehensive Analysis]
+    K --> P
+    M --> P
+    N --> P
+    O --> P
+    
+    P --> Q[Generate Recommendations]
+    Q --> R[Update Submission Record]
+    R --> S[Emit Analysis Complete Event]
+    
+    style B fill:#e8f5e8
+    style P fill:#fff3e0
+    style Q fill:#e1f5fe
+```
+
+### Analysis Outputs
+
+The AI agent generates comprehensive analysis results including:
+
+1. **Completeness Assessment**
+   - Document coverage analysis
+   - Missing information identification
+   - Compliance requirement checking
+
+2. **Risk Analysis**
+   - Vendor/entity risk evaluation
+   - Financial risk assessment
+   - Operational risk identification
+
+3. **Recommendation Generation**
+   - Next steps for submission processing
+   - Additional documentation requirements
+   - Potential opportunities or concerns
+
+4. **Compliance Validation**
+   - Regulatory requirement verification
+   - Policy adherence checking
+   - Audit trail generation
 
 ## Service Scaling and High Availability
 
