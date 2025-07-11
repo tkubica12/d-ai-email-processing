@@ -1,117 +1,192 @@
 # Submission Analyzer Service
 
 ## Overview
-The Submission Analyzer service performs the final AI-powered analysis of complete submissions. It evaluates all processed documents together to generate insights, identify missing information, and provide recommendations for operators.
+The Submission Analyzer service performs AI-powered analysis of submission content using Azure AI Projects. It analyzes email submissions, complaints, or support requests to provide comprehensive insights and recommendations using multiple AI tools.
 
-## Architecture Decisions
+## Features
+- **Bing Grounding Tool**: Access to current web information and market data
+- **Company API Integration**: Access to internal company data including:
+  - User products and subscriptions
+  - Financial scores and assessments
+  - Income data and trends
+- **Managed Identity Authentication**: Secure access to company APIs using Azure Managed Identity
+- **Comprehensive Analysis**: Combines personal data with market context for actionable recommendations
 
-### Event Sourcing Pattern
-- **Event Consumption**: Listens to Cosmos DB Change Feed for `SubmissionDocumentsCompleteEvent`
-- **Event Publishing**: Emits `SubmissionAnalysisCompleteEvent` after analysis completion
-- **Complete Context**: Accesses all processed documents for comprehensive analysis
+## Quick Start
 
-### Data Storage
-- **Analysis Results**: Stores final analysis in Cosmos DB `submissions` container
-- **Document Access**: Reads processed documents from `documents` container
-- **AI Integration**: Uses Azure OpenAI or other LLM services for analysis
+### Prerequisites
+- Python 3.12 or higher
+- Azure CLI installed and authenticated (`az login`)
+- Access to Azure AI Foundry and related services
+- Company APIs service running (for full functionality)
+
+### Installation
+```bash
+# Install dependencies
+uv sync
+
+# Copy environment configuration
+cp .env.example .env
+
+# Edit .env with your Azure service endpoints
+```
+
+### Configuration
+Update the `.env` file with your Azure service configurations:
+
+```bash
+# Azure AI Foundry Configuration
+AZURE_FOUNDRY_PROJECT_ENDPOINT=https://your-instance.services.ai.azure.com/api/projects/your-project
+AZURE_OPENAI_MODEL=gpt-4.1
+BING_CONNECTION_ID=/subscriptions/xxx/resourceGroups/xxx/providers/Microsoft.CognitiveServices/accounts/xxx/projects/xxx/connections/xxx
+
+# Company API Configuration
+COMPANY_API_BASE_URL=http://localhost:8003
+COMPANY_API_AUDIENCE=fake-audience
+
+# Application Configuration
+LOG_LEVEL=INFO
+```
+
+### Running the Service
+```bash
+# Run the example analysis
+python main.py
+
+# Or using uv
+uv run main.py
+```
+
+## Architecture
+### Core Components
+
+#### SubmissionAnalyzerAgent
+- **Purpose**: Wrapper around Azure AI Projects for submission analysis
+- **Features**: Context management, message handling, and automatic cleanup
+- **Tools**: Integrated Bing grounding and Company API access
+- **Configuration**: Uses centralized config management with environment variables
+
+#### Configuration Management
+- **Pattern**: Pydantic-based configuration with environment validation
+- **Structure**: Separate configs for AI Projects, Cosmos DB, OpenAI, Company APIs, and logging
+- **Validation**: Automatic validation of required environment variables
+- **Security**: Managed Identity authentication for company APIs
+
+## Usage
+
+### Basic Analysis
+```python
+from agent import SubmissionAnalyzerAgent
+from config import AppConfig
+
+# Load configuration
+config = AppConfig.from_env()
+
+# Analyze submission with context manager
+with SubmissionAnalyzerAgent(config) as agent:
+    result = agent.analyze_submission("Your submission content here")
+    print(f"Analysis status: {result['run_result']['status']}")
+```
+
+### Manual Agent Management
+```python
+# Create agent
+agent = SubmissionAnalyzerAgent(config)
+
+# Analyze submission
+result = agent.analyze_submission("Your submission content here")
+
+# Clean up resources
+agent.cleanup()
+```
 
 ## Analysis Capabilities
 
-### Comprehensive Document Review
-1. **Cross-Document Analysis**: Analyzes all documents in submission together
-2. **Information Extraction**: Identifies key data points across multiple sources
-3. **Consistency Checking**: Detects contradictions between documents
-4. **Completeness Assessment**: Identifies missing required information
+### Content Analysis
+1. **Document Understanding**: Processes and analyzes submission content
+2. **Information Extraction**: Identifies key data points and entities
+3. **Context Awareness**: Maintains conversation context across interactions
+4. **Insight Generation**: Provides structured analysis results
 
-### AI-Powered Insights
-1. **Content Classification**: Categorizes submission type and purpose
-2. **Risk Assessment**: Evaluates potential issues or concerns
-3. **Recommendation Generation**: Suggests next steps for operators
-4. **Confidence Scoring**: Provides reliability metrics for analysis
-
-## Responsibilities
-
-1. **Event Processing**
-   - Monitors Change Feed for `SubmissionDocumentsCompleteEvent`
-   - Retrieves all processed documents for the submission
-   - Accesses submission metadata and context
-
-2. **Document Aggregation**
-   - Collects processed text from all documents
-   - Combines results from both processing pipelines (markitdown and foundry)
-   - Builds comprehensive document corpus for analysis
-
-3. **AI Analysis**
-   - Performs intelligent analysis using LLM services
-   - Generates structured insights and recommendations
-   - Identifies gaps, inconsistencies, and action items
-   - Produces confidence scores for findings
-
-4. **Result Storage**
-   - Stores analysis results in submission record
-   - Updates submission status to completed
-   - Provides structured output for operator interfaces
-
-5. **Event Emission**
-   - Emits `SubmissionAnalysisCompleteEvent` with results
-   - Signals completion of processing pipeline
-   - Enables operator notification and workflow triggers
-
-## Analysis Output Schema
-
-```json
-{
-  "analysisResults": {
-    "submissionType": "loan_application|insurance_claim|support_request",
-    "completenessScore": 0.85,
-    "missingInformation": [
-      "tax_identification_number",
-      "supporting_financial_documents",
-      "identity_verification"
-    ],
-    "extractedData": {
-      "applicantName": "John Doe",
-      "applicationAmount": 50000,
-      "applicationDate": "2025-07-07"
-    },
-    "riskFactors": [
-      "incomplete_documentation",
-      "inconsistent_information"
-    ],
-    "recommendations": [
-      "request_additional_documentation", 
-      "verify_identity_information",
-      "schedule_follow_up_call"
-    ],
-    "confidence": 0.92,
-    "processingTime": "45.2s"
-  },
-  "status": "completed",
-  "timestamp": "2025-07-07T10:00:00Z"
-}
-```
-
-## Event Flow
-
-```
-SubmissionDocumentsCompleteEvent → Document Retrieval → AI Analysis
-                                                            ↓
-                                                    Result Storage
-                                                            ↓
-                                            SubmissionAnalysisCompleteEvent
-```
+### AI Features
+1. **Code Interpreter**: Built-in code execution capabilities
+2. **Conversation Management**: Maintains thread state and message history
+3. **Error Handling**: Robust error management and logging
+4. **Resource Cleanup**: Automatic cleanup of Azure resources
 
 ## Technology Stack
-- **Framework**: FastAPI for health checks and monitoring
-- **AI Services**: Azure OpenAI for intelligent analysis
-- **Event Store**: Cosmos DB Change Feed
-- **Document Access**: Cosmos DB document queries
+- **AI Platform**: Azure AI Projects
 - **Authentication**: DefaultAzureCredential with Managed Identity
-- **Port**: 8005 (for local development)
+- **Configuration**: Pydantic models with environment variables
+- **Logging**: Structured logging with Azure SDK noise reduction
+- **Error Handling**: Comprehensive exception handling and recovery
 
-## Key Features
-- **Intelligent Analysis**: Advanced AI-powered document understanding
-- **Cross-Reference Capability**: Analyzes relationships between multiple documents
-- **Structured Output**: Produces actionable insights for operators
-- **Scalable Processing**: Handles varying submission sizes and complexity
-- **Quality Metrics**: Provides confidence scores and processing statistics
+## Available Tools
+
+### Bing Grounding Tool
+Provides access to current web information including:
+- Market data and financial news
+- General information and research
+- Real-time search capabilities
+
+### Company API Tool
+Accesses internal company data through OpenAPI specification:
+- **User Products**: `/api/v1/users/{userId}/products`
+- **Financial Scores**: `/api/v1/users/{userId}/financial-score`
+- **Income Data**: `/api/v1/users/{userId}/income`
+
+Authentication uses Azure Managed Identity with configurable audience.
+
+## Development
+
+### Project Structure
+```
+submission-analyzer/
+├── agent.py                    # Main agent implementation
+├── config.py                   # Configuration management
+├── main.py                     # Example usage and entry point
+├── company-apis-openapi.json   # Company API OpenAPI specification
+├── models.py                   # Data models (if needed)
+├── pyproject.toml              # Dependencies and project metadata
+├── README.md                   # This file
+├── .env                        # Environment configuration
+└── .env.example               # Environment configuration template
+```
+
+### Testing
+```bash
+# Run the example
+python main.py
+
+# With debug logging
+LOG_LEVEL=DEBUG python main.py
+```
+
+## Configuration Reference
+
+### Required Environment Variables
+- `AZURE_FOUNDRY_PROJECT_ENDPOINT`: Azure AI Foundry project endpoint URL
+- `AZURE_OPENAI_MODEL`: AI model deployment name
+- `BING_CONNECTION_ID`: Bing connection ID for grounding tool
+
+### Company API Configuration
+- `COMPANY_API_BASE_URL`: Base URL for company APIs (default: http://localhost:8003)
+- `COMPANY_API_AUDIENCE`: Audience for managed identity authentication (default: fake-audience)
+
+### Legacy Configuration (for reference)
+- `PROJECT_ENDPOINT`: Azure AI Projects endpoint URL
+- `MODEL_DEPLOYMENT_NAME`: AI model deployment name
+- `AZURE_OPENAI_ENDPOINT`: Azure OpenAI endpoint (fallback)
+
+### Optional Environment Variables
+- `AZURE_OPENAI_MODEL`: OpenAI model name (default: gpt-4.1)
+- `LOG_LEVEL`: Logging level (default: INFO)
+- Additional Cosmos DB and Storage configurations for future features
+
+## Troubleshooting
+
+### Common Issues
+1. **Authentication Errors**: Ensure you're logged in with `az login`
+2. **Missing Environment Variables**: Check `.env` file configuration
+3. **Model Deployment**: Verify model deployment name matches Azure configuration
+4. **Endpoint URLs**: Ensure all endpoints are accessible and correct
