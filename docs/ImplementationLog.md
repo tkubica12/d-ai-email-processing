@@ -189,4 +189,23 @@ Implemented a FastAPI-based service that provides mock business data for AI agen
 
 ---
 
+## 4. Container Configuration
+
+**Date**: July 11, 2025
+
+**Company APIs Dockerfile Creation:**
+- Created Dockerfile for company-apis service using uv package manager
+- Follows established pattern from client-web service
+- Uses Python 3.12 slim base image for security and performance
+- Configured to run on port 8003 (company-apis specific port)
+- Implements multi-stage approach: dependencies → application code → runtime
+- Uses `uv sync --frozen` for reproducible builds from uv.lock file
+
+**Container Build Pattern:**
+```dockerfile
+# Install uv → Copy project files → Install dependencies → Copy app code → Configure runtime
+```
+
+---
+
 **This log focuses on architectural decisions, critical fixes, and lessons learned. For detailed implementation, see source code and service-specific documentation.**
