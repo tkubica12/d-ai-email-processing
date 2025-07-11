@@ -1,0 +1,86 @@
+### Company APIs REST Client
+### Test file for Company APIs service endpoints
+
+# Base URL for local development
+@baseUrl = http://localhost:8003
+@token = test-token-123
+
+### Health Check
+GET {{baseUrl}}/health
+
+### Get User Products
+GET {{baseUrl}}/api/v1/users/john.doe@example.com/products
+Authorization: Bearer {{token}}
+
+### Get User Products - Different User
+GET {{baseUrl}}/api/v1/users/jane.smith@example.com/products
+Authorization: Bearer {{token}}
+
+### Get User Products - Non-email User ID
+GET {{baseUrl}}/api/v1/users/user123/products
+Authorization: Bearer {{token}}
+
+### Get User Products - Another Non-email User ID
+GET {{baseUrl}}/api/v1/users/testuser456/products
+Authorization: Bearer {{token}}
+
+### Get Financial Score - Composite (Default)
+GET {{baseUrl}}/api/v1/users/john.doe@example.com/financial-score
+Authorization: Bearer {{token}}
+
+### Get Financial Score - Creditworthiness
+GET {{baseUrl}}/api/v1/users/john.doe@example.com/financial-score?scoreType=creditworthiness
+Authorization: Bearer {{token}}
+
+### Get Financial Score - Liquidity
+GET {{baseUrl}}/api/v1/users/jane.smith@example.com/financial-score?scoreType=liquidity
+Authorization: Bearer {{token}}
+
+### Get Financial Score - Stability (Non-email User)
+GET {{baseUrl}}/api/v1/users/user123/financial-score?scoreType=stability
+Authorization: Bearer {{token}}
+
+### Get Financial Score - Growth
+GET {{baseUrl}}/api/v1/users/john.doe@example.com/financial-score?scoreType=growth
+Authorization: Bearer {{token}}
+
+### Get Income Data - Monthly (Default)
+GET {{baseUrl}}/api/v1/users/john.doe@example.com/income?startDate=2025-01-01T00:00:00Z&endDate=2025-07-31T23:59:59Z
+Authorization: Bearer {{token}}
+
+### Get Income Data - Weekly
+GET {{baseUrl}}/api/v1/users/john.doe@example.com/income?startDate=2025-06-01T00:00:00Z&endDate=2025-07-31T23:59:59Z&granularity=weekly
+Authorization: Bearer {{token}}
+
+### Get Income Data - Daily
+GET {{baseUrl}}/api/v1/users/john.doe@example.com/income?startDate=2025-07-01T00:00:00Z&endDate=2025-07-07T23:59:59Z&granularity=daily
+Authorization: Bearer {{token}}
+
+### Get Income Data - Different User
+GET {{baseUrl}}/api/v1/users/jane.smith@example.com/income?startDate=2025-01-01T00:00:00Z&endDate=2025-07-31T23:59:59Z&granularity=monthly
+Authorization: Bearer {{token}}
+
+### Get Income Data - Non-email User
+GET {{baseUrl}}/api/v1/users/user123/income?startDate=2025-01-01T00:00:00Z&endDate=2025-07-31T23:59:59Z&granularity=monthly
+Authorization: Bearer {{token}}
+
+### Test Error Cases
+
+### Missing Authorization
+GET {{baseUrl}}/api/v1/users/john.doe@example.com/products
+
+### Invalid Date Range
+GET {{baseUrl}}/api/v1/users/john.doe@example.com/income?startDate=2025-07-31T00:00:00Z&endDate=2025-01-01T00:00:00Z
+Authorization: Bearer {{token}}
+
+### Invalid Score Type (should be handled by FastAPI validation)
+GET {{baseUrl}}/api/v1/users/john.doe@example.com/financial-score?scoreType=invalid
+Authorization: Bearer {{token}}
+
+### Test Consistency - Same User Multiple Times
+GET {{baseUrl}}/api/v1/users/user123/products
+Authorization: Bearer {{token}}
+
+### Test Consistency - Same User Multiple Times (should return same data)
+GET {{baseUrl}}/api/v1/users/user123/products
+Authorization: Bearer {{token}}

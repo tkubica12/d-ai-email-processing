@@ -152,6 +152,25 @@ await container.create_item(body=event_dict)
 
 ---
 
+## FastAPI Development
+
+**Errors**:
+- **422 Unprocessable Entity with "Field required"** → Parameter name mismatch between URL and function signature
+  - **Solution**: Use camelCase parameter names (startDate, endDate) to match OpenAPI spec and client expectations
+  - **Example**: `startDate: datetime = Query(...)` not `start_date: datetime = Query(...)`
+
+- **Missing ProductType in mock data** → KeyError when accessing dictionary with enum key
+  - **Solution**: Ensure all enum values have corresponding entries in data dictionaries
+  - **Example**: Add `ProductType.other` to both `PRODUCT_NAMES` and `PRODUCT_FEATURES`
+
+- **Timezone issues on Windows** → `zoneinfo.ZoneInfoNotFoundError: No time zone found with key UTC`
+  - **Solution**: Use `datetime.timezone.utc` instead of `ZoneInfo("UTC")` for cross-platform compatibility
+  - **Alternative**: Add `tzdata` package to dependencies
+
+**Prevention**: Test all enum values, use cross-platform datetime handling, maintain consistent parameter naming.
+
+---
+
 ## Quick Troubleshooting
 
 1. **Authentication**: `az login`, check subscription and RBAC

@@ -42,7 +42,40 @@ The system implements a multi-stage document processing pipeline:
 
 ---
 
-## 3. Critical Technical Fixes & Lessons Learned
+## 3. Architecture Redesign - AI-Powered Analysis Focus
+
+**Date**: July 11, 2025
+
+**Major Changes Made:**
+1. **Removed docproc-aggregator**: Eliminated complexity of tracking document processing completion
+2. **Enhanced submission-analyzer**: Upgraded to AI Foundry agent with advanced capabilities
+3. **Added company-apis**: New service providing business logic APIs with mock data
+4. **Enhanced docproc-search-indexer**: Added userId metadata for security trimming
+
+**AI Foundry Agent Capabilities:**
+- **RAG Integration**: Azure AI Search with security trimming by userId
+- **Web Search**: Entity investigation and verification capabilities
+- **Company APIs**: Integration with internal business systems
+- **Comprehensive Analysis**: Multi-faceted submission evaluation
+
+**Company APIs Service:**
+- **User Products API**: Subscription and service portfolio data
+- **Financial Score API**: Multi-dimensional financial health scoring
+- **Income Analysis API**: Aggregated income data with configurable granularity
+
+**Simplified Event Flow:**
+- Direct processing from document events to submission-analyzer
+- Removed intermediate aggregation events
+- Enhanced analyzer to handle multiple simultaneous processing streams
+
+**Business Logic Enhancement:**
+- Focus on showcasing AI capabilities for business analysis
+- Real-world scenarios with vendor verification and risk assessment
+- Comprehensive user context through internal APIs
+
+---
+
+## 4. Critical Technical Fixes & Lessons Learned
 
 **Event System Consistency:**
 - **Issue**: Missing `documentId` in event data and inconsistent partition keys
@@ -109,6 +142,50 @@ The system implements a multi-stage document processing pipeline:
 - Migrated from plain dictionaries to Pydantic models for Service Bus messages
 - Added `submittedAt` timestamp for traceability
 - Enabled automatic JSON schema generation for future API documentation
+
+---
+
+## 7. Company APIs Service Implementation
+
+**Date**: July 11, 2025
+
+**Service Overview:**
+Implemented a FastAPI-based service that provides mock business data for AI agents to use during submission analysis. The service exposes RESTful APIs with realistic, consistent mock data generation.
+
+**Key Implementation Decisions:**
+1. **Mock Data Strategy**: Uses seeded random generation with user ID as seed for consistent results
+2. **Cross-Platform Compatibility**: Replaced `zoneinfo` with `datetime.timezone.utc` for Windows compatibility
+3. **Flexible User IDs**: Accepts any string as user ID, not just email addresses
+4. **Comprehensive Error Handling**: Structured error responses with proper HTTP status codes
+
+**Technical Architecture:**
+- **FastAPI**: Modern Python web framework with automatic API documentation
+- **Pydantic Models**: Type-safe request/response validation
+- **Bearer Token Authentication**: Simplified mock authentication for development
+- **Seeded Random Generation**: Consistent mock data per user using `abs(hash(user_id)) % (2**32)`
+
+**API Endpoints Implemented:**
+1. `GET /api/v1/users/{userId}/products` - User products and subscriptions
+2. `GET /api/v1/users/{userId}/financial-score` - Financial health scores (5 types)
+3. `GET /api/v1/users/{userId}/income` - Income data with configurable granularity
+
+**Mock Data Features:**
+- **Product Types**: Banking, insurance, investment, loan, credit, other
+- **Financial Scores**: Composite, creditworthiness, liquidity, stability, growth
+- **Income Granularity**: Daily, weekly, monthly, yearly aggregation
+- **Realistic Ranges**: Sensible financial data ranges and relationships
+
+**Common Issues Resolved:**
+- **Missing ProductType.other**: Added missing product names and features for 'other' category
+- **Timezone Compatibility**: Used `timezone.utc` instead of `ZoneInfo("UTC")` for Windows
+- **Hash Consistency**: Used `abs(hash())` to avoid negative values in ID generation
+- **Dependencies**: Added `tzdata` package for timezone support on Windows
+
+**Testing Strategy:**
+- REST Client file with comprehensive test cases
+- Tests for all endpoints and error conditions
+- Consistency tests to verify seeded random generation
+- Support for both email and non-email user IDs
 
 ---
 
