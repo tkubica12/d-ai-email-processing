@@ -15,18 +15,12 @@ from dotenv import load_dotenv
 
 
 class CompanyAPIConfig(BaseModel):
-    """Configuration for Company APIs integration."""
+    """Configuration for Company APIs integration with autonomous authentication."""
     
     base_url: str = Field(
         default="http://localhost:8003",
         description="Base URL for Company APIs",
         example="http://localhost:8003"
-    )
-    
-    audience: str = Field(
-        default="fake-audience",
-        description="Audience for managed identity token",
-        example="fake-audience"
     )
 
 
@@ -239,8 +233,7 @@ class AppConfig(BaseModel):
                 enabled=table_storage_enabled
             ),
             company_api=CompanyAPIConfig(
-                base_url=os.getenv('COMPANY_API_BASE_URL', 'http://localhost:8003'),
-                audience=os.getenv('COMPANY_API_AUDIENCE', 'fake-audience')
+                base_url=os.getenv('COMPANY_API_BASE_URL', 'http://localhost:8003')
             ),
             logging=LoggingConfig(
                 level=log_level

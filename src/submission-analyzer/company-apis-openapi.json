@@ -11,12 +11,8 @@
   },
   "servers": [
     {
-      "url": "http://localhost:8003",
-      "description": "Local development server"
-    },
-    {
-      "url": "https://company-apis.example.com",
-      "description": "Production server"
+      "url": "https://ca-company-apis-email-dev-vwyh.redground-3db75dd7.swedencentral.azurecontainerapps.io/",
+      "description": "server"
     }
   ],
   "paths": {

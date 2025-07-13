@@ -11,9 +11,8 @@ from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential
 from azure.ai.agents.models import (
     BingGroundingTool, 
-    OpenApiTool, 
-    OpenApiManagedAuthDetails, 
-    OpenApiManagedSecurityScheme
+    OpenApiTool,
+    OpenApiAnonymousAuthDetails
 )
 
 from config import AppConfig, setup_logging
@@ -92,10 +91,14 @@ You MUST always call some company API.
             Exception: If agent creation fails
         """
         try:
+            print("🛠️  Setting up agent tools...")
+            
             # Create Bing grounding tool
+            print("   🔍 Configuring Bing search tool...")
             bing = BingGroundingTool(connection_id=self.config.ai_projects.bing_connection_id)
             
             # Load Company API OpenAPI specification
+            print("   🏢 Loading Company API specification...")
             openapi_spec_path = os.path.join(os.path.dirname(__file__), "company-apis-openapi.json")
             with open(openapi_spec_path, "r") as f:
                 company_api_spec = jsonref.loads(f.read())
@@ -107,25 +110,23 @@ You MUST always call some company API.
                     "description": "Company APIs server"
                 }
             ]
+            print(f"   🌐 Company API endpoint: {self.config.company_api.base_url}")
             
-            # Create managed identity authentication for Company API
-            company_api_auth = OpenApiManagedAuthDetails(
-                security_scheme=OpenApiManagedSecurityScheme(
-                    audience=self.config.company_api.audience
-                )
-            )
-            
-            # Create Company API OpenAPI tool
+            # Create Company API OpenAPI tool with autonomous authentication (no auth required)
+            print("   🔓 Using autonomous authentication (no auth required)")
+            auth = OpenApiAnonymousAuthDetails()
             company_api_tool = OpenApiTool(
                 name="company_apis",
                 spec=company_api_spec,
                 description="Access company internal APIs to retrieve user products, financial scores, and income data",
-                auth=company_api_auth
+                auth=auth
             )
             
             # Combine tool definitions
             all_tools = bing.definitions + company_api_tool.definitions
+            print(f"   ✅ Configured {len(all_tools)} tool functions")
             
+            print("🤖 Creating AI agent...")
             agent = self.project_client.agents.create_agent(
                 model=self.config.ai_projects.model_deployment_name,
                 name=self.agent_name,
@@ -134,10 +135,12 @@ You MUST always call some company API.
             )
             
             self.agent_id = agent.id
+            print(f"✅ Agent created successfully with ID: {self.agent_id}")
             self.logger.info(f"Created agent with ID: {self.agent_id}")
             return self.agent_id
             
         except Exception as e:
+            print(f"❌ Failed to create agent: {e}")
             self.logger.error(f"Failed to create agent: {e}")
             raise
     
@@ -152,12 +155,15 @@ You MUST always call some company API.
             Exception: If thread creation fails
         """
         try:
+            print("💬 Creating conversation thread...")
             thread = self.project_client.agents.threads.create()
             self.thread_id = thread.id
+            print(f"✅ Thread created successfully with ID: {self.thread_id}")
             self.logger.info(f"Created thread with ID: {self.thread_id}")
             return self.thread_id
             
         except Exception as e:
+            print(f"❌ Failed to create thread: {e}")
             self.logger.error(f"Failed to create thread: {e}")
             raise
     
@@ -180,6 +186,7 @@ You MUST always call some company API.
             raise ValueError("Thread must be created before sending messages")
         
         try:
+            print("📝 Sending message to agent...")
             message = self.project_client.agents.messages.create(
                 thread_id=self.thread_id,
                 role=role,
@@ -187,10 +194,12 @@ You MUST always call some company API.
             )
             
             message_id = message['id']
+            print(f"✅ Message sent successfully with ID: {message_id}")
             self.logger.info(f"Sent message with ID: {message_id}")
             return message_id
             
         except Exception as e:
+            print(f"❌ Failed to send message: {e}")
             self.logger.error(f"Failed to send message: {e}")
             raise
     
@@ -211,25 +220,250 @@ You MUST always call some company API.
             raise ValueError("Thread must be created before running")
         
         try:
+            print("🔧 Creating agent run...")
             run = self.project_client.agents.runs.create_and_process(
                 thread_id=self.thread_id,
                 agent_id=self.agent_id
             )
             
+            print(f"🎯 Agent run finished with status: {run.status}")
             self.logger.info(f"Agent run finished with status: {run.status}")
+            self.logger.debug(f"Run object type: {type(run)}")
+            self.logger.debug(f"Run object attributes: {dir(run)}")
+            
+            # Capture tool usage information
+            tool_usage = []
             
             if run.status == "failed":
+                print(f"❌ Agent run failed: {run.last_error}")
                 self.logger.error(f"Agent run failed: {run.last_error}")
+            elif run.status == "completed":
+                print("✅ Agent run completed successfully")
+                
+                # Get detailed run steps to capture tool usage
+                try:
+                    self.logger.debug("Attempting to access run steps...")
+                    self.logger.debug(f"Project client agents type: {type(self.project_client.agents)}")
+                    self.logger.debug(f"Project client agents attributes: {dir(self.project_client.agents)}")
+                    
+                    # Access run steps through the run_steps attribute
+                    self.logger.debug("Calling run_steps.list()...")
+                    run_steps = self.project_client.agents.run_steps.list(
+                        thread_id=self.thread_id,
+                        run_id=run.id
+                    )
+                    
+                    self.logger.debug(f"Run steps response type: {type(run_steps)}")
+                    self.logger.debug(f"Run steps response: {run_steps}")
+                    
+                    if hasattr(run_steps, '__dict__'):
+                        self.logger.debug(f"Run steps attributes: {run_steps.__dict__}")
+                    
+                    if hasattr(run_steps, 'data'):
+                        self.logger.debug(f"Run steps data type: {type(run_steps.data)}")
+                        self.logger.debug(f"Run steps data length: {len(run_steps.data) if run_steps.data else 'None'}")
+                        
+                    if hasattr(run_steps, 'value'):
+                        self.logger.debug(f"Run steps value type: {type(run_steps.value)}")
+                        self.logger.debug(f"Run steps value length: {len(run_steps.value) if run_steps.value else 'None'}")
+                    
+                    if run_steps:
+                        # ItemPaged is an iterator, so we need to convert it to a list
+                        try:
+                            steps_data = list(run_steps)
+                            self.logger.debug(f"Retrieved {len(steps_data)} steps from ItemPaged")
+                        except Exception as e:
+                            self.logger.debug(f"Error converting ItemPaged to list: {e}")
+                            steps_data = []
+                        
+                        if steps_data and len(steps_data) > 0:
+                            print(f"🛠️  Processing {len(steps_data)} execution steps...")
+                            self.logger.debug(f"Processing {len(steps_data)} steps...")
+                            
+                            for i, step in enumerate(steps_data, 1):
+                                self.logger.debug(f"Step {i}: {type(step)}")
+                                self.logger.debug(f"Step {i} attributes: {dir(step)}")
+                                
+                                if hasattr(step, '__dict__'):
+                                    self.logger.debug(f"Step {i} dict: {step.__dict__}")
+                                
+                                # Extract timing information
+                                created_at = getattr(step, 'created_at', None)
+                                completed_at = getattr(step, 'completed_at', None)
+                                duration = None
+                                if created_at and completed_at:
+                                    duration = completed_at - created_at
+                                
+                                if hasattr(step, 'step_details') and step.step_details:
+                                    step_type = getattr(step.step_details, 'type', 'unknown')
+                                    self.logger.debug(f"Step {i} type: {step_type}")
+                                    self.logger.debug(f"Step {i} step_details: {step.step_details}")
+                                    
+                                    if step_type == 'tool_calls' and hasattr(step.step_details, 'tool_calls'):
+                                        self.logger.debug(f"Step {i} has tool_calls: {len(step.step_details.tool_calls)}")
+                                        for j, tool_call in enumerate(step.step_details.tool_calls):
+                                            self.logger.debug(f"Tool call {j}: {type(tool_call)}")
+                                            self.logger.debug(f"Tool call {j} attributes: {dir(tool_call)}")
+                                            if hasattr(tool_call, '__dict__'):
+                                                self.logger.debug(f"Tool call {j} dict: {tool_call.__dict__}")
+                                            
+                                            tool_info = self._parse_tool_call(tool_call)
+                                            if tool_info:
+                                                # Add timing information
+                                                tool_info["created_at"] = created_at
+                                                tool_info["completed_at"] = completed_at
+                                                tool_info["duration_seconds"] = duration
+                                                
+                                                # Add usage information if available
+                                                if hasattr(step, 'usage') and step.usage:
+                                                    tool_info["usage"] = {
+                                                        "prompt_tokens": getattr(step.usage, 'prompt_tokens', 0),
+                                                        "completion_tokens": getattr(step.usage, 'completion_tokens', 0),
+                                                        "total_tokens": getattr(step.usage, 'total_tokens', 0)
+                                                    }
+                                                
+                                                tool_usage.append(tool_info)
+                                                print(f"   🔧 Tool used: {tool_info.get('name', 'unknown')}")
+                                                self.logger.debug(f"Parsed tool info: {tool_info}")
+                                    else:
+                                        self.logger.debug(f"Step {i} is not a tool_calls step or has no tool_calls")
+                                else:
+                                    self.logger.debug(f"Step {i} has no step_details or step_details is None")
+                        else:
+                            print("🛠️  No execution steps with tool calls found")
+                            self.logger.debug("No steps data found or steps data is empty")
+                    else:
+                        print("🛠️  Could not access run steps - method not available")
+                        self.logger.debug("Run steps is None or empty")
+                    
+                except Exception as e:
+                    self.logger.warning(f"Could not retrieve detailed tool usage: {e}")
+                    self.logger.debug(f"Exception details: {type(e).__name__}: {e}")
+                    self.logger.debug(f"Exception traceback:", exc_info=True)
+                    print(f"⚠️  Could not retrieve detailed tool usage information: {e}")
             
             return {
                 "status": run.status,
                 "last_error": getattr(run, 'last_error', None),
-                "run_id": run.id
+                "run_id": run.id,
+                "tool_usage": tool_usage
             }
             
         except Exception as e:
+            print(f"❌ Failed to run agent: {e}")
             self.logger.error(f"Failed to run agent: {e}")
             raise
+    
+    def _parse_tool_call(self, tool_call) -> Dict[str, Any]:
+        """
+        Parse a tool call to extract useful information.
+        
+        Args:
+            tool_call: Tool call object from the agent run
+            
+        Returns:
+            Dict[str, Any]: Parsed tool call information
+        """
+        try:
+            tool_info = {
+                "id": getattr(tool_call, 'id', 'unknown'),
+                "type": getattr(tool_call, 'type', 'unknown'),
+                "name": "unknown",
+                "input": {},
+                "output": None
+            }
+            
+            tool_type = getattr(tool_call, 'type', 'unknown')
+            
+            # Parse function calls (OpenAPI tools)
+            if tool_type == 'function' and hasattr(tool_call, 'function'):
+                tool_info["name"] = getattr(tool_call.function, 'name', 'unknown')
+                
+                # Parse function arguments
+                if hasattr(tool_call.function, 'arguments'):
+                    try:
+                        args_str = getattr(tool_call.function, 'arguments', '{}')
+                        if args_str:
+                            tool_info["input"] = json.loads(args_str)
+                    except (json.JSONDecodeError, AttributeError):
+                        tool_info["input"] = {"raw": str(getattr(tool_call.function, 'arguments', ''))}
+                        
+                # Get function output
+                if hasattr(tool_call.function, 'output') and tool_call.function.output:
+                    output_str = str(tool_call.function.output)
+                    tool_info["output"] = output_str[:500] + "..." if len(output_str) > 500 else output_str
+                    
+            # Parse OpenAPI calls (newer format)
+            elif tool_type == 'openapi' and hasattr(tool_call, '_data'):
+                # Extract from the _data attribute which contains the full tool call info
+                data = tool_call._data
+                if 'function' in data:
+                    func_data = data['function']
+                    tool_info["name"] = func_data.get('name', 'unknown')
+                    
+                    # Parse arguments
+                    if 'arguments' in func_data:
+                        try:
+                            args_str = func_data['arguments']
+                            if args_str:
+                                tool_info["input"] = json.loads(args_str)
+                        except (json.JSONDecodeError, TypeError):
+                            tool_info["input"] = {"raw": str(func_data.get('arguments', ''))}
+                    
+                    # Get output
+                    if 'output' in func_data and func_data['output']:
+                        output_str = str(func_data['output'])
+                        tool_info["output"] = output_str[:500] + "..." if len(output_str) > 500 else output_str
+            
+            # Parse Bing grounding calls
+            elif tool_type == 'bing_grounding':
+                tool_info["name"] = "bing_grounding"
+                tool_info["type"] = "bing_grounding"
+                
+                # Try to extract from different possible attributes
+                if hasattr(tool_call, 'bing_grounding'):
+                    # Extract query from requesturl if available
+                    if hasattr(tool_call.bing_grounding, 'requesturl'):
+                        request_url = tool_call.bing_grounding.requesturl
+                        # Extract query from URL
+                        if '?q=' in request_url:
+                            query_part = request_url.split('?q=')[1].split('&')[0]
+                            tool_info["input"] = {"query": query_part.replace('%20', ' ')}
+                    
+                    # Extract metadata if available
+                    if hasattr(tool_call.bing_grounding, 'response_metadata'):
+                        tool_info["metadata"] = tool_call.bing_grounding.response_metadata
+                        
+                elif hasattr(tool_call, '_data') and 'bing_grounding' in tool_call._data:
+                    # Extract from _data
+                    bing_data = tool_call._data['bing_grounding']
+                    if 'requesturl' in bing_data:
+                        request_url = bing_data['requesturl']
+                        if '?q=' in request_url:
+                            query_part = request_url.split('?q=')[1].split('&')[0]
+                            tool_info["input"] = {"query": query_part.replace('%20', ' ')}
+                    
+                    if 'response_metadata' in bing_data:
+                        tool_info["metadata"] = bing_data['response_metadata']
+            
+            # Handle other tool types
+            elif hasattr(tool_call, tool_type):
+                tool_info["name"] = tool_type
+                tool_attr = getattr(tool_call, tool_type)
+                if hasattr(tool_attr, 'input'):
+                    tool_info["input"] = {"query": str(tool_attr.input)}
+            
+            return tool_info
+            
+        except Exception as e:
+            self.logger.warning(f"Could not parse tool call: {e}")
+            return {
+                "id": "unknown",
+                "type": "unknown", 
+                "name": "unknown",
+                "input": {},
+                "output": None
+            }
     
     def get_messages(self) -> List[Dict[str, Any]]:
         """
@@ -246,6 +480,7 @@ You MUST always call some company API.
             raise ValueError("Thread must be created before retrieving messages")
         
         try:
+            print("📥 Retrieving messages from thread...")
             messages = self.project_client.agents.messages.list(thread_id=self.thread_id)
             
             formatted_messages = []
@@ -255,10 +490,12 @@ You MUST always call some company API.
                     "content": message.content
                 })
             
+            print(f"✅ Retrieved {len(formatted_messages)} messages")
             self.logger.info(f"Retrieved {len(formatted_messages)} messages")
             return formatted_messages
             
         except Exception as e:
+            print(f"❌ Failed to retrieve messages: {e}")
             self.logger.error(f"Failed to retrieve messages: {e}")
             raise
     
@@ -304,11 +541,14 @@ You MUST always call some company API.
         """
         if self.agent_id:
             try:
+                print("🧹 Cleaning up agent resources...")
                 self.project_client.agents.delete_agent(self.agent_id)
+                print(f"✅ Agent deleted successfully")
                 self.logger.info(f"Deleted agent with ID: {self.agent_id}")
                 self.agent_id = None
                 self.thread_id = None
             except Exception as e:
+                print(f"❌ Failed to delete agent: {e}")
                 self.logger.error(f"Failed to delete agent: {e}")
     
     def __enter__(self):
