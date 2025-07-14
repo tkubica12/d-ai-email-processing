@@ -9,8 +9,9 @@ The Submission Analyzer service performs AI-powered analysis of submission conte
   - User products and subscriptions
   - Financial scores and assessments
   - Income data and trends
-- **Managed Identity Authentication**: Secure access to company APIs using Azure Managed Identity
-- **Comprehensive Analysis**: Combines personal data with market context for actionable recommendations
+- **Azure AI Search Integration**: Search through submitted documents and previous submissions to find relevant information
+- **Managed Identity Authentication**: Secure access to company APIs and Azure services using Azure Managed Identity
+- **Comprehensive Analysis**: Combines personal data, document context, and market information for actionable recommendations
 
 ## Quick Start
 
@@ -43,6 +44,11 @@ BING_CONNECTION_ID=/subscriptions/xxx/resourceGroups/xxx/providers/Microsoft.Cog
 # Company API Configuration
 COMPANY_API_BASE_URL=http://localhost:8003
 COMPANY_API_AUDIENCE=fake-audience
+
+# Azure AI Search Configuration
+AZURE_SEARCH_SERVICE_NAME=your-search-service
+AZURE_SEARCH_INDEX_NAME=documents-index
+AZURE_SEARCH_CONNECTION_ID=/subscriptions/xxx/resourceGroups/xxx/providers/Microsoft.MachineLearningServices/workspaces/xxx/connections/xxx
 
 # Application Configuration
 LOG_LEVEL=INFO

@@ -13,7 +13,9 @@ from azure.identity import DefaultAzureCredential
 from azure.ai.agents.models import (
     BingGroundingTool, 
     OpenApiTool,
-    OpenApiAnonymousAuthDetails
+    OpenApiAnonymousAuthDetails,
+    AzureAISearchTool,
+    AzureAISearchQueryType
 )
 
 from config import AppConfig, setup_logging
@@ -124,7 +126,7 @@ class SubmissionAnalyzerAgent:
     
     def create_agent(self) -> str:
         """
-        Create an Azure AI agent with Bing grounding and Company API tools.
+        Create an Azure AI agent with Bing grounding, Company API, and AI Search tools.
         
         Returns:
             str: The created agent ID
@@ -138,6 +140,16 @@ class SubmissionAnalyzerAgent:
             # Create Bing grounding tool
             self._log_or_print("Configuring Bing search tool...", "info", "🔍")
             bing = BingGroundingTool(connection_id=self.config.ai_projects.bing_connection_id)
+            
+            # Create Azure AI Search tool for document search
+            self._log_or_print("Configuring Azure AI Search tool...", "info", "🔍")
+            ai_search = AzureAISearchTool(
+                index_connection_id=self.config.search.connection_id,
+                index_name=self.config.search.index_name,
+                query_type=AzureAISearchQueryType.VECTOR_SEMANTIC_HYBRID,  # Use hybrid search (vector + semantic)
+                top_k=5,  # Retrieve top 5 results
+                filter=""  # No additional filters (security trimming handled by agent context)
+            )
             
             # Load Company API OpenAPI specification
             self._log_or_print("Loading Company API specification...", "info", "🏢")
@@ -165,7 +177,7 @@ class SubmissionAnalyzerAgent:
             )
             
             # Combine tool definitions
-            all_tools = bing.definitions + company_api_tool.definitions
+            all_tools = bing.definitions + ai_search.definitions + company_api_tool.definitions
             self._log_or_print(f"Configured {len(all_tools)} tool functions", "info", "✅")
             
             self._log_or_print("Creating AI agent...", "info", "🤖")
@@ -174,6 +186,7 @@ class SubmissionAnalyzerAgent:
                 name=self.agent_name,
                 instructions=self.instructions,
                 tools=all_tools,
+                tool_resources=ai_search.resources,
             )
             
             self.agent_id = agent.id
@@ -487,6 +500,32 @@ class SubmissionAnalyzerAgent:
                     
                     if 'response_metadata' in bing_data:
                         tool_info["metadata"] = bing_data['response_metadata']
+            
+            # Parse Azure AI Search calls
+            elif tool_type == 'azure_ai_search':
+                tool_info["name"] = "azure_ai_search"
+                tool_info["type"] = "azure_ai_search"
+                
+                # Try to extract from different possible attributes
+                if hasattr(tool_call, 'azure_ai_search'):
+                    # Extract input query
+                    if hasattr(tool_call.azure_ai_search, 'input'):
+                        tool_info["input"] = {"query": str(tool_call.azure_ai_search.input)}
+                    
+                    # Extract output/results
+                    if hasattr(tool_call.azure_ai_search, 'output'):
+                        output_str = str(tool_call.azure_ai_search.output)
+                        tool_info["output"] = output_str[:500] + "..." if len(output_str) > 500 else output_str
+                        
+                elif hasattr(tool_call, '_data') and 'azure_ai_search' in tool_call._data:
+                    # Extract from _data
+                    search_data = tool_call._data['azure_ai_search']
+                    if 'input' in search_data:
+                        tool_info["input"] = {"query": str(search_data['input'])}
+                    
+                    if 'output' in search_data:
+                        output_str = str(search_data['output'])
+                        tool_info["output"] = output_str[:500] + "..." if len(output_str) > 500 else output_str
             
             # Handle other tool types
             elif hasattr(tool_call, tool_type):

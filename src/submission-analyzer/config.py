@@ -24,6 +24,33 @@ class CompanyAPIConfig(BaseModel):
     )
 
 
+class AISearchConfig(BaseModel):
+    """Configuration for Azure AI Search service."""
+    
+    service_name: str = Field(
+        ...,
+        description="Azure AI Search service name",
+        example="search-email-dev-vwyh"
+    )
+    
+    index_name: str = Field(
+        ...,
+        description="Azure AI Search index name for documents",
+        example="documents-index"
+    )
+    
+    connection_id: str = Field(
+        ...,
+        description="Azure AI Search connection ID in AI Foundry",
+        example="/subscriptions/xxx/resourceGroups/xxx/providers/Microsoft.MachineLearningServices/workspaces/xxx/connections/xxx"
+    )
+    
+    @property
+    def endpoint(self) -> str:
+        """Generate the full Azure AI Search endpoint URL."""
+        return f"https://{self.service_name}.search.windows.net"
+
+
 class AzureAIProjectsConfig(BaseModel):
     """Configuration for Azure AI Projects connection."""
     
@@ -149,6 +176,7 @@ class AppConfig(BaseModel):
     table_storage: TableStorageConfig
     company_api: CompanyAPIConfig
     logging: LoggingConfig
+    search: AISearchConfig
     pretty_print: bool = Field(
         default=True,
         description="Enable pretty console output for debugging",
@@ -217,6 +245,17 @@ class AppConfig(BaseModel):
         log_level = os.getenv('LOG_LEVEL', 'INFO')
         pretty_print = os.getenv('PRETTY_PRINT', 'true').lower() == 'true'
         
+        # Extract AI Search configuration
+        search_service_name = os.getenv('AZURE_SEARCH_SERVICE_NAME')
+        index_name = os.getenv('AZURE_SEARCH_INDEX_NAME')
+        connection_id = os.getenv('AZURE_SEARCH_CONNECTION_ID')
+        
+        if not all([search_service_name, index_name, connection_id]):
+            raise ValueError(
+                "Missing required AI Search configuration. "
+                "Check AZURE_SEARCH_SERVICE_NAME, AZURE_SEARCH_INDEX_NAME, and AZURE_SEARCH_CONNECTION_ID environment variables."
+            )
+        
         return cls(
             ai_projects=AzureAIProjectsConfig(
                 project_endpoint=project_endpoint,
@@ -243,6 +282,11 @@ class AppConfig(BaseModel):
             ),
             logging=LoggingConfig(
                 level=log_level
+            ),
+            search=AISearchConfig(
+                service_name=search_service_name,
+                index_name=index_name,
+                connection_id=connection_id
             ),
             pretty_print=pretty_print
         )

@@ -92,6 +92,31 @@ Deploy infrastructure → Update `.env` → `az login` → `uv run python main.p
 - Port 8003, managed identity with RBAC
 - GitHub Container Registry integration
 
+## AI Search Tool Integration (July 14, 2025)
+
+**Enhanced Submission Analyzer:**
+- **Added** Azure AI Search tool integration to Azure AI Foundry agent
+- **Configured** Entra ID authentication for secure access to search index
+- **Implemented** document search capabilities within agent tools
+- **Updated** system prompt to include AI Search tool instructions
+
+**Technical Implementation:**
+- Uses `AzureAISearchTool` from Azure AI Projects SDK
+- Configured with connection ID for secure authentication
+- Integrated with existing document index from search-indexer service
+- Supports both semantic and keyword search capabilities
+
+**Configuration:**
+- Environment variables: `AZURE_SEARCH_SERVICE_NAME`, `AZURE_SEARCH_INDEX_NAME`, `AZURE_SEARCH_CONNECTION_ID`
+- Authentication via DefaultAzureCredential (Entra ID)
+- Consistent configuration format across all services
+
+**Benefits:**
+- Agent can now search through submitted documents and previous submissions
+- Provides contextual information for more accurate analysis
+- Seamless integration with existing document processing pipeline
+- Secure access with proper authentication and authorization
+
 ## Critical Technical Lessons
 
 **Event System:**
