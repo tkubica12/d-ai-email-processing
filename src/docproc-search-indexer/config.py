@@ -1,8 +1,8 @@
 """
-Configuration management for the docproc-parser-foundry service.
+Configuration management for the docproc-search-indexer service.
 
 This module provides centralized configuration loading and validation
-for the document processing service using Azure Document Intelligence,
+for the search indexing service using Azure AI Search,
 including environment variables and logging setup.
 """
 
@@ -39,16 +39,6 @@ class CosmosDBConfig(BaseModel):
         ...,
         description="Cosmos DB documents container name",
         example="documents"
-    )
-
-
-class DocumentIntelligenceConfig(BaseModel):
-    """Configuration for Azure Document Intelligence service."""
-    
-    endpoint: str = Field(
-        ...,
-        description="Document Intelligence service endpoint URL",
-        example="https://email-dev-vwyh-docintel.cognitiveservices.azure.com/"
     )
 
 
@@ -106,7 +96,6 @@ class AppConfig(BaseModel):
     """Main application configuration."""
     
     cosmos_db: CosmosDBConfig
-    document_intelligence: DocumentIntelligenceConfig
     table_storage: TableStorageConfig
     logging: LoggingConfig
     
@@ -138,14 +127,7 @@ class AppConfig(BaseModel):
                 "and AZURE_COSMOS_DB_DOCUMENTS_CONTAINER_NAME environment variables."
             )
         
-        # Extract Document Intelligence configuration
-        document_intelligence_endpoint = os.getenv('AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT')
-        
-        if not document_intelligence_endpoint:
-            raise ValueError(
-                "Missing required Document Intelligence configuration. "
-                "Check AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT environment variable."
-            )
+        # Extract Document Intelligence configuration - not needed for search indexer
         
         # Extract Table Storage configuration
         storage_account_name = os.getenv('AZURE_STORAGE_ACCOUNT_NAME')
@@ -166,9 +148,6 @@ class AppConfig(BaseModel):
                 database_name=database_name,
                 events_container_name=events_container_name,
                 documents_container_name=documents_container_name
-            ),
-            document_intelligence=DocumentIntelligenceConfig(
-                endpoint=document_intelligence_endpoint
             ),
             table_storage=TableStorageConfig(
                 account_name=storage_account_name or "",

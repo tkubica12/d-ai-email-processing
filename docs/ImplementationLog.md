@@ -226,4 +226,62 @@ Implemented a FastAPI-based service that provides mock business data for AI agen
 
 ---
 
+## 5. Document Search Indexer Service Implementation
+
+**Date**: July 14, 2025
+
+**Service Overview:**
+The `docproc-search-indexer` service listens to `DocumentContentExtractedEvent` events from the Cosmos DB Change Feed and processes them for Azure AI Search indexing. This service enables full-text search capabilities across all processed documents with proper security trimming by userId.
+
+**Key Implementation Details:**
+
+**Event Processing Pattern:**
+- Listens to Change Feed for `DocumentContentExtractedEvent` events
+- Filters events by type and processes only relevant events
+- Maintains continuation tokens for reliable processing across restarts
+- Implements proper error handling with event-level isolation
+
+**Service Architecture:**
+- **ChangeFeedProcessor**: Core processing logic with async event handling
+- **ContinuationTokenStorage**: Persistent state management (optional)
+- **DocumentIndexedEvent**: Event emitted after successful indexing
+- **Structured Logging**: Comprehensive logging for debugging and monitoring
+
+**Technical Implementation:**
+- Uses `azure-cosmos` async client for Change Feed processing
+- Implements tenacity retry logic for resilient Azure service calls
+- Supports graceful shutdown with proper resource cleanup
+- Environment-based configuration following established patterns
+
+**Current Status (Phase 1):**
+- ✅ Change Feed event processing with proper filtering
+- ✅ Event parsing and validation using Pydantic models
+- ✅ Continuation token storage for stateful processing
+- ✅ DocumentIndexedEvent preparation (structure ready)
+- ✅ Comprehensive logging and error handling
+
+**Next Phase (Phase 2):**
+- [ ] Azure AI Search client integration
+- [ ] Document indexing with metadata and security trimming
+- [ ] DocumentIndexedEvent emission to Cosmos DB
+- [ ] Index schema management and optimization
+
+**Technical Patterns Established:**
+- **Change Feed Iteration**: Proper async iteration over change feed items
+- **Event Filtering**: Type-based event filtering with debug logging
+- **Token Management**: Continuation token persistence and recovery
+- **Service Lifecycle**: Async initialization and graceful shutdown
+
+**Configuration Management:**
+- Removed unnecessary Document Intelligence configuration
+- Simplified config to focus on Cosmos DB and Table Storage
+- Maintained consistent environment variable patterns
+
+**Development Notes:**
+- Service follows established patterns from other document processing services
+- Ready for Azure AI Search integration in next phase
+- Comprehensive README with usage instructions and architecture overview
+
+---
+
 **This log focuses on architectural decisions, critical fixes, and lessons learned. For detailed implementation, see source code and service-specific documentation.**
