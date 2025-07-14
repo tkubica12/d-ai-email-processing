@@ -35,6 +35,13 @@ resource "azurerm_role_assignment" "current_user_document_intelligence_user" {
   principal_id         = data.azurerm_client_config.current.object_id
 }
 
+# Allow current user (for local development) to manage AI Search service
+resource "azurerm_role_assignment" "current_user_search_service_contributor" {
+  scope                = azurerm_search_service.main.id
+  role_definition_name = "Search Service Contributor"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
 # Managed Identity for Company APIs service
 resource "azurerm_user_assigned_identity" "company_apis" {
   location            = azurerm_resource_group.main.location
