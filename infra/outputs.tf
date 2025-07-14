@@ -93,6 +93,23 @@ output "document_intelligence_endpoint" {
   value       = azurerm_cognitive_account.document_intelligence.endpoint
 }
 
+# Azure OpenAI outputs
+output "azure_openai_endpoint" {
+  description = "The endpoint URL for the Azure OpenAI service"
+  value       = azurerm_cognitive_account.openai.endpoint
+}
+
+# Azure AI Search outputs
+output "azure_search_service_name" {
+  description = "The name of the Azure AI Search service"
+  value       = azurerm_search_service.main.name
+}
+
+output "azure_search_endpoint" {
+  description = "The endpoint URL for the Azure AI Search service"
+  value       = "https://${azurerm_search_service.main.name}.search.windows.net"
+}
+
 # output "company_apis_url" {
 #   description = "The URL for the Company APIs service"
 #   value       = "https://${azapi_resource.company_apis.output.fqdn}"

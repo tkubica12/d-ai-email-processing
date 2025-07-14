@@ -68,3 +68,17 @@ resource "azurerm_role_assignment" "company_apis_storage_table_contributor" {
   role_definition_name = "Storage Table Data Contributor"
   principal_id         = azurerm_user_assigned_identity.company_apis.principal_id
 }
+
+# Allow current user (for local development) to use Azure OpenAI service
+resource "azurerm_role_assignment" "current_user_openai_user" {
+  scope                = azurerm_cognitive_account.openai.id
+  role_definition_name = "Cognitive Services OpenAI User"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
+# Allow Azure AI Search service to use Azure OpenAI for vectorization
+resource "azurerm_role_assignment" "search_openai_user" {
+  scope                = azurerm_cognitive_account.openai.id
+  role_definition_name = "Cognitive Services OpenAI User"
+  principal_id         = azurerm_search_service.main.identity[0].principal_id
+}

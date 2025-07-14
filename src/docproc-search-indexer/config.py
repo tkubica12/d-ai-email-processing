@@ -100,6 +100,12 @@ class OpenAIConfig(BaseModel):
         example="text-embedding-3-large"
     )
     
+    resource_uri: Optional[str] = Field(
+        default=None,
+        description="Azure OpenAI resource URI for vectorizers",
+        example="https://your-openai-instance.openai.azure.com"
+    )
+    
     api_version: str = Field(
         default="2024-06-01",
         description="Azure OpenAI API version",
@@ -214,6 +220,7 @@ class AppConfig(BaseModel):
         
         # Extract Azure OpenAI configuration
         azure_openai_endpoint = os.getenv('AZURE_OPENAI_ENDPOINT')
+        azure_openai_resource_uri = os.getenv('AZURE_OPENAI_RESOURCE_URI')
         azure_openai_deployment = os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME')
         
         if not all([azure_openai_endpoint, azure_openai_deployment]):
@@ -243,6 +250,7 @@ class AppConfig(BaseModel):
             ),
             openai=OpenAIConfig(
                 endpoint=azure_openai_endpoint,
+                resource_uri=azure_openai_resource_uri,
                 deployment_name=azure_openai_deployment,
                 api_version=os.getenv('AZURE_OPENAI_API_VERSION', '2024-06-01'),
                 embedding_dimensions=int(os.getenv('AZURE_OPENAI_EMBEDDING_DIMENSIONS', '3072')),

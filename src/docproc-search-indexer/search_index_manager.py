@@ -22,10 +22,16 @@ from azure.search.documents.indexes.models import (
     VectorSearchProfile,
     HnswAlgorithmConfiguration,
     VectorSearchAlgorithmKind,
-    VectorSearchAlgorithmMetric
+    VectorSearchAlgorithmMetric,
+    SemanticConfiguration,
+    SemanticField,
+    SemanticPrioritizedFields,
+    SemanticSearch,
+    AzureOpenAIVectorizer,
+    AzureOpenAIVectorizerParameters
 )
 
-from config import AISearchConfig
+from config import AISearchConfig, OpenAIConfig
 
 
 logger = logging.getLogger(__name__)
@@ -39,15 +45,17 @@ class SearchIndexManager:
     definitions for document chunking, vector search, and security trimming.
     """
     
-    def __init__(self, config: AISearchConfig, credential: Optional[TokenCredential] = None):
+    def __init__(self, config: AISearchConfig, openai_config: OpenAIConfig, credential: Optional[TokenCredential] = None):
         """
         Initialize the search index manager.
         
         Args:
             config: AI Search configuration settings
+            openai_config: Azure OpenAI configuration for vectorizers
             credential: Azure credential for authentication (defaults to DefaultAzureCredential)
         """
         self.config = config
+        self.openai_config = openai_config
         self.credential = credential or DefaultAzureCredential()
         self.client = SearchIndexClient(
             endpoint=config.endpoint,
@@ -154,7 +162,7 @@ class SearchIndexManager:
                 retrievable=True
             ),
             
-            # Searchable content field
+            # Searchable content field with semantic search capabilities
             SearchableField(
                 name="content",
                 type=SearchFieldDataType.String,
@@ -167,6 +175,7 @@ class SearchIndexManager:
                 name="contentVector",
                 type=SearchFieldDataType.Collection(SearchFieldDataType.Single),
                 searchable=True,
+                stored=True,  # Use 'stored' instead of 'retrievable'
                 vector_search_dimensions=3072,  # text-embedding-3-large dimensions
                 vector_search_profile_name="default"
             ),
@@ -218,18 +227,45 @@ class SearchIndexManager:
             )
         ]
         
-        # Create vector search configuration
+        # Create vector search configuration with Azure OpenAI vectorizer
         vector_search = VectorSearch(
             profiles=[
                 VectorSearchProfile(
                     name="default",
-                    algorithm_configuration_name="default-algorithm"
+                    algorithm_configuration_name="default-algorithm",
+                    vectorizer_name="openai-vectorizer"
                 )
             ],
             algorithms=[
                 HnswAlgorithmConfiguration(
                     name="default-algorithm",
                     kind=VectorSearchAlgorithmKind.HNSW
+                )
+            ],
+            vectorizers=[
+                AzureOpenAIVectorizer(
+                    vectorizer_name="openai-vectorizer",
+                    parameters=AzureOpenAIVectorizerParameters(
+                        resource_url=self.openai_config.resource_uri or self.openai_config.endpoint,
+                        deployment_name="text-embedding-3-large",
+                        model_name="text-embedding-3-large",
+                        api_key=None,  # Use managed identity
+                        auth_identity=None  # Use service's system-assigned identity
+                    )
+                )
+            ]
+        )
+        
+        # Create semantic search configuration
+        semantic_search = SemanticSearch(
+            configurations=[
+                SemanticConfiguration(
+                    name="default-semantic-config",
+                    prioritized_fields=SemanticPrioritizedFields(
+                        content_fields=[
+                            SemanticField(field_name="content")
+                        ]
+                    )
                 )
             ]
         )
@@ -238,7 +274,8 @@ class SearchIndexManager:
         index = SearchIndex(
             name=self.config.index_name,
             fields=fields,
-            vector_search=vector_search
+            vector_search=vector_search,
+            semantic_search=semantic_search
         )
         
         return index

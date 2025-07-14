@@ -78,6 +78,7 @@ class SearchIndexer:
             sync_credential = SyncDefaultAzureCredential()
             self.search_index_manager = SearchIndexManager(
                 config=self.config.ai_search,
+                openai_config=self.config.openai,
                 credential=sync_credential
             )
             
