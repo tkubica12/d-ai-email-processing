@@ -78,13 +78,14 @@ class ChangeFeedProcessor:
             await self.search_indexer.initialize()
             
             # Load continuation token if available
-            self.continuation_token = await self.token_storage.load_continuation_token(self.processor_id)
+            if self.token_storage.config.enabled:
+                self.continuation_token = await self.token_storage.load_continuation_token(self.processor_id)
+                if self.continuation_token:
+                    self.logger.info(f"Loaded continuation token from storage: {self.continuation_token[:20]}...")
+                else:
+                    self.logger.info("No continuation token found in storage - starting from beginning")
             
             self.logger.info(f"Change Feed processor initialized successfully")
-            if self.continuation_token:
-                self.logger.info(f"Loaded continuation token from storage")
-            else:
-                self.logger.info(f"No continuation token found, starting from beginning")
                 
         except Exception as e:
             self.logger.error(f"Failed to initialize Change Feed processor: {str(e)}")
@@ -108,15 +109,15 @@ class ChangeFeedProcessor:
             
             # Check if there are any DocumentContentExtractedEvent events in the container
             try:
-                query = "SELECT COUNT(1) as count FROM c WHERE c.eventType = 'DocumentContentExtractedEvent'"
-                items = container.query_items(query=query, enable_cross_partition_query=True)
-                count_result = []
+                # Use a simpler query that doesn't require cross-partition query
+                query = "SELECT TOP 1 c.eventType FROM c WHERE c.eventType = 'DocumentContentExtractedEvent'"
+                items = container.query_items(query=query)
+                found_events = []
                 async for item in items:
-                    count_result.append(item)
+                    found_events.append(item)
                 
-                if count_result:
-                    event_count = count_result[0].get('count', 0)
-                    self.logger.info(f"Found {event_count} DocumentContentExtractedEvent events in container")
+                if found_events:
+                    self.logger.info("Found DocumentContentExtractedEvent events in container")
                 else:
                     self.logger.info("No DocumentContentExtractedEvent events found in container")
                     
@@ -126,7 +127,7 @@ class ChangeFeedProcessor:
             # Also check for any events at all
             try:
                 query = "SELECT TOP 5 c.eventType FROM c"
-                items = container.query_items(query=query, enable_cross_partition_query=True)
+                items = container.query_items(query=query)
                 event_types = []
                 async for item in items:
                     event_types.append(item.get('eventType'))
@@ -191,17 +192,20 @@ class ChangeFeedProcessor:
                 events_processed += 1
             
             # Update continuation token after processing batch
-            if hasattr(feed_iterator, 'continuation_token'):
+            headers = container.client_connection.last_response_headers
+            if 'etag' in headers:
                 old_token = self.continuation_token
-                self.continuation_token = feed_iterator.continuation_token
+                self.continuation_token = headers['etag']
+                self.logger.debug(f"Updated continuation token: {self.continuation_token[:20]}...")
                 
-                # Save continuation token if it changed
-                if old_token != self.continuation_token and self.token_storage:
+                # Save continuation token to storage if enabled and token changed
+                if (self.token_storage and 
+                    self.token_storage.config.enabled and 
+                    old_token != self.continuation_token):
                     await self.token_storage.save_continuation_token(
                         self.processor_id, 
                         self.continuation_token
                     )
-                    self.logger.debug(f"Updated continuation token")
             
             if events_processed > 0:
                 self.logger.info(f"Processed {events_processed} events from Change Feed")
