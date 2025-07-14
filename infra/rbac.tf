@@ -42,6 +42,12 @@ resource "azurerm_role_assignment" "current_user_search_service_contributor" {
   principal_id         = data.azurerm_client_config.current.object_id
 }
 
+resource "azurerm_role_assignment" "current_user_search_index_data_contributor" {
+  scope                = azurerm_search_service.main.id
+  role_definition_name = "Search Index Data Contributor"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
 # Managed Identity for Company APIs service
 resource "azurerm_user_assigned_identity" "company_apis" {
   location            = azurerm_resource_group.main.location

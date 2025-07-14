@@ -64,6 +64,27 @@ class TableStorageConfig(BaseModel):
     )
 
 
+class AISearchConfig(BaseModel):
+    """Configuration for Azure AI Search."""
+    
+    service_name: str = Field(
+        ...,
+        description="Azure AI Search service name",
+        example="search-email-dev-vwyh"
+    )
+    
+    index_name: str = Field(
+        ...,
+        description="Azure AI Search index name for documents",
+        example="documents-index"
+    )
+    
+    @property
+    def endpoint(self) -> str:
+        """Generate the full Azure AI Search endpoint URL."""
+        return f"https://{self.service_name}.search.windows.net"
+
+
 class LoggingConfig(BaseModel):
     """Configuration for application logging."""
     
@@ -97,6 +118,7 @@ class AppConfig(BaseModel):
     
     cosmos_db: CosmosDBConfig
     table_storage: TableStorageConfig
+    ai_search: AISearchConfig
     logging: LoggingConfig
     
     @classmethod
@@ -139,6 +161,16 @@ class AppConfig(BaseModel):
                 "Check AZURE_STORAGE_ACCOUNT_NAME environment variable when table storage is enabled."
             )
         
+        # Extract AI Search configuration
+        search_service_name = os.getenv('AZURE_SEARCH_SERVICE_NAME')
+        search_index_name = os.getenv('AZURE_SEARCH_INDEX_NAME')
+        
+        if not all([search_service_name, search_index_name]):
+            raise ValueError(
+                "Missing required AI Search configuration. "
+                "Check AZURE_SEARCH_SERVICE_NAME and AZURE_SEARCH_INDEX_NAME environment variables."
+            )
+        
         # Extract logging configuration
         log_level = os.getenv('LOG_LEVEL', 'INFO')
         
@@ -153,6 +185,10 @@ class AppConfig(BaseModel):
                 account_name=storage_account_name or "",
                 table_name=os.getenv('AZURE_TABLE_STORAGE_TABLE_NAME', 'continuationtokens'),
                 enabled=table_storage_enabled
+            ),
+            ai_search=AISearchConfig(
+                service_name=search_service_name,
+                index_name=search_index_name
             ),
             logging=LoggingConfig(
                 level=log_level
@@ -181,6 +217,7 @@ def setup_logging(config: LoggingConfig) -> None:
         'azure.cosmos',
         'azure.ai.formrecognizer',
         'azure.ai.documentintelligence',
+        'azure.search.documents',
         'azure.identity',
         'azure.core'
     ]

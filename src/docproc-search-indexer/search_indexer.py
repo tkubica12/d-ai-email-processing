@@ -13,6 +13,7 @@ from datetime import datetime
 from azure.cosmos.aio import CosmosClient
 from azure.core.exceptions import ResourceNotFoundError, HttpResponseError
 from azure.identity.aio import DefaultAzureCredential
+from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -24,6 +25,7 @@ from tenacity import (
 
 from config import AppConfig
 from models import DocumentContentExtractedEvent, DocumentRecord, DocumentIndexedEvent, DocumentIndexedEventData
+from search_index_manager import SearchIndexManager
 
 
 class SearchIndexer:
@@ -39,12 +41,13 @@ class SearchIndexer:
         Initialize the search indexer.
         
         Args:
-            config: Application configuration containing Cosmos DB settings
+            config: Application configuration containing Cosmos DB and AI Search settings
         """
         self.config = config
         self.logger = logging.getLogger(__name__)
         self.cosmos_client: Optional[CosmosClient] = None
         self.documents_container = None
+        self.search_index_manager: Optional[SearchIndexManager] = None
         
     async def initialize(self) -> None:
         """
@@ -66,6 +69,16 @@ class SearchIndexer:
             # Get database and container references
             database = self.cosmos_client.get_database_client(self.config.cosmos_db.database_name)
             self.documents_container = database.get_container_client(self.config.cosmos_db.documents_container_name)
+            
+            # Initialize search index manager (using sync credential)
+            sync_credential = SyncDefaultAzureCredential()
+            self.search_index_manager = SearchIndexManager(
+                config=self.config.ai_search,
+                credential=sync_credential
+            )
+            
+            # Ensure the search index exists (sync call)
+            self.search_index_manager.ensure_index_exists()
             
             self.logger.info("Search indexer initialized successfully")
             
@@ -137,11 +150,13 @@ class SearchIndexer:
                 return await self._create_failed_event(event, "Document not found in documents container")
             
             # TODO: Step 2: Create Azure AI Search index if it doesn't exist
+            # Index already ensured to exist during initialization
+            
             # TODO: Step 3: Process document content (chunking, embeddings)
             # TODO: Step 4: Index document with metadata and security trimming
             
             # For now, just prepare the success event
-            return await self._create_success_event(event, "documents-index")
+            return await self._create_success_event(event, self.config.ai_search.index_name)
             
         except Exception as e:
             self.logger.error(f"Failed to index document {event.data.documentId}: {e}")
@@ -188,7 +203,7 @@ class SearchIndexer:
         event_data = DocumentIndexedEventData(
             documentUrl=event.data.documentUrl,
             documentId=event.data.documentId,
-            searchIndexName="documents-index",
+            searchIndexName=self.config.ai_search.index_name,
             success=False
         )
         
