@@ -12,15 +12,16 @@ This log captures key implementation decisions, technical insights, and architec
 - **DefaultAzureCredential**: Secure, secretless Azure authentication
 - **Terraform**: Infrastructure as Code with RBAC for local development
 - **Pydantic**: Type-safe data models and validation throughout
+- **Azure OpenAI**: Enterprise-grade embedding generation with Entra authentication
 
 **Development Workflow:**
 1. Deploy infrastructure → 2. Update `.env` from Terraform outputs → 3. Authenticate with `az login` → 4. Run with `uv run python main.py`
 
 **Key Architectural Principles:**
 - Event-driven architecture with Azure Service Bus
-- Stateless, container-ready applications
-- No secrets in code; all config via environment variables
-- Structured logging and comprehensive error handling
+- Document chunking strategy: 2000 characters with 200 character overlap
+- Vector embeddings using Azure OpenAI text-embedding-3-large (3072 dimensions)
+- Security trimming via userId filtering in search indexes
 
 ---
 
@@ -32,13 +33,14 @@ The system implements a multi-stage document processing pipeline:
 1. **Submission Intake** → Service Bus worker processing new submissions
 2. **Document Parser** → Azure Document Intelligence extraction to Cosmos DB
 3. **Document Classifier** → Azure OpenAI classification into document types
-4. **Data Extractor** → Structured data extraction from invoices
+4. **Search Indexer** → Document chunking and vector embedding with Azure AI Search
+5. **Data Extractor** → Structured data extraction from invoices
 
 **Common Patterns Established:**
 - **Change Feed Processing**: Cosmos DB event-driven service pattern
 - **Azure OpenAI Integration**: Structured outputs with Pydantic models
-- **Event Emission**: Consistent event structure with proper datetime serialization
-- **Error Handling**: Graceful failures with continued processing
+- **Document Chunking**: Overlapping text segments for better search context
+- **Vector Search**: Semantic search capabilities with OpenAI embeddings
 
 ---
 
@@ -75,7 +77,44 @@ The system implements a multi-stage document processing pipeline:
 
 ---
 
-## 4. Critical Technical Fixes & Lessons Learned
+## 4. Search Indexer Implementation
+
+**Azure AI Search Integration:**
+- **Index Creation**: Automatic index creation with proper field definitions
+- **Vector Search**: contentVector field with 3072 dimensions for semantic search
+- **Security Trimming**: userId field ensures data isolation per user
+- **Document Chunking**: 2000 character chunks with 200 character overlap
+- **Metadata Preservation**: documentId, submissionId, chunkIndex for traceability
+
+**Azure OpenAI Integration:**
+- **Service**: Azure OpenAI instead of OpenAI API for enterprise compliance
+- **Authentication**: DefaultAzureCredential for seamless Entra authentication
+- **Model**: text-embedding-3-large deployment for high-quality embeddings
+- **API Version**: 2024-06-01 for latest capabilities
+
+**Implementation Challenges:**
+- **Sync/Async Mix**: SearchIndexClient is sync while embedding client is async
+- **Error Handling**: Comprehensive retry logic for both search and embeddings
+- **Performance**: Concurrent embedding generation for multiple chunks
+- **Field Types**: Proper Azure Search field type mapping for vectors
+
+**Search Index Schema:**
+```json
+{
+  "id": "documentId_chunkIndex",
+  "content": "chunk text content",
+  "contentVector": [embedding array],
+  "documentId": "source document ID",
+  "submissionId": "submission ID",
+  "userId": "user ID for security",
+  "chunkIndex": 0,
+  "timestamp": "2025-07-14T10:00:00Z"
+}
+```
+
+---
+
+## 5. Critical Technical Fixes & Lessons Learned
 
 **Event System Consistency:**
 - **Issue**: Missing `documentId` in event data and inconsistent partition keys
@@ -281,6 +320,78 @@ The `docproc-search-indexer` service listens to `DocumentContentExtractedEvent` 
 - Service follows established patterns from other document processing services
 - Ready for Azure AI Search integration in next phase
 - Comprehensive README with usage instructions and architecture overview
+
+---
+
+## 8. Azure AI Search Integration Complete
+
+**Date**: July 14, 2025
+
+**Objective**: Complete the search indexing service with vector embeddings and Azure OpenAI integration.
+
+**Key Implementations:**
+
+**Azure AI Search Index Management:**
+- Index creation with proper vector field definitions using `SearchField` with `Collection(SearchFieldDataType.Single)`
+- Vector search configuration using `HnswAlgorithmConfiguration` for semantic search
+- Schema validation and automatic index recreation when vector fields are missing
+- Support for 3072-dimension vectors from Azure OpenAI text-embedding-3-large model
+
+**Document Chunking and Embedding Pipeline:**
+- Document chunking service with 2000 character chunks and 200 character overlap
+- Azure OpenAI integration using AsyncAzureOpenAI client with bearer token authentication
+- Vector embedding generation with proper error handling and retry logic
+- Search document creation with comprehensive metadata (userId, submissionId, documentId, etc.)
+
+**Security and Access Control:**
+- Security trimming implementation via userId field filtering
+- Bearer token authentication for Azure OpenAI service calls
+- Proper credential management using DefaultAzureCredential pattern
+- Row-level security for multi-tenant document access
+
+**Event Processing Architecture:**
+- DocumentContentExtractedEvent processing from Cosmos DB Change Feed
+- DocumentIndexedEvent emission back to Cosmos DB events container
+- Comprehensive logging and error handling throughout the pipeline
+- Successful integration with existing event sourcing patterns
+
+**Technical Challenges Resolved:**
+- **Vector Field Definition**: Initially tried `VectorSearchField` class which doesn't exist in Python SDK - resolved by using `SearchField` with proper Collection type
+- **Algorithm Configuration**: Fixed vector search algorithm configuration using `HnswAlgorithmConfiguration` instead of generic configuration class
+- **Index Schema Mismatch**: Implemented index validation and recreation when existing index lacks vector fields
+- **Authentication**: Successfully migrated from OpenAI API to Azure OpenAI with Entra authentication
+
+**Performance and Scalability:**
+- Async processing throughout for high throughput
+- Proper connection management and resource cleanup
+- Tenacity retry patterns for resilient operation
+- Support for horizontal scaling via Change Feed partitioning
+
+**Implementation Status:**
+- ✅ Azure AI Search index creation with vector fields
+- ✅ Document chunking with configurable parameters
+- ✅ Azure OpenAI embedding generation
+- ✅ Search document upload with metadata
+- ✅ DocumentIndexedEvent emission
+- ✅ Security trimming and access control
+- ✅ Comprehensive error handling and logging
+
+**Next Phase Focus:**
+- Submission analyzer service for AI-powered document analysis
+- RAG (Retrieval-Augmented Generation) search capabilities
+- Company APIs integration for business intelligence
+- Web search integration for entity verification
+
+**Configuration Finalized:**
+```env
+AZURE_OPENAI_CHUNK_SIZE=2000
+AZURE_OPENAI_CHUNK_OVERLAP=200
+AZURE_OPENAI_EMBEDDING_DIMENSIONS=3072
+AZURE_OPENAI_DEPLOYMENT_NAME=text-embedding-3-large
+```
+
+**Architectural Achievement:**
+The search indexing service now provides a complete vector search foundation for the AI agent. Documents are properly chunked, embedded, and indexed with security trimming, enabling sophisticated RAG-based analysis in subsequent services.
 
 ---
 

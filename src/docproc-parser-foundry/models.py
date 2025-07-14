@@ -52,7 +52,7 @@ class DocumentUploadedEvent(BaseModel):
     id: str = Field(
         ...,
         description="Unique event identifier",
-        example="evt_123e4567-e89b-12d3-a456-426614174000"
+        example="123e4567-e89b-12d3-a456-426614174000"
     )
     
     eventType: str = Field(

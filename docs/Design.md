@@ -193,9 +193,10 @@ This approach uses event-driven architecture with event sourcing patterns to imp
 **Index Name:** `documents-index`
 
 **Document Chunking Strategy:**
-- Large documents are split into chunks of approximately 1000-1500 characters
+- Large documents are split into chunks of 2000 characters
 - Chunks maintain context by including overlapping text (200-character overlap)
 - Each chunk preserves metadata from the original document
+- Vector embeddings generated using Azure OpenAI text-embedding-3-large model (3072 dimensions)
 
 **Index Fields:**
 
@@ -317,7 +318,7 @@ This approach uses event-driven architecture with event sourcing patterns to imp
   "data": {
     "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
     "documentId": "550e8400-e29b-41d4-a716-446655440000",
-    "searchIndexId": "doc-uuid-in-search",
+    "searchIndexName": "documents-index",
     "success": true
   }
 }

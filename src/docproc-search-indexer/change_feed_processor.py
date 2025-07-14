@@ -264,8 +264,8 @@ class ChangeFeedProcessor:
             indexed_event = await self.search_indexer.index_document(event)
             self.logger.info(f"Document indexing completed: {indexed_event.data.success}")
             
-            # TODO: Emit the DocumentIndexedEvent to Cosmos DB
-            # await self._emit_document_indexed_event(indexed_event)
+            # Emit the DocumentIndexedEvent to Cosmos DB
+            await self._emit_document_indexed_event(indexed_event)
             
         except Exception as e:
             self.logger.error(f"Failed to index document {event.data.documentId}: {e}")

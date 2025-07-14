@@ -14,6 +14,7 @@ from azure.cosmos.aio import CosmosClient
 from azure.core.exceptions import ResourceNotFoundError, HttpResponseError
 from azure.identity.aio import DefaultAzureCredential
 from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
+from azure.search.documents.aio import SearchClient
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -26,6 +27,7 @@ from tenacity import (
 from config import AppConfig
 from models import DocumentContentExtractedEvent, DocumentRecord, DocumentIndexedEvent, DocumentIndexedEventData
 from search_index_manager import SearchIndexManager
+from document_chunking_service import DocumentChunkingService
 
 
 class SearchIndexer:
@@ -48,6 +50,8 @@ class SearchIndexer:
         self.cosmos_client: Optional[CosmosClient] = None
         self.documents_container = None
         self.search_index_manager: Optional[SearchIndexManager] = None
+        self.search_client: Optional[SearchClient] = None
+        self.chunking_service: Optional[DocumentChunkingService] = None
         
     async def initialize(self) -> None:
         """
@@ -79,6 +83,16 @@ class SearchIndexer:
             
             # Ensure the search index exists (sync call)
             self.search_index_manager.ensure_index_exists()
+            
+            # Initialize search client for indexing documents
+            self.search_client = SearchClient(
+                endpoint=self.config.ai_search.endpoint,
+                index_name=self.config.ai_search.index_name,
+                credential=credential
+            )
+            
+            # Initialize document chunking service
+            self.chunking_service = DocumentChunkingService(config=self.config.openai)
             
             self.logger.info("Search indexer initialized successfully")
             
@@ -152,10 +166,37 @@ class SearchIndexer:
             # TODO: Step 2: Create Azure AI Search index if it doesn't exist
             # Index already ensured to exist during initialization
             
-            # TODO: Step 3: Process document content (chunking, embeddings)
-            # TODO: Step 4: Index document with metadata and security trimming
+            # Step 3: Process document content (chunking and embeddings)
+            chunks = await self.chunking_service.chunk_and_embed_document(
+                content=document.content,
+                document_id=document.id,
+                document_url=document.documentUrl,
+                submission_id=document.submissionId,
+                user_id=document.userId
+            )
             
-            # For now, just prepare the success event
+            if not chunks:
+                self.logger.warning(f"No chunks generated for document {document.id}")
+                return await self._create_failed_event(event, "No chunks generated from document content")
+            
+            # Step 4: Index document chunks with metadata and security trimming
+            search_documents = [chunk.to_search_document() for chunk in chunks]
+            
+            try:
+                result = await self.search_client.upload_documents(search_documents)
+                
+                # Check if all documents were indexed successfully
+                failed_count = len([r for r in result if not r.succeeded])
+                if failed_count > 0:
+                    self.logger.warning(f"Failed to index {failed_count} out of {len(search_documents)} chunks")
+                
+                self.logger.info(f"Successfully indexed {len(search_documents) - failed_count} chunks for document {document.id}")
+                
+            except Exception as e:
+                self.logger.error(f"Failed to upload documents to search index: {e}")
+                return await self._create_failed_event(event, f"Failed to upload to search index: {str(e)}")
+            
+            # Return success event
             return await self._create_success_event(event, self.config.ai_search.index_name)
             
         except Exception as e:
@@ -181,7 +222,7 @@ class SearchIndexer:
         )
         
         return DocumentIndexedEvent(
-            id=f"evt_{uuid.uuid4()}",
+            id=str(uuid.uuid4()),
             eventType="DocumentIndexedEvent",
             submissionId=event.submissionId,
             userId=event.userId,
@@ -208,7 +249,7 @@ class SearchIndexer:
         )
         
         return DocumentIndexedEvent(
-            id=f"evt_{uuid.uuid4()}",
+            id=str(uuid.uuid4()),
             eventType="DocumentIndexedEvent",
             submissionId=event.submissionId,
             userId=event.userId,
@@ -220,6 +261,8 @@ class SearchIndexer:
         """
         Close all client connections and clean up resources.
         """
+        if self.search_client:
+            await self.search_client.close()
         if self.cosmos_client:
             await self.cosmos_client.close()
             self.logger.info("Search indexer closed")

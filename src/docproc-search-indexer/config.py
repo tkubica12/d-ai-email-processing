@@ -85,6 +85,46 @@ class AISearchConfig(BaseModel):
         return f"https://{self.service_name}.search.windows.net"
 
 
+class OpenAIConfig(BaseModel):
+    """Configuration for Azure OpenAI embeddings."""
+    
+    endpoint: str = Field(
+        ...,
+        description="Azure OpenAI endpoint URL",
+        example="https://your-openai-instance.openai.azure.com"
+    )
+    
+    deployment_name: str = Field(
+        ...,
+        description="Azure OpenAI embedding deployment name",
+        example="text-embedding-3-large"
+    )
+    
+    api_version: str = Field(
+        default="2024-06-01",
+        description="Azure OpenAI API version",
+        example="2024-06-01"
+    )
+    
+    embedding_dimensions: int = Field(
+        default=3072,
+        description="Embedding dimensions for text-embedding-3-large",
+        example=3072
+    )
+    
+    chunk_size: int = Field(
+        default=2000,
+        description="Character chunk size for document splitting",
+        example=2000
+    )
+    
+    chunk_overlap: int = Field(
+        default=200,
+        description="Character overlap between chunks",
+        example=200
+    )
+
+
 class LoggingConfig(BaseModel):
     """Configuration for application logging."""
     
@@ -119,6 +159,7 @@ class AppConfig(BaseModel):
     cosmos_db: CosmosDBConfig
     table_storage: TableStorageConfig
     ai_search: AISearchConfig
+    openai: OpenAIConfig
     logging: LoggingConfig
     
     @classmethod
@@ -171,6 +212,16 @@ class AppConfig(BaseModel):
                 "Check AZURE_SEARCH_SERVICE_NAME and AZURE_SEARCH_INDEX_NAME environment variables."
             )
         
+        # Extract Azure OpenAI configuration
+        azure_openai_endpoint = os.getenv('AZURE_OPENAI_ENDPOINT')
+        azure_openai_deployment = os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME')
+        
+        if not all([azure_openai_endpoint, azure_openai_deployment]):
+            raise ValueError(
+                "Missing required Azure OpenAI configuration. "
+                "Check AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_DEPLOYMENT_NAME environment variables."
+            )
+        
         # Extract logging configuration
         log_level = os.getenv('LOG_LEVEL', 'INFO')
         
@@ -189,6 +240,14 @@ class AppConfig(BaseModel):
             ai_search=AISearchConfig(
                 service_name=search_service_name,
                 index_name=search_index_name
+            ),
+            openai=OpenAIConfig(
+                endpoint=azure_openai_endpoint,
+                deployment_name=azure_openai_deployment,
+                api_version=os.getenv('AZURE_OPENAI_API_VERSION', '2024-06-01'),
+                embedding_dimensions=int(os.getenv('AZURE_OPENAI_EMBEDDING_DIMENSIONS', '3072')),
+                chunk_size=int(os.getenv('AZURE_OPENAI_CHUNK_SIZE', '2000')),
+                chunk_overlap=int(os.getenv('AZURE_OPENAI_CHUNK_OVERLAP', '200'))
             ),
             logging=LoggingConfig(
                 level=log_level
@@ -217,6 +276,7 @@ def setup_logging(config: LoggingConfig) -> None:
         'azure.cosmos',
         'azure.ai.formrecognizer',
         'azure.ai.documentintelligence',
+        'azure.ai.inference',
         'azure.search.documents',
         'azure.identity',
         'azure.core'
