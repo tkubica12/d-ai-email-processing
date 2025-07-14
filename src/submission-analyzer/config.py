@@ -149,6 +149,11 @@ class AppConfig(BaseModel):
     table_storage: TableStorageConfig
     company_api: CompanyAPIConfig
     logging: LoggingConfig
+    pretty_print: bool = Field(
+        default=True,
+        description="Enable pretty console output for debugging",
+        example=True
+    )
     
     @classmethod
     def from_env(cls) -> 'AppConfig':
@@ -210,6 +215,7 @@ class AppConfig(BaseModel):
         
         # Extract logging configuration
         log_level = os.getenv('LOG_LEVEL', 'INFO')
+        pretty_print = os.getenv('PRETTY_PRINT', 'true').lower() == 'true'
         
         return cls(
             ai_projects=AzureAIProjectsConfig(
@@ -237,7 +243,8 @@ class AppConfig(BaseModel):
             ),
             logging=LoggingConfig(
                 level=log_level
-            )
+            ),
+            pretty_print=pretty_print
         )
 
 

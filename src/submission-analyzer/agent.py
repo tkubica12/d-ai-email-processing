@@ -68,6 +68,7 @@ You MUST always call some company API.
         
         self.agent_name = agent_name
         self.instructions = instructions
+        self.pretty_print = self.config.pretty_print
         
         # Initialize the AI Project Client
         self.project_client = AIProjectClient(
@@ -80,6 +81,33 @@ You MUST always call some company API.
         
         self.logger.info(f"Initialized SubmissionAnalyzerAgent with endpoint: {self.config.ai_projects.project_endpoint}")
     
+    def _log_or_print(self, message: str, level: str = "info", emoji: str = ""):
+        """
+        Log a message or print it based on pretty_print setting.
+        
+        Args:
+            message: The message to log or print
+            level: Log level (info, warning, error)
+            emoji: Emoji to include in pretty print mode
+        """
+        if self.pretty_print:
+            print(f"{emoji} {message}" if emoji else message)
+        else:
+            log_func = getattr(self.logger, level.lower(), self.logger.info)
+            log_func(message)
+    
+    def _log_or_print_error(self, message: str, emoji: str = "❌"):
+        """Helper for error messages."""
+        self._log_or_print(message, "error", emoji)
+    
+    def _log_or_print_info(self, message: str, emoji: str = ""):
+        """Helper for info messages."""
+        self._log_or_print(message, "info", emoji)
+    
+    def _log_or_print_warning(self, message: str, emoji: str = "⚠️"):
+        """Helper for warning messages."""
+        self._log_or_print(message, "warning", emoji)
+    
     def create_agent(self) -> str:
         """
         Create an Azure AI agent with Bing grounding and Company API tools.
@@ -91,14 +119,14 @@ You MUST always call some company API.
             Exception: If agent creation fails
         """
         try:
-            print("🛠️  Setting up agent tools...")
+            self._log_or_print("Setting up agent tools...", "info", "🛠️")
             
             # Create Bing grounding tool
-            print("   🔍 Configuring Bing search tool...")
+            self._log_or_print("Configuring Bing search tool...", "info", "🔍")
             bing = BingGroundingTool(connection_id=self.config.ai_projects.bing_connection_id)
             
             # Load Company API OpenAPI specification
-            print("   🏢 Loading Company API specification...")
+            self._log_or_print("Loading Company API specification...", "info", "🏢")
             openapi_spec_path = os.path.join(os.path.dirname(__file__), "company-apis-openapi.json")
             with open(openapi_spec_path, "r") as f:
                 company_api_spec = jsonref.loads(f.read())
@@ -110,10 +138,10 @@ You MUST always call some company API.
                     "description": "Company APIs server"
                 }
             ]
-            print(f"   🌐 Company API endpoint: {self.config.company_api.base_url}")
+            self._log_or_print(f"Company API endpoint: {self.config.company_api.base_url}", "info", "🌐")
             
             # Create Company API OpenAPI tool with autonomous authentication (no auth required)
-            print("   🔓 Using autonomous authentication (no auth required)")
+            self._log_or_print("Using autonomous authentication (no auth required)", "info", "🔓")
             auth = OpenApiAnonymousAuthDetails()
             company_api_tool = OpenApiTool(
                 name="company_apis",
@@ -124,9 +152,9 @@ You MUST always call some company API.
             
             # Combine tool definitions
             all_tools = bing.definitions + company_api_tool.definitions
-            print(f"   ✅ Configured {len(all_tools)} tool functions")
+            self._log_or_print(f"Configured {len(all_tools)} tool functions", "info", "✅")
             
-            print("🤖 Creating AI agent...")
+            self._log_or_print("Creating AI agent...", "info", "🤖")
             agent = self.project_client.agents.create_agent(
                 model=self.config.ai_projects.model_deployment_name,
                 name=self.agent_name,
@@ -135,12 +163,12 @@ You MUST always call some company API.
             )
             
             self.agent_id = agent.id
-            print(f"✅ Agent created successfully with ID: {self.agent_id}")
+            self._log_or_print(f"Agent created successfully with ID: {self.agent_id}", "info", "✅")
             self.logger.info(f"Created agent with ID: {self.agent_id}")
             return self.agent_id
             
         except Exception as e:
-            print(f"❌ Failed to create agent: {e}")
+            self._log_or_print_error(f"Failed to create agent: {e}")
             self.logger.error(f"Failed to create agent: {e}")
             raise
     
@@ -155,15 +183,15 @@ You MUST always call some company API.
             Exception: If thread creation fails
         """
         try:
-            print("💬 Creating conversation thread...")
+            self._log_or_print("Creating conversation thread...", "info", "💬")
             thread = self.project_client.agents.threads.create()
             self.thread_id = thread.id
-            print(f"✅ Thread created successfully with ID: {self.thread_id}")
+            self._log_or_print(f"Thread created successfully with ID: {self.thread_id}", "info", "✅")
             self.logger.info(f"Created thread with ID: {self.thread_id}")
             return self.thread_id
             
         except Exception as e:
-            print(f"❌ Failed to create thread: {e}")
+            self._log_or_print_error(f"Failed to create thread: {e}")
             self.logger.error(f"Failed to create thread: {e}")
             raise
     
@@ -186,7 +214,7 @@ You MUST always call some company API.
             raise ValueError("Thread must be created before sending messages")
         
         try:
-            print("📝 Sending message to agent...")
+            self._log_or_print("Sending message to agent...", "info", "📝")
             message = self.project_client.agents.messages.create(
                 thread_id=self.thread_id,
                 role=role,
@@ -194,12 +222,12 @@ You MUST always call some company API.
             )
             
             message_id = message['id']
-            print(f"✅ Message sent successfully with ID: {message_id}")
+            self._log_or_print(f"Message sent successfully with ID: {message_id}", "info", "✅")
             self.logger.info(f"Sent message with ID: {message_id}")
             return message_id
             
         except Exception as e:
-            print(f"❌ Failed to send message: {e}")
+            self._log_or_print_error(f"Failed to send message: {e}")
             self.logger.error(f"Failed to send message: {e}")
             raise
     
@@ -220,13 +248,13 @@ You MUST always call some company API.
             raise ValueError("Thread must be created before running")
         
         try:
-            print("🔧 Creating agent run...")
+            self._log_or_print("Creating agent run...", "info", "🔧")
             run = self.project_client.agents.runs.create_and_process(
                 thread_id=self.thread_id,
                 agent_id=self.agent_id
             )
             
-            print(f"🎯 Agent run finished with status: {run.status}")
+            self._log_or_print(f"Agent run finished with status: {run.status}", "info", "🎯")
             self.logger.info(f"Agent run finished with status: {run.status}")
             self.logger.debug(f"Run object type: {type(run)}")
             self.logger.debug(f"Run object attributes: {dir(run)}")
@@ -235,10 +263,10 @@ You MUST always call some company API.
             tool_usage = []
             
             if run.status == "failed":
-                print(f"❌ Agent run failed: {run.last_error}")
+                self._log_or_print_error(f"Agent run failed: {run.last_error}")
                 self.logger.error(f"Agent run failed: {run.last_error}")
             elif run.status == "completed":
-                print("✅ Agent run completed successfully")
+                self._log_or_print("Agent run completed successfully", "info", "✅")
                 
                 # Get detailed run steps to capture tool usage
                 try:
@@ -277,7 +305,7 @@ You MUST always call some company API.
                             steps_data = []
                         
                         if steps_data and len(steps_data) > 0:
-                            print(f"🛠️  Processing {len(steps_data)} execution steps...")
+                            self._log_or_print(f"Processing {len(steps_data)} execution steps...", "info", "🛠️")
                             self.logger.debug(f"Processing {len(steps_data)} steps...")
                             
                             for i, step in enumerate(steps_data, 1):
@@ -323,24 +351,24 @@ You MUST always call some company API.
                                                     }
                                                 
                                                 tool_usage.append(tool_info)
-                                                print(f"   🔧 Tool used: {tool_info.get('name', 'unknown')}")
+                                                self._log_or_print(f"Tool used: {tool_info.get('name', 'unknown')}", "info", "🔧")
                                                 self.logger.debug(f"Parsed tool info: {tool_info}")
                                     else:
                                         self.logger.debug(f"Step {i} is not a tool_calls step or has no tool_calls")
                                 else:
                                     self.logger.debug(f"Step {i} has no step_details or step_details is None")
                         else:
-                            print("🛠️  No execution steps with tool calls found")
+                            self._log_or_print("🛠️  No execution steps with tool calls found")
                             self.logger.debug("No steps data found or steps data is empty")
                     else:
-                        print("🛠️  Could not access run steps - method not available")
+                        self._log_or_print("🛠️  Could not access run steps - method not available")
                         self.logger.debug("Run steps is None or empty")
                     
                 except Exception as e:
                     self.logger.warning(f"Could not retrieve detailed tool usage: {e}")
                     self.logger.debug(f"Exception details: {type(e).__name__}: {e}")
                     self.logger.debug(f"Exception traceback:", exc_info=True)
-                    print(f"⚠️  Could not retrieve detailed tool usage information: {e}")
+                    self._log_or_print(f"⚠️  Could not retrieve detailed tool usage information: {e}", "warning")
             
             return {
                 "status": run.status,
@@ -350,7 +378,7 @@ You MUST always call some company API.
             }
             
         except Exception as e:
-            print(f"❌ Failed to run agent: {e}")
+            self._log_or_print(f"❌ Failed to run agent: {e}", "error")
             self.logger.error(f"Failed to run agent: {e}")
             raise
     
@@ -480,7 +508,7 @@ You MUST always call some company API.
             raise ValueError("Thread must be created before retrieving messages")
         
         try:
-            print("📥 Retrieving messages from thread...")
+            self._log_or_print("Retrieving messages from thread...", "info", "📥")
             messages = self.project_client.agents.messages.list(thread_id=self.thread_id)
             
             formatted_messages = []
@@ -490,12 +518,12 @@ You MUST always call some company API.
                     "content": message.content
                 })
             
-            print(f"✅ Retrieved {len(formatted_messages)} messages")
+            self._log_or_print(f"Retrieved {len(formatted_messages)} messages", "info", "✅")
             self.logger.info(f"Retrieved {len(formatted_messages)} messages")
             return formatted_messages
             
         except Exception as e:
-            print(f"❌ Failed to retrieve messages: {e}")
+            self._log_or_print_error(f"Failed to retrieve messages: {e}")
             self.logger.error(f"Failed to retrieve messages: {e}")
             raise
     
@@ -541,14 +569,14 @@ You MUST always call some company API.
         """
         if self.agent_id:
             try:
-                print("🧹 Cleaning up agent resources...")
+                self._log_or_print("Cleaning up agent resources...", "info", "🧹")
                 self.project_client.agents.delete_agent(self.agent_id)
-                print(f"✅ Agent deleted successfully")
+                self._log_or_print("Agent deleted successfully", "info", "✅")
                 self.logger.info(f"Deleted agent with ID: {self.agent_id}")
                 self.agent_id = None
                 self.thread_id = None
             except Exception as e:
-                print(f"❌ Failed to delete agent: {e}")
+                self._log_or_print_error(f"Failed to delete agent: {e}")
                 self.logger.error(f"Failed to delete agent: {e}")
     
     def __enter__(self):
