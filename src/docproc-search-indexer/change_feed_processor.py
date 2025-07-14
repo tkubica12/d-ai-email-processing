@@ -26,6 +26,7 @@ from tenacity import (
 from config import AppConfig
 from models import DocumentContentExtractedEvent, DocumentIndexedEvent, DocumentIndexedEventData
 from continuation_token_storage import ContinuationTokenStorage
+from search_indexer import SearchIndexer
 
 
 class ChangeFeedProcessor:
@@ -48,6 +49,7 @@ class ChangeFeedProcessor:
         self.cosmos_client: Optional[CosmosClient] = None
         self.continuation_token: Optional[str] = None
         self.token_storage: Optional[ContinuationTokenStorage] = None
+        self.search_indexer: Optional[SearchIndexer] = None
         self.processor_id = "docproc-search-indexer"
         
     async def initialize(self) -> None:
@@ -70,6 +72,10 @@ class ChangeFeedProcessor:
             # Initialize continuation token storage
             self.token_storage = ContinuationTokenStorage(self.config.table_storage)
             await self.token_storage.initialize()
+            
+            # Initialize search indexer
+            self.search_indexer = SearchIndexer(self.config)
+            await self.search_indexer.initialize()
             
             # Load continuation token if available
             self.continuation_token = await self.token_storage.load_continuation_token(self.processor_id)
@@ -234,7 +240,7 @@ class ChangeFeedProcessor:
     
     async def _handle_document_content_extracted_event(self, event: DocumentContentExtractedEvent) -> None:
         """
-        Handle a DocumentContentExtractedEvent by printing it to screen.
+        Handle a DocumentContentExtractedEvent by indexing the document.
         
         Args:
             event: The DocumentContentExtractedEvent to process
@@ -249,41 +255,17 @@ class ChangeFeedProcessor:
         self.logger.info(f"  Success: {event.data.success}")
         self.logger.info(f"  Timestamp: {event.timestamp}")
         
-        # TODO: Add actual search indexing logic here
-        
-        # For now, just prepare the event emission structure
-        await self._prepare_document_indexed_event(event)
-    
-    async def _prepare_document_indexed_event(self, event: DocumentContentExtractedEvent) -> None:
-        """
-        Prepare a DocumentIndexedEvent for emission (not yet emitted).
-        
-        Args:
-            event: The DocumentContentExtractedEvent that was processed
-        """
-        # Generate event data
-        event_data = DocumentIndexedEventData(
-            documentUrl=event.data.documentUrl,
-            documentId=event.data.documentId,
-            searchIndexName="documents-index",  # TODO: Make configurable
-            success=True  # TODO: Based on actual indexing result
-        )
-        
-        # Generate the event
-        indexed_event = DocumentIndexedEvent(
-            id=f"evt_{uuid.uuid4()}",
-            eventType="DocumentIndexedEvent",
-            submissionId=event.submissionId,
-            userId=event.userId,
-            timestamp=datetime.utcnow(),
-            data=event_data
-        )
-        
-        self.logger.info(f"Prepared DocumentIndexedEvent: {indexed_event.id}")
-        self.logger.debug(f"Event data: {indexed_event.model_dump()}")
-        
-        # TODO: Emit the event to Cosmos DB events container
-        # await self._emit_document_indexed_event(indexed_event)
+        # Use search indexer to process the document
+        try:
+            indexed_event = await self.search_indexer.index_document(event)
+            self.logger.info(f"Document indexing completed: {indexed_event.data.success}")
+            
+            # TODO: Emit the DocumentIndexedEvent to Cosmos DB
+            # await self._emit_document_indexed_event(indexed_event)
+            
+        except Exception as e:
+            self.logger.error(f"Failed to index document {event.data.documentId}: {e}")
+            # Continue processing other events even if one fails
     
     async def _emit_document_indexed_event(self, event: DocumentIndexedEvent) -> None:
         """
@@ -317,5 +299,8 @@ class ChangeFeedProcessor:
             
         if self.token_storage:
             await self.token_storage.close()
+            
+        if self.search_indexer:
+            await self.search_indexer.close()
             
         self.logger.info("Change Feed processor closed")
