@@ -2,14 +2,14 @@
 
 # Allow current user (for local development) to read/write blobs in the storage account
 resource "azurerm_role_assignment" "current_user_storage_blob_contributor" {
-  scope                = azurerm_storage_account.main.id
+  scope                = azapi_resource.main.id
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = data.azurerm_client_config.current.object_id
 }
 
 # Allow current user (for local development) to read/write tables in the storage account
 resource "azurerm_role_assignment" "current_user_storage_table_contributor" {
-  scope                = azurerm_storage_account.main.id
+  scope                = azapi_resource.main.id
   role_definition_name = "Storage Table Data Contributor"
   principal_id         = data.azurerm_client_config.current.object_id
 }
@@ -44,14 +44,14 @@ resource "azurerm_user_assigned_identity" "company_apis" {
 
 # Allow Company APIs service to read/write blobs in the storage account
 resource "azurerm_role_assignment" "company_apis_storage_blob_contributor" {
-  scope                = azurerm_storage_account.main.id
+  scope                = azapi_resource.main.id
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = azurerm_user_assigned_identity.company_apis.principal_id
 }
 
 # Allow Company APIs service to read/write tables in the storage account
 resource "azurerm_role_assignment" "company_apis_storage_table_contributor" {
-  scope                = azurerm_storage_account.main.id
+  scope                = azapi_resource.main.id
   role_definition_name = "Storage Table Data Contributor"
   principal_id         = azurerm_user_assigned_identity.company_apis.principal_id
 }
