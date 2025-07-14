@@ -188,6 +188,55 @@ This approach uses event-driven architecture with event sourcing patterns to imp
    - Mock data generation for demonstration purposes
    - Exposes internal company APIs as HTTP endpoints
 
+#### Azure AI Search Index Schema
+
+**Index Name:** `documents-index`
+
+**Document Chunking Strategy:**
+- Large documents are split into chunks of approximately 1000-1500 characters
+- Chunks maintain context by including overlapping text (200-character overlap)
+- Each chunk preserves metadata from the original document
+
+**Index Fields:**
+
+| Field Name | Type | Properties | Description |
+|------------|------|------------|-------------|
+| `id` | Edm.String | Key, Retrievable | Unique identifier for the chunk (format: `{documentId}_{chunkIndex}`) |
+| `content` | Edm.String | Searchable, Retrievable | Text content of the document chunk |
+| `contentVector` | Collection(Edm.Single) | Searchable | Vector embedding of the content for semantic search |
+| `documentId` | Edm.String | Filterable, Retrievable | ID of the source document in Cosmos DB |
+| `documentUrl` | Edm.String | Filterable, Retrievable | Azure Blob Storage URL of the original document |
+| `submissionId` | Edm.String | Filterable, Retrievable | Submission ID (enables filtering by submission) |
+| `userId` | Edm.String | Filterable, Retrievable | User ID for security trimming |
+| `chunkIndex` | Edm.Int32 | Filterable, Retrievable | Sequential index of the chunk within the document |
+| `timestamp` | Edm.DateTimeOffset | Filterable, Retrievable | When the document was indexed |
+
+**Security Trimming Implementation:**
+- All search queries include filter: `userId eq '{currentUserId}'`
+- Ensures users only see their own document content
+- Applied at query time for real-time access control
+
+**Search Capabilities:**
+- **Full-text search:** Traditional keyword-based search across content
+- **Semantic search:** Vector-based similarity search using contentVector field
+- **Filtered search:** Combine text/semantic search with metadata filters
+- **Faceted search:** Group results by submissionId, etc.
+
+**Example Index Document:**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000_0",
+  "content": "Invoice #INV-2025-001\n\nBill To: Acme Corporation\n123 Business St\nSeattle, WA 98101\n\nDate: July 15, 2025\nDue Date: August 14, 2025\n\nDescription: Professional consulting services for Q2 2025 project implementation...",
+  "contentVector": [0.1234, -0.5678, 0.9012, ...],
+  "documentId": "550e8400-e29b-41d4-a716-446655440000",
+  "documentUrl": "https://storage.blob.core.windows.net/submissions/123e4567-e89b-12d3-a456-426614174000/invoice.pdf",
+  "submissionId": "123e4567-e89b-12d3-a456-426614174000",
+  "userId": "user@example.com",
+  "chunkIndex": 0,
+  "timestamp": "2025-07-15T10:30:00Z"
+}
+```
+
 #### Event Formats
 
 **SubmissionCreated**
@@ -718,10 +767,34 @@ The submission-analyzer service implements an AI Foundry agent with sophisticate
 **Purpose:** Search and retrieve relevant information from the user's document history and previous conversations.
 
 **Implementation:**
-- Queries Azure AI Search index containing all user documents
+- Queries Azure AI Search `documents-index` containing all user document chunks
 - Applies security trimming by filtering results where `userId == currentUser`
-- Retrieves contextually relevant documents based on semantic similarity
+- Supports both full-text and semantic search using content vectors
+- Retrieves contextually relevant document chunks with source metadata
 - Provides document context to the AI agent for informed decision making
+
+**Search Query Examples:**
+```
+// Semantic search with security trimming
+{
+  "search": "invoice payment terms",
+  "vector": { "value": [0.1, 0.2, ...], "fields": "contentVector" },
+  "filter": "userId eq 'user@example.com'",
+  "select": "content,documentUrl,submissionId,documentType,chunkIndex"
+}
+
+// Filtered search by submission
+{
+  "search": "*",
+  "filter": "userId eq 'user@example.com' and submissionId eq '123e4567-e89b-12d3-a456-426614174000'",
+  "select": "content,documentUrl,submissionId"
+}
+```
+
+**Retrieved Context Format:**
+- Document chunk content with source attribution
+- Metadata including documentUrl, submissionId
+- Chunk index for reconstructing document structure if needed
 
 **Security Features:**
 - Row-level security through userId filtering

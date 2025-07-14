@@ -108,7 +108,7 @@ class SearchIndexer:
             
             return document
             
-        except CosmosResourceNotFoundError:
+        except ResourceNotFoundError:
             self.logger.warning(f"Document not found: {document_id} in submission {submission_id}")
             return None
         except Exception as e:
