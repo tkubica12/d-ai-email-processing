@@ -7,6 +7,7 @@ import jsonref
 import logging
 import os
 from typing import Optional, List, Dict, Any
+from jinja2 import Environment, FileSystemLoader
 from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential
 from azure.ai.agents.models import (
@@ -30,26 +31,7 @@ class SubmissionAnalyzerAgent:
         self,
         config: Optional[AppConfig] = None,
         agent_name: str = "submission-analyzer-agent",
-        instructions: str = """You are a helpful financial assistant that analyzes customer submissions and provides comprehensive support. 
-
-You have access to two powerful tools:
-1. Bing search capabilities to find current market information, financial news, and general information
-2. Company internal APIs to access user-specific data including:
-   - User products and subscriptions
-   - Financial scores and risk assessments  
-   - Income data and trends
-
-When analyzing submissions:
-- Extract user email addresses when provided to fetch their specific data
-- Use company APIs to get personalized financial information
-- Use Bing search for current market conditions, financial news, and general information
-- Provide actionable recommendations based on both personal data and market context
-- Always be helpful, accurate, and professional in your responses
-
-If you cannot find user-specific data, explain what information you need and suggest alternative approaches.
-
-You MUST always call some company API.
-"""
+        instructions: Optional[str] = None
     ):
         """
         Initialize the SubmissionAnalyzerAgent.
@@ -57,7 +39,7 @@ You MUST always call some company API.
         Args:
             config: Application configuration. If None, loads from environment.
             agent_name: Name for the agent
-            instructions: Instructions for the agent behavior
+            instructions: Instructions for the agent behavior. If None, loads from system_prompt.jinja2
         """
         # Load configuration
         self.config = config or AppConfig.from_env()
@@ -67,7 +49,7 @@ You MUST always call some company API.
         self.logger = logging.getLogger(__name__)
         
         self.agent_name = agent_name
-        self.instructions = instructions
+        self.instructions = instructions or self._load_system_prompt()
         self.pretty_print = self.config.pretty_print
         
         # Initialize the AI Project Client
@@ -80,6 +62,38 @@ You MUST always call some company API.
         self.thread_id: Optional[str] = None
         
         self.logger.info(f"Initialized SubmissionAnalyzerAgent with endpoint: {self.config.ai_projects.project_endpoint}")
+    
+    def _load_system_prompt(self) -> str:
+        """
+        Load the system prompt from the system_prompt.jinja2 file.
+        
+        Returns:
+            str: The loaded system prompt
+            
+        Raises:
+            FileNotFoundError: If system_prompt.jinja2 file is not found
+            Exception: If there's an error loading or rendering the template
+        """
+        try:
+            # Get the directory containing this file
+            current_dir = os.path.dirname(__file__)
+            
+            # Set up Jinja2 environment
+            env = Environment(loader=FileSystemLoader(current_dir))
+            
+            # Load and render the template
+            template = env.get_template("system_prompt.jinja2")
+            rendered_prompt = template.render()
+            
+            self.logger.info("Successfully loaded system prompt from system_prompt.jinja2")
+            return rendered_prompt
+            
+        except FileNotFoundError:
+            self.logger.error("system_prompt.jinja2 file not found")
+            raise FileNotFoundError("system_prompt.jinja2 file not found in the current directory")
+        except Exception as e:
+            self.logger.error(f"Error loading system prompt: {e}")
+            raise Exception(f"Error loading system prompt: {e}")
     
     def _log_or_print(self, message: str, level: str = "info", emoji: str = ""):
         """

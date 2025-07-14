@@ -144,9 +144,6 @@ def format_analysis_results(result, pretty_print=True):
         if messages and messages[0]['role'] == 'assistant':
             assistant_response = parse_message_content(messages[0]['content'])
             logger.info(f"Assistant response: {assistant_response[:200]}{'...' if len(assistant_response) > 200 else ''}")
-    print("✨ ANALYSIS COMPLETE")
-    print("="*80)
-
 
 def parse_message_content(content):
     """
@@ -248,15 +245,12 @@ def main():
             improving my financial health.
             
             My email is john.doe@example.com and I would like to:
-            1. Get my current financial score
-            2. See what products I currently have
-            3. Get information about my recent income trends
-            4. Understand current market conditions that might affect my finances
+            1. Get my current financial score and whether some of my products might have negative impacts on it
+            2. As accountant, I need to understand by financial prospects given Artificial Intelligence taking over.
+            3. Have I provided PUMA invoice already?
             
-            Please provide a comprehensive analysis and recommendations.
+            Please provide simple structured answers to these questions.
 
-            You must use all tools, return products I have and score in various discplines.
-            
             Best regards,
             John Doe
             """
