@@ -334,3 +334,62 @@ Container Apps provide better scalability and managed runtime compared to App Se
 - Retry logic with exponential backoff for resilient document processing
 - Support for multiple document formats (PDF, images, Office documents)
 - Stateful processing with continuation token management for service restarts
+
+## Container App Deployment - Document Classifier (July 15, 2025)
+
+**AI-Powered Document Classification:**
+- Deployed docproc-classifier as a background Container App service
+- Processes Cosmos DB Change Feed for DocumentContentExtractedEvent events
+- Uses Azure OpenAI GPT-4.1 model for intelligent document classification
+- Classifies documents into categories: invoice, contract, bank statement, submission notes, other
+- Generates document summaries using structured AI outputs
+
+**Azure OpenAI Integration:**
+- Uses `azurerm_cognitive_deployment.gpt_41` for document classification
+- Configured with "Cognitive Services OpenAI User" RBAC role
+- Structured outputs ensure consistent classification results
+- Jinja2 templates for dynamic prompt generation
+
+**Scaling Strategy:**
+- Minimum 1 replica for continuous change feed processing
+- Maximum 3 replicas (limited due to stateful change feed processing)
+- CPU-based scaling for AI processing workload
+- Stateful processing with continuation token persistence
+
+**Authentication & Authorization:**
+- Created user-assigned managed identity for Azure service authentication
+- Configured RBAC assignments for:
+  - Cosmos DB custom role for data plane operations
+  - Storage Blob/Table Data Contributor for document and token storage
+  - Cognitive Services OpenAI User for Azure OpenAI access
+
+**Environment Variables:**
+- `AZURE_CLIENT_ID` - Managed identity authentication
+- `AZURE_COSMOS_DB_ENDPOINT` - Cosmos DB account endpoint
+- `AZURE_COSMOS_DB_DATABASE_NAME` - Database name
+- `AZURE_COSMOS_DB_EVENTS_CONTAINER_NAME` - Events container for change feed
+- `AZURE_COSMOS_DB_DOCUMENTS_CONTAINER_NAME` - Documents container for updates
+- `AZURE_OPENAI_ENDPOINT` - Azure OpenAI service endpoint
+- `AZURE_OPENAI_MODEL` - GPT-4.1 model deployment name
+- `AZURE_STORAGE_ACCOUNT_NAME` - Storage account for continuation tokens
+- `AZURE_TABLE_STORAGE_ENABLED` - Enable continuation token persistence
+- `AZURE_TABLE_STORAGE_TABLE_NAME` - Table name for continuation tokens
+- `APPLICATIONINSIGHTS_CONNECTION_STRING` - Application monitoring
+
+**Docker Configuration:**
+- Python 3.12 slim base image with OpenAI SDK
+- UV for efficient dependency management
+- Async processing with structured AI outputs
+- Jinja2 templating for dynamic prompts
+
+**GitHub Actions:**
+- Created `docproc-classifier-build.yaml` workflow
+- Triggers on changes to `src/docproc-classifier/**` path
+- Automated Docker image building and registry push
+
+**Event Processing Flow:**
+1. Monitors Change Feed for DocumentContentExtractedEvent
+2. Fetches document content from Cosmos DB
+3. Classifies document using Azure OpenAI with structured outputs
+4. Updates document record with classification results
+5. Emits DocumentClassifiedEvent for downstream processing

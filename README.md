@@ -96,6 +96,27 @@ The docproc-parser-foundry service is a background worker that processes Cosmos 
 
 The service will continuously monitor the Cosmos DB Change Feed for DocumentUploadedEvent events and process them using Azure Document Intelligence.
 
+### Running the Document Classifier Service (Background)
+
+The docproc-classifier service is a background worker that processes Cosmos DB Change Feed events for document classification:
+
+1. **Navigate to docproc-classifier service**
+   ```bash
+   cd src/docproc-classifier
+   ```
+
+2. **Install dependencies**
+   ```bash
+   uv sync
+   ```
+
+3. **Run the service**
+   ```bash
+   uv run python main.py
+   ```
+
+The service will continuously monitor the Cosmos DB Change Feed for DocumentContentExtractedEvent events and classify them using Azure OpenAI.
+
 ### Running in Container Apps
 
 After infrastructure deployment, the client-web service is automatically deployed as a Container App with the following features:
@@ -120,6 +141,7 @@ Access the deployed web application using the `client_web_url` output from Terra
   - Company APIs: Business data integration endpoints
   - Submission Intake: Background service for processing Service Bus messages
   - Document Parser Foundry: Change feed processor for document content extraction
+  - Document Classifier: AI-powered document classification using Azure OpenAI
 - **RBAC Configuration**: Proper permissions for local development and managed identities
 
 ### Cosmos DB Configuration

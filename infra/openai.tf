@@ -24,7 +24,6 @@ resource "azurerm_cognitive_deployment" "text_embedding_3_large" {
   }
 }
 
-# Optional: Add a chat completion model for future use
 resource "azurerm_cognitive_deployment" "gpt_41" {
   name                 = "gpt-4.1"
   cognitive_account_id = azurerm_cognitive_account.openai.id

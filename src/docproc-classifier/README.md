@@ -72,3 +72,37 @@ The service uses structured logging with configurable log levels. Set `LOG_LEVEL
 - `WARNING`: Warning messages
 - `ERROR`: Error messages
 - `CRITICAL`: Critical errors
+
+## Container Deployment
+
+The service is deployed as a Container App with:
+- **Background Service**: No ingress configuration (internal change feed processor)
+- **Minimum 1 replica**: Ensures continuous change feed processing
+- **Maximum 3 replicas**: Limited due to stateful change feed processing
+- **CPU-based auto-scaling**: Scales based on AI processing workload
+- **Managed identity authentication**: Secure access to Azure services
+
+### Environment Variables in Container
+- `AZURE_CLIENT_ID` - Managed identity client ID
+- `AZURE_COSMOS_DB_ENDPOINT` - Cosmos DB account endpoint
+- `AZURE_COSMOS_DB_DATABASE_NAME` - Database name
+- `AZURE_COSMOS_DB_EVENTS_CONTAINER_NAME` - Events container for change feed
+- `AZURE_COSMOS_DB_DOCUMENTS_CONTAINER_NAME` - Documents container for updates
+- `AZURE_OPENAI_ENDPOINT` - Azure OpenAI service endpoint
+- `AZURE_OPENAI_MODEL` - GPT-4.1 model deployment name
+- `AZURE_STORAGE_ACCOUNT_NAME` - Storage account name
+- `AZURE_TABLE_STORAGE_ENABLED` - Enable continuation token persistence
+- `AZURE_TABLE_STORAGE_TABLE_NAME` - Table name for continuation tokens
+- `APPLICATIONINSIGHTS_CONNECTION_STRING` - Application monitoring
+
+### RBAC Permissions
+- **Cosmos DB**: Custom role for data plane operations
+- **Storage Account**: Blob Data Contributor for document access
+- **Storage Account**: Table Data Contributor for continuation tokens
+- **Azure OpenAI**: Cognitive Services OpenAI User for classification
+
+### Docker Configuration
+- Python 3.12 slim base image with OpenAI SDK
+- UV for efficient dependency management
+- Async processing with structured AI outputs
+- Jinja2 templating for dynamic prompts

@@ -76,6 +76,13 @@ resource "azurerm_user_assigned_identity" "docproc_parser_foundry" {
   resource_group_name = azurerm_resource_group.main.name
 }
 
+# Managed Identity for Document Classifier service
+resource "azurerm_user_assigned_identity" "docproc_classifier" {
+  name                = "docproc-classifier-${random_string.suffix.result}"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+}
+
 # Allow Company APIs service to read/write blobs in the storage account
 resource "azurerm_role_assignment" "company_apis_storage_blob_contributor" {
   scope                = azapi_resource.main.id
@@ -179,4 +186,25 @@ resource "azurerm_role_assignment" "docproc_parser_foundry_document_intelligence
   scope                = azurerm_cognitive_account.document_intelligence.id
   role_definition_name = "Cognitive Services User"
   principal_id         = azurerm_user_assigned_identity.docproc_parser_foundry.principal_id
+}
+
+# Allow Document Classifier service to read/write blobs in the storage account
+resource "azurerm_role_assignment" "docproc_classifier_storage_blob_contributor" {
+  scope                = azapi_resource.main.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.docproc_classifier.principal_id
+}
+
+# Allow Document Classifier service to read/write tables in the storage account
+resource "azurerm_role_assignment" "docproc_classifier_storage_table_contributor" {
+  scope                = azapi_resource.main.id
+  role_definition_name = "Storage Table Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.docproc_classifier.principal_id
+}
+
+# Allow Document Classifier service to use Azure OpenAI service
+resource "azurerm_role_assignment" "docproc_classifier_openai_user" {
+  scope                = azurerm_cognitive_account.openai.id
+  role_definition_name = "Cognitive Services OpenAI User"
+  principal_id         = azurerm_user_assigned_identity.docproc_classifier.principal_id
 }
