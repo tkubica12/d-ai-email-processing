@@ -23,6 +23,27 @@ az login
 uv run python cleanup_demo_data.py
 ```
 
+### submit_demo_data.py
+A utility script to submit demo data from the demo-submissions folder.
+
+**What it does:**
+- Processes all subfolders in the configured demo submissions directory
+- For each subfolder, uploads all files (including body.txt) to Azure Blob Storage
+- Sends Service Bus messages to trigger the email processing pipeline
+- Mimics the client-web application behavior for testing purposes
+
+**Usage:**
+```bash
+# Install dependencies
+uv sync
+
+# Ensure you're logged into Azure
+az login
+
+# Run the demo data submission
+uv run python submit_demo_data.py
+```
+
 **Prerequisites:**
 - Azure CLI installed and authenticated (`az login`)
 - Proper environment variables set in `.env` file
