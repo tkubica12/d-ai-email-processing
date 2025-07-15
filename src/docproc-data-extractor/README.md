@@ -72,3 +72,13 @@ The service uses structured logging with configurable log levels. Set `LOG_LEVEL
 - `WARNING`: Warning messages
 - `ERROR`: Error messages
 - `CRITICAL`: Critical errors
+
+## Container Deployment
+
+The service is deployed as an Azure Container App with the following features:
+- **Managed Identity**: Uses user-assigned identity for secure Azure service access
+- **Auto-scaling**: Scales 1-3 replicas based on CPU utilization (70% threshold)
+- **Background Service**: No ingress configuration (internal processing only)
+- **Monitoring**: Application Insights integration with OpenTelemetry
+
+The container is built and deployed automatically via GitHub Actions when changes are pushed to the `src/docproc-data-extractor/` directory.

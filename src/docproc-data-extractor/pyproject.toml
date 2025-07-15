@@ -1,7 +1,7 @@
 [project]
-name = "docproc-classifier"
+name = "docproc-data-extractor"
 version = "0.1.0"
-description = "Add your description here"
+description = "Document data extraction service using Azure OpenAI API"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

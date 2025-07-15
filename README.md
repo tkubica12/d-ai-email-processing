@@ -117,6 +117,27 @@ The docproc-classifier service is a background worker that processes Cosmos DB C
 
 The service will continuously monitor the Cosmos DB Change Feed for DocumentContentExtractedEvent events and classify them using Azure OpenAI.
 
+### Running the Document Data Extractor Service (Background)
+
+The docproc-data-extractor service is a background worker that processes Cosmos DB Change Feed events for structured data extraction:
+
+1. **Navigate to docproc-data-extractor service**
+   ```bash
+   cd src/docproc-data-extractor
+   ```
+
+2. **Install dependencies**
+   ```bash
+   uv sync
+   ```
+
+3. **Run the service**
+   ```bash
+   uv run python main.py
+   ```
+
+The service will continuously monitor the Cosmos DB Change Feed for DocumentContentExtractedEvent events and extract structured data using Azure OpenAI.
+
 ### Running in Container Apps
 
 After infrastructure deployment, the client-web service is automatically deployed as a Container App with the following features:
@@ -142,6 +163,7 @@ Access the deployed web application using the `client_web_url` output from Terra
   - Submission Intake: Background service for processing Service Bus messages
   - Document Parser Foundry: Change feed processor for document content extraction
   - Document Classifier: AI-powered document classification using Azure OpenAI
+  - Document Data Extractor: Structured data extraction from documents using Azure OpenAI
 - **RBAC Configuration**: Proper permissions for local development and managed identities
 
 ### Cosmos DB Configuration

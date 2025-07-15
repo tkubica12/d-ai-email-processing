@@ -393,3 +393,26 @@ Container Apps provide better scalability and managed runtime compared to App Se
 3. Classifies document using Azure OpenAI with structured outputs
 4. Updates document record with classification results
 5. Emits DocumentClassifiedEvent for downstream processing
+
+## Container App Infrastructure (July 15, 2025)
+
+**Container Services Deployment:**
+- **client-web** - FastHTML web application (port 8000)
+- **submission-intake** - Service Bus message processing
+- **docproc-parser-foundry** - Document Intelligence processing
+- **docproc-classifier** - Document classification using Azure OpenAI
+- **docproc-data-extractor** - Structured data extraction using Azure OpenAI
+
+**Container App Features:**
+- Background services with CPU-based scaling (70% threshold)
+- Managed identities with least-privilege RBAC
+- Application Insights monitoring with OTEL
+- Simplified naming: `servicename-{random_string}`
+- Azure Container Registry with GitHub Actions CI/CD
+
+**Data Extraction Service:**
+- Processes `DocumentContentExtractedEvent` from Change Feed
+- Uses Azure OpenAI GPT-4.1 for structured invoice data extraction
+- Flat Pydantic models for clean JSON responses
+- Table Storage for continuation token persistence
+- Emits `DocumentDataExtractedEvent` for downstream processing
