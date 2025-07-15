@@ -1,7 +1,7 @@
 [project]
 name = "docproc-search-indexer"
 version = "0.1.0"
-description = "Add your description here"
+description = "Document search indexing service using Azure AI Search and OpenAI embeddings"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

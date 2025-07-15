@@ -145,3 +145,16 @@ resource "azurerm_cosmosdb_sql_role_assignment" "docproc_classifier" {
   principal_id        = azurerm_user_assigned_identity.docproc_classifier.principal_id
   scope               = azurerm_cosmosdb_account.main.id
 }
+
+# Generate UUID for docproc-search-indexer role assignment
+resource "random_uuid" "cosmosdb_role_assignment_guid_docproc_search_indexer" {}
+
+# Role assignment for docproc-search-indexer service
+resource "azurerm_cosmosdb_sql_role_assignment" "docproc_search_indexer" {
+  name                = random_uuid.cosmosdb_role_assignment_guid_docproc_search_indexer.result
+  resource_group_name = azurerm_resource_group.main.name
+  account_name        = azurerm_cosmosdb_account.main.name
+  role_definition_id  = azurerm_cosmosdb_sql_role_definition.data_contributor.id
+  principal_id        = azurerm_user_assigned_identity.docproc_search_indexer.principal_id
+  scope               = azurerm_cosmosdb_account.main.id
+}

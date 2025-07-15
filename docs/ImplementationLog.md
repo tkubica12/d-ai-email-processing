@@ -402,6 +402,7 @@ Container Apps provide better scalability and managed runtime compared to App Se
 - **docproc-parser-foundry** - Document Intelligence processing
 - **docproc-classifier** - Document classification using Azure OpenAI
 - **docproc-data-extractor** - Structured data extraction using Azure OpenAI
+- **docproc-search-indexer** - AI Search indexing with vector embeddings
 
 **Container App Features:**
 - Background services with CPU-based scaling (70% threshold)
@@ -409,6 +410,14 @@ Container Apps provide better scalability and managed runtime compared to App Se
 - Application Insights monitoring with OTEL
 - Simplified naming: `servicename-{random_string}`
 - Azure Container Registry with GitHub Actions CI/CD
+
+**Search Indexer Service:**
+- Processes `DocumentContentExtractedEvent` from Change Feed
+- Uses Azure OpenAI text-embedding-3-large for vector embeddings
+- Document chunking with 2000-char chunks and 200-char overlap
+- Azure AI Search integration with semantic search capabilities
+- Security trimming with userId field for multi-tenant access
+- Comprehensive RBAC: Search Service Contributor + Index Data Contributor
 
 **Data Extraction Service:**
 - Processes `DocumentContentExtractedEvent` from Change Feed

@@ -138,6 +138,27 @@ The docproc-data-extractor service is a background worker that processes Cosmos 
 
 The service will continuously monitor the Cosmos DB Change Feed for DocumentContentExtractedEvent events and extract structured data using Azure OpenAI.
 
+### Running the Document Search Indexer Service (Background)
+
+The docproc-search-indexer service is a background worker that processes Cosmos DB Change Feed events for Azure AI Search indexing:
+
+1. **Navigate to docproc-search-indexer service**
+   ```bash
+   cd src/docproc-search-indexer
+   ```
+
+2. **Install dependencies**
+   ```bash
+   uv sync
+   ```
+
+3. **Run the service**
+   ```bash
+   uv run python main.py
+   ```
+
+The service will continuously monitor the Cosmos DB Change Feed for DocumentContentExtractedEvent events and index document content into Azure AI Search with embeddings.
+
 ### Running in Container Apps
 
 After infrastructure deployment, the client-web service is automatically deployed as a Container App with the following features:
@@ -164,6 +185,9 @@ Access the deployed web application using the `client_web_url` output from Terra
   - Document Parser Foundry: Change feed processor for document content extraction
   - Document Classifier: AI-powered document classification using Azure OpenAI
   - Document Data Extractor: Structured data extraction from documents using Azure OpenAI
+  - Document Search Indexer: AI-powered search indexing with vector embeddings using Azure AI Search
+- **Azure AI Search**: Vector search with semantic capabilities for document retrieval
+- **Azure OpenAI**: GPT-4.1 for classification/extraction and text-embedding-3-large for vector search
 - **RBAC Configuration**: Proper permissions for local development and managed identities
 
 ### Cosmos DB Configuration

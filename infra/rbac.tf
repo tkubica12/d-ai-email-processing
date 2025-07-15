@@ -90,6 +90,13 @@ resource "azurerm_user_assigned_identity" "docproc_data_extractor" {
   resource_group_name = azurerm_resource_group.main.name
 }
 
+# Managed Identity for Document Search Indexer service
+resource "azurerm_user_assigned_identity" "docproc_search_indexer" {
+  name                = "docproc-search-indexer-${random_string.suffix.result}"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+}
+
 # Allow Company APIs service to read/write blobs in the storage account
 resource "azurerm_role_assignment" "company_apis_storage_blob_contributor" {
   scope                = azapi_resource.main.id
@@ -235,4 +242,39 @@ resource "azurerm_role_assignment" "docproc_classifier_openai_user" {
   scope                = azurerm_cognitive_account.openai.id
   role_definition_name = "Cognitive Services OpenAI User"
   principal_id         = azurerm_user_assigned_identity.docproc_classifier.principal_id
+}
+
+# Allow Document Search Indexer service to read/write blobs in the storage account
+resource "azurerm_role_assignment" "docproc_search_indexer_storage_blob_contributor" {
+  scope                = azapi_resource.main.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.docproc_search_indexer.principal_id
+}
+
+# Allow Document Search Indexer service to read/write tables in the storage account
+resource "azurerm_role_assignment" "docproc_search_indexer_storage_table_contributor" {
+  scope                = azapi_resource.main.id
+  role_definition_name = "Storage Table Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.docproc_search_indexer.principal_id
+}
+
+# Allow Document Search Indexer service to use Azure OpenAI service
+resource "azurerm_role_assignment" "docproc_search_indexer_openai_user" {
+  scope                = azurerm_cognitive_account.openai.id
+  role_definition_name = "Cognitive Services OpenAI User"
+  principal_id         = azurerm_user_assigned_identity.docproc_search_indexer.principal_id
+}
+
+# Allow Document Search Indexer service to manage AI Search service
+resource "azurerm_role_assignment" "docproc_search_indexer_search_service_contributor" {
+  scope                = azurerm_search_service.main.id
+  role_definition_name = "Search Service Contributor"
+  principal_id         = azurerm_user_assigned_identity.docproc_search_indexer.principal_id
+}
+
+# Allow Document Search Indexer service to contribute to AI Search indexes
+resource "azurerm_role_assignment" "docproc_search_indexer_search_index_data_contributor" {
+  scope                = azurerm_search_service.main.id
+  role_definition_name = "Search Index Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.docproc_search_indexer.principal_id
 }
