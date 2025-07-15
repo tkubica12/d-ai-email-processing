@@ -406,3 +406,36 @@ spec:
 | **Continuation Tokens** | Stored in Table Storage | Per-FeedRange tokens in Table Storage |
 
 The MVP provides the foundation with persistent continuation tokens and single-replica processing. Production scaling adds the coordination layer without changing the core document processing logic.
+
+## Container Deployment
+
+The service is deployed as a Container App with:
+- **Background Service**: No ingress configuration (internal change feed processor)
+- **Minimum 1 replica**: Ensures continuous change feed processing
+- **Maximum 3 replicas**: Limited due to stateful change feed processing nature
+- **CPU-based auto-scaling**: Scales based on document processing workload
+- **Managed identity authentication**: Secure access to Azure services
+
+### Environment Variables in Container
+- `AZURE_CLIENT_ID` - Managed identity client ID
+- `AZURE_COSMOS_DB_ENDPOINT` - Cosmos DB account endpoint
+- `AZURE_COSMOS_DB_DATABASE_NAME` - Database name
+- `AZURE_COSMOS_DB_EVENTS_CONTAINER_NAME` - Events container for change feed
+- `AZURE_COSMOS_DB_DOCUMENTS_CONTAINER_NAME` - Documents container for results
+- `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` - Document Intelligence service endpoint
+- `AZURE_STORAGE_ACCOUNT_NAME` - Storage account name
+- `AZURE_TABLE_STORAGE_ENABLED` - Enable continuation token persistence
+- `AZURE_TABLE_STORAGE_TABLE_NAME` - Table name for continuation tokens
+- `APPLICATIONINSIGHTS_CONNECTION_STRING` - Application monitoring
+
+### RBAC Permissions
+- **Cosmos DB**: Custom role for data plane operations
+- **Storage Account**: Blob Data Contributor for document access
+- **Storage Account**: Table Data Contributor for continuation tokens
+- **Document Intelligence**: Cognitive Services User for document processing
+
+### Docker Configuration
+- Python 3.12 slim base image optimized for document processing
+- UV for efficient dependency management
+- Async processing capabilities with retry logic
+- Support for multiple document formats and enterprise-grade analysis

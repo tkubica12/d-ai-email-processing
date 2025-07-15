@@ -50,22 +50,29 @@ resource "azurerm_role_assignment" "current_user_search_index_data_contributor" 
 
 # Managed Identity for Company APIs service
 resource "azurerm_user_assigned_identity" "company_apis" {
+  name                = "company-apis-${random_string.suffix.result}"
   location            = azurerm_resource_group.main.location
-  name                = "id-company-apis-${local.prefix}"
   resource_group_name = azurerm_resource_group.main.name
 }
 
 # Managed Identity for Client Web service
 resource "azurerm_user_assigned_identity" "client_web" {
+  name                = "client-web-${random_string.suffix.result}"
   location            = azurerm_resource_group.main.location
-  name                = "id-client-web-${local.prefix}"
   resource_group_name = azurerm_resource_group.main.name
 }
 
 # Managed Identity for Submission Intake service
 resource "azurerm_user_assigned_identity" "submission_intake" {
+  name                = "submission-intake-${random_string.suffix.result}"
   location            = azurerm_resource_group.main.location
-  name                = "id-submission-intake-${local.prefix}"
+  resource_group_name = azurerm_resource_group.main.name
+}
+
+# Managed Identity for Document Parser Foundry service
+resource "azurerm_user_assigned_identity" "docproc_parser_foundry" {
+  name                = "docproc-parser-foundry-${random_string.suffix.result}"
+  location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
 }
 
@@ -151,4 +158,25 @@ resource "azurerm_role_assignment" "submission_intake_storage_table_contributor"
   scope                = azapi_resource.main.id
   role_definition_name = "Storage Table Data Contributor"
   principal_id         = azurerm_user_assigned_identity.submission_intake.principal_id
+}
+
+# Allow Document Parser Foundry service to read/write blobs in the storage account
+resource "azurerm_role_assignment" "docproc_parser_foundry_storage_blob_contributor" {
+  scope                = azapi_resource.main.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.docproc_parser_foundry.principal_id
+}
+
+# Allow Document Parser Foundry service to read/write tables in the storage account
+resource "azurerm_role_assignment" "docproc_parser_foundry_storage_table_contributor" {
+  scope                = azapi_resource.main.id
+  role_definition_name = "Storage Table Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.docproc_parser_foundry.principal_id
+}
+
+# Allow Document Parser Foundry service to use Document Intelligence service
+resource "azurerm_role_assignment" "docproc_parser_foundry_document_intelligence_user" {
+  scope                = azurerm_cognitive_account.document_intelligence.id
+  role_definition_name = "Cognitive Services User"
+  principal_id         = azurerm_user_assigned_identity.docproc_parser_foundry.principal_id
 }

@@ -75,6 +75,27 @@ The submission-intake service is a background worker that processes Service Bus 
 
 The service will continuously listen for messages from the Service Bus topic and process them.
 
+### Running the Document Parser Foundry Service (Background)
+
+The docproc-parser-foundry service is a background worker that processes Cosmos DB Change Feed events:
+
+1. **Navigate to docproc-parser-foundry service**
+   ```bash
+   cd src/docproc-parser-foundry
+   ```
+
+2. **Install dependencies**
+   ```bash
+   uv sync
+   ```
+
+3. **Run the service**
+   ```bash
+   uv run python main.py
+   ```
+
+The service will continuously monitor the Cosmos DB Change Feed for DocumentUploadedEvent events and process them using Azure Document Intelligence.
+
 ### Running in Container Apps
 
 After infrastructure deployment, the client-web service is automatically deployed as a Container App with the following features:
@@ -98,6 +119,7 @@ Access the deployed web application using the `client_web_url` output from Terra
   - Client Web: User interface for document submission
   - Company APIs: Business data integration endpoints
   - Submission Intake: Background service for processing Service Bus messages
+  - Document Parser Foundry: Change feed processor for document content extraction
 - **RBAC Configuration**: Proper permissions for local development and managed identities
 
 ### Cosmos DB Configuration

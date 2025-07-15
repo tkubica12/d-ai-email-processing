@@ -267,3 +267,70 @@ Container Apps provide better scalability and managed runtime compared to App Se
 - Maximum 5 replicas for burst capacity
 - CPU-based scaling at 70% utilization threshold
 - Future enhancement: Service Bus message count-based scaling
+
+## Naming Strategy Optimization (July 15, 2025)
+
+**Simplified Container App Naming:**
+- Changed from `ca-servicename-project-env-random` to `servicename-random`
+- Uses existing `random_string.suffix` from main.tf for uniqueness
+- Managed identities follow same pattern: `servicename-random`
+- Results in cleaner, shorter resource names while maintaining uniqueness
+
+**Benefits:**
+- Reduced resource name length (Azure has limits)
+- Cleaner Azure portal experience
+- Consistent naming across container apps and managed identities
+- Leverages existing randomization infrastructure
+
+**Examples:**
+- Container App: `client-web-vwyh` instead of `ca-client-web-email-dev-vwyh`
+- Managed Identity: `client-web-vwyh` instead of `id-client-web-email-dev-vwyh`
+
+## Container App Deployment - Document Parser Foundry (July 15, 2025)
+
+**Change Feed Processing Architecture:**
+- Deployed docproc-parser-foundry as a background Container App service
+- Processes Cosmos DB Change Feed for DocumentUploadedEvent events
+- Uses Azure Document Intelligence for enterprise-grade document content extraction
+- Stores processed content in documents container and emits DocumentContentExtractedEvent
+
+**Scaling Strategy:**
+- Minimum 1 replica for continuous change feed processing
+- Maximum 3 replicas (limited due to stateful change feed processing)
+- CPU-based scaling to handle document processing workload
+- Stateful processing with continuation token persistence in Table Storage
+
+**Authentication & Authorization:**
+- Created user-assigned managed identity for Azure service authentication
+- Configured RBAC assignments for:
+  - Cosmos DB custom role for data plane operations
+  - Storage Blob/Table Data Contributor for document and token storage
+  - Cognitive Services User for Document Intelligence access
+
+**Environment Variables:**
+- `AZURE_CLIENT_ID` - Managed identity authentication
+- `AZURE_COSMOS_DB_ENDPOINT` - Cosmos DB account endpoint
+- `AZURE_COSMOS_DB_DATABASE_NAME` - Database name
+- `AZURE_COSMOS_DB_EVENTS_CONTAINER_NAME` - Events container for change feed
+- `AZURE_COSMOS_DB_DOCUMENTS_CONTAINER_NAME` - Documents container for results
+- `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` - Document Intelligence service endpoint
+- `AZURE_STORAGE_ACCOUNT_NAME` - Storage account for document access
+- `AZURE_TABLE_STORAGE_ENABLED` - Enable continuation token persistence
+- `AZURE_TABLE_STORAGE_TABLE_NAME` - Table name for continuation tokens
+- `APPLICATIONINSIGHTS_CONNECTION_STRING` - Application monitoring
+
+**Docker Configuration:**
+- Python 3.12 slim base image optimized for document processing
+- UV for efficient dependency management including Document Intelligence SDK
+- Async processing capabilities for high-throughput document analysis
+
+**GitHub Actions:**
+- Created `docproc-parser-foundry-build.yaml` workflow
+- Triggers on changes to `src/docproc-parser-foundry/**` path
+- Automated Docker image building and registry push
+
+**Technical Architecture:**
+- Event-driven processing using Cosmos DB Change Feed
+- Retry logic with exponential backoff for resilient document processing
+- Support for multiple document formats (PDF, images, Office documents)
+- Stateful processing with continuation token management for service restarts

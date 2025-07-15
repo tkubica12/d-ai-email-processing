@@ -1,6 +1,6 @@
 resource "azapi_resource" "client_web" {
   type      = "Microsoft.App/containerApps@2024-03-01"
-  name      = "ca-client-web-${local.base_name}"
+  name      = "client-web-${random_string.suffix.result}"
   location  = azurerm_resource_group.main.location
   parent_id = azurerm_resource_group.main.id
 

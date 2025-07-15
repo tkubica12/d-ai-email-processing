@@ -1,6 +1,6 @@
-resource "azapi_resource" "submission_intake" {
+resource "azapi_resource" "docproc_parser_foundry" {
   type      = "Microsoft.App/containerApps@2024-03-01"
-  name      = "submission-intake-${random_string.suffix.result}"
+  name      = "docproc-parser-foundry-${random_string.suffix.result}"
   location  = azurerm_resource_group.main.location
   parent_id = azurerm_resource_group.main.id
 
@@ -8,7 +8,7 @@ resource "azapi_resource" "submission_intake" {
     identity = {
       type = "UserAssigned"
       userAssignedIdentities = {
-        "${azurerm_user_assigned_identity.submission_intake.id}" = {}
+        "${azurerm_user_assigned_identity.docproc_parser_foundry.id}" = {}
       }
     }
     properties = {
@@ -19,8 +19,8 @@ resource "azapi_resource" "submission_intake" {
       }
       template = {
         scale = {
-          minReplicas    = 1  # Keep at least 1 replica for message processing
-          maxReplicas    = 5
+          minReplicas    = 1  # Keep at least 1 replica for change feed processing
+          maxReplicas    = 3  # Limited replicas since change feed processing is stateful
           rules = [
             {
               name = "cpu-scale-rule"
@@ -36,8 +36,8 @@ resource "azapi_resource" "submission_intake" {
         }
         containers = [
           {
-            name  = "submission-intake"
-            image = "ghcr.io/${var.github_repository}/submission-intake:latest"
+            name  = "docproc-parser-foundry"
+            image = "ghcr.io/${var.github_repository}/docproc-parser-foundry:latest"
             resources = {
               cpu    = 0.5
               memory = "1Gi"
@@ -45,19 +45,7 @@ resource "azapi_resource" "submission_intake" {
             env = [
               {
                 name  = "AZURE_CLIENT_ID"
-                value = azurerm_user_assigned_identity.submission_intake.client_id
-              },
-              {
-                name  = "AZURE_SERVICE_BUS_FQDN"
-                value = "${azurerm_servicebus_namespace.main.name}.servicebus.windows.net"
-              },
-              {
-                name  = "AZURE_SERVICE_BUS_TOPIC_NAME"
-                value = azurerm_servicebus_topic.new_submissions.name
-              },
-              {
-                name  = "AZURE_SERVICE_BUS_SUBSCRIPTION_NAME"
-                value = azurerm_servicebus_subscription.submission_intake.name
+                value = azurerm_user_assigned_identity.docproc_parser_foundry.client_id
               },
               {
                 name  = "AZURE_COSMOS_DB_ENDPOINT"
@@ -72,16 +60,24 @@ resource "azapi_resource" "submission_intake" {
                 value = azurerm_cosmosdb_sql_container.events.name
               },
               {
-                name  = "AZURE_COSMOS_DB_SUBMISSIONS_CONTAINER_NAME"
-                value = azurerm_cosmosdb_sql_container.submissions.name
-              },
-              {
                 name  = "AZURE_COSMOS_DB_DOCUMENTS_CONTAINER_NAME"
                 value = azurerm_cosmosdb_sql_container.documents.name
               },
               {
+                name  = "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT"
+                value = azurerm_cognitive_account.document_intelligence.endpoint
+              },
+              {
                 name  = "AZURE_STORAGE_ACCOUNT_NAME"
                 value = azapi_resource.main.name
+              },
+              {
+                name  = "AZURE_TABLE_STORAGE_ENABLED"
+                value = "true"
+              },
+              {
+                name  = "AZURE_TABLE_STORAGE_TABLE_NAME"
+                value = "continuationtokens"
               },
               {
                 name  = "LOG_LEVEL"
@@ -93,7 +89,7 @@ resource "azapi_resource" "submission_intake" {
               },
               {
                 name  = "OTEL_SERVICE_NAME"
-                value = "submission-intake"
+                value = "docproc-parser-foundry"
               }
             ]
           }

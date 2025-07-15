@@ -1,6 +1,6 @@
 resource "azapi_resource" "company_apis" {
   type      = "Microsoft.App/containerApps@2024-03-01"
-  name      = "ca-company-apis-${local.base_name}"
+  name      = "company-apis-${random_string.suffix.result}"
   location  = azurerm_resource_group.main.location
   parent_id = azurerm_resource_group.main.id
 
