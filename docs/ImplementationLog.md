@@ -117,6 +117,42 @@ Deploy infrastructure → Update `.env` → `az login` → `uv run python main.p
 - Seamless integration with existing document processing pipeline
 - Secure access with proper authentication and authorization
 
+## Policies Search Setup (July 15, 2025)
+
+**Implementation Overview:**
+Implemented comprehensive setup script for Azure AI Search with vector search capabilities for policy documents.
+
+**Key Features:**
+- **Blob Storage Integration**: Automatic upload of policy documents from local folder
+- **Vector Search**: Azure OpenAI text-embedding-3-large integration (3072 dimensions)
+- **Semantic Search**: Built-in Azure AI Search semantic capabilities
+- **Skillset Pipeline**: Text splitting (2000 chars, 200 overlap) + embedding generation
+- **Idempotent Operations**: Safe to run multiple times, updates existing resources
+
+**Technical Implementation:**
+- **Index Fields**: id, title, content, filename, metadata, content_vector
+- **Vector Configuration**: HNSW algorithm with cosine similarity
+- **Indexer Schedule**: Hourly processing of new/updated documents
+- **Authentication**: DefaultAzureCredential for managed identity support
+
+**Architecture Decision:**
+Chose Python script over Terraform for AI Search configuration due to complexity of skillsets and indexer field mappings. This allows for better error handling and step-by-step logging.
+
+**Dependencies Added:**
+- `azure-storage-blob` for blob operations
+- `azure-search-documents` for index management
+- Enhanced error handling and progress logging
+
+**Usage:**
+```bash
+uv run main.py
+```
+
+**Next Steps:**
+- Add document status monitoring
+- Implement search query interface
+- Add indexer failure recovery mechanisms
+
 ## Critical Technical Lessons
 
 **Event System:**

@@ -82,3 +82,17 @@ resource "azurerm_role_assignment" "search_openai_user" {
   role_definition_name = "Cognitive Services OpenAI User"
   principal_id         = azurerm_search_service.main.identity[0].principal_id
 }
+
+# Allow Azure AI Search service to read blob storage for data source
+resource "azurerm_role_assignment" "search_storage_blob_reader" {
+  scope                = azapi_resource.main.id
+  role_definition_name = "Storage Blob Data Reader"
+  principal_id         = azurerm_search_service.main.identity[0].principal_id
+}
+
+# Allow Azure AI Search service to read storage account for data source
+resource "azurerm_role_assignment" "search_storage_account_reader" {
+  scope                = azapi_resource.main.id
+  role_definition_name = "Reader"
+  principal_id         = azurerm_search_service.main.identity[0].principal_id
+}
