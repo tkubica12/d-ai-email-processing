@@ -54,6 +54,27 @@ See [Design.md](docs/Design.md) for detailed architecture comparison and impleme
 4. **Access the application**
    Open your browser to `http://localhost:8000`
 
+### Running the Submission Intake Service (Background)
+
+The submission-intake service is a background worker that processes Service Bus messages:
+
+1. **Navigate to submission-intake service**
+   ```bash
+   cd src/submission-intake
+   ```
+
+2. **Install dependencies**
+   ```bash
+   uv sync
+   ```
+
+3. **Run the service**
+   ```bash
+   uv run python main.py
+   ```
+
+The service will continuously listen for messages from the Service Bus topic and process them.
+
 ### Running in Container Apps
 
 After infrastructure deployment, the client-web service is automatically deployed as a Container App with the following features:
@@ -76,6 +97,7 @@ Access the deployed web application using the `client_web_url` output from Terra
 - **Azure Container Apps**: Serverless container hosting for web services
   - Client Web: User interface for document submission
   - Company APIs: Business data integration endpoints
+  - Submission Intake: Background service for processing Service Bus messages
 - **RBAC Configuration**: Proper permissions for local development and managed identities
 
 ### Cosmos DB Configuration

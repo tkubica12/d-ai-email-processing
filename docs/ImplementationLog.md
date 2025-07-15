@@ -228,3 +228,42 @@ uv run main.py
 
 **Architecture Decision:** 
 Container Apps provide better scalability and managed runtime compared to App Service for this stateless web application. The service can scale to zero when not in use and automatically handle traffic spikes.
+
+## Container App Deployment - Submission Intake (July 15, 2025)
+
+**Background Service Architecture:**
+- Deployed submission-intake as a background Container App service (no ingress)
+- Configured minimum 1 replica to ensure continuous message processing from Service Bus
+- Used CPU-based scaling rules for automatic scaling based on processing load
+
+**Authentication & Authorization:**
+- Created user-assigned managed identity for Azure service authentication
+- Configured RBAC assignments for Service Bus Data Receiver, Storage Blob/Table Contributor
+- Added Cosmos DB role assignment for data plane operations
+
+**Environment Variables:**
+- `AZURE_CLIENT_ID` - Managed identity authentication
+- `AZURE_SERVICE_BUS_FQDN` - Service Bus namespace endpoint
+- `AZURE_SERVICE_BUS_TOPIC_NAME` - Topic name for submission events
+- `AZURE_SERVICE_BUS_SUBSCRIPTION_NAME` - Subscription name for message processing
+- `AZURE_COSMOS_DB_ENDPOINT` - Cosmos DB account endpoint
+- `AZURE_COSMOS_DB_DATABASE_NAME` - Database name
+- `AZURE_COSMOS_DB_*_CONTAINER_NAME` - Container names for events, submissions, documents
+- `AZURE_STORAGE_ACCOUNT_NAME` - Storage account reference
+- `APPLICATIONINSIGHTS_CONNECTION_STRING` - Application monitoring
+
+**Docker Configuration:**
+- Used Python 3.12 slim base image for optimal performance
+- Implemented uv for efficient dependency management
+- Simple CMD execution for background service operation
+
+**GitHub Actions:**
+- Created `submission-intake-build.yaml` workflow for automated Docker image building
+- Configured to trigger on changes to `src/submission-intake/**` path
+- Images pushed to GitHub Container Registry
+
+**Scaling Strategy:**
+- Minimum 1 replica to ensure message processing continuity
+- Maximum 5 replicas for burst capacity
+- CPU-based scaling at 70% utilization threshold
+- Future enhancement: Service Bus message count-based scaling

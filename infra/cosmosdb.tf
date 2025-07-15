@@ -93,3 +93,16 @@ resource "azurerm_cosmosdb_sql_role_assignment" "current_user" {
   principal_id        = data.azurerm_client_config.current.object_id
   scope               = azurerm_cosmosdb_account.main.id
 }
+
+# Generate UUID for submission-intake role assignment
+resource "random_uuid" "cosmosdb_role_assignment_guid_submission_intake" {}
+
+# Role assignment for submission-intake service
+resource "azurerm_cosmosdb_sql_role_assignment" "submission_intake" {
+  name                = random_uuid.cosmosdb_role_assignment_guid_submission_intake.result
+  resource_group_name = azurerm_resource_group.main.name
+  account_name        = azurerm_cosmosdb_account.main.name
+  role_definition_id  = azurerm_cosmosdb_sql_role_definition.data_contributor.id
+  principal_id        = azurerm_user_assigned_identity.submission_intake.principal_id
+  scope               = azurerm_cosmosdb_account.main.id
+}

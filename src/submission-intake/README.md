@@ -157,3 +157,23 @@ LOG_LEVEL=DEBUG python main.py
 - **Error Handling**: Comprehensive error handling with retry logic
 - **Monitoring**: Health check endpoints and structured logging
 - **Scalability**: Stateless design enables horizontal scaling
+
+## Container Deployment
+
+The service is deployed as a Container App with:
+- **Background Service**: No ingress configuration (internal service)
+- **Minimum 1 replica**: Ensures continuous message processing
+- **CPU-based auto-scaling**: Scales based on processing load
+- **Managed identity authentication**: Secure access to Azure services
+- **Full RBAC permissions**: Service Bus, Cosmos DB, Storage access
+
+### Environment Variables in Container
+- `AZURE_CLIENT_ID` - Managed identity client ID
+- `AZURE_SERVICE_BUS_FQDN` - Service Bus namespace endpoint
+- `AZURE_SERVICE_BUS_TOPIC_NAME` - Topic name for submission events
+- `AZURE_SERVICE_BUS_SUBSCRIPTION_NAME` - Subscription name
+- `AZURE_COSMOS_DB_ENDPOINT` - Cosmos DB account endpoint
+- `AZURE_COSMOS_DB_DATABASE_NAME` - Database name
+- `AZURE_COSMOS_DB_*_CONTAINER_NAME` - Container names
+- `AZURE_STORAGE_ACCOUNT_NAME` - Storage account name
+- `APPLICATIONINSIGHTS_CONNECTION_STRING` - Application monitoring

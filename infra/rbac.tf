@@ -62,6 +62,13 @@ resource "azurerm_user_assigned_identity" "client_web" {
   resource_group_name = azurerm_resource_group.main.name
 }
 
+# Managed Identity for Submission Intake service
+resource "azurerm_user_assigned_identity" "submission_intake" {
+  location            = azurerm_resource_group.main.location
+  name                = "id-submission-intake-${local.prefix}"
+  resource_group_name = azurerm_resource_group.main.name
+}
+
 # Allow Company APIs service to read/write blobs in the storage account
 resource "azurerm_role_assignment" "company_apis_storage_blob_contributor" {
   scope                = azapi_resource.main.id
@@ -123,4 +130,25 @@ resource "azurerm_role_assignment" "client_web_service_bus_sender" {
   scope                = azurerm_servicebus_namespace.main.id
   role_definition_name = "Azure Service Bus Data Sender"
   principal_id         = azurerm_user_assigned_identity.client_web.principal_id
+}
+
+# Allow Submission Intake service to receive messages from Service Bus
+resource "azurerm_role_assignment" "submission_intake_service_bus_receiver" {
+  scope                = azurerm_servicebus_namespace.main.id
+  role_definition_name = "Azure Service Bus Data Receiver"
+  principal_id         = azurerm_user_assigned_identity.submission_intake.principal_id
+}
+
+# Allow Submission Intake service to read/write blobs in the storage account
+resource "azurerm_role_assignment" "submission_intake_storage_blob_contributor" {
+  scope                = azapi_resource.main.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.submission_intake.principal_id
+}
+
+# Allow Submission Intake service to read/write tables in the storage account
+resource "azurerm_role_assignment" "submission_intake_storage_table_contributor" {
+  scope                = azapi_resource.main.id
+  role_definition_name = "Storage Table Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.submission_intake.principal_id
 }
