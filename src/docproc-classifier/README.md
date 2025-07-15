@@ -1,11 +1,13 @@
 # Document Classifier Service
 
-This service processes document classification by listening to Cosmos DB Change Feed for `DocumentContentExtractedEvent` events. It classifies documents using Azure OpenAI API and updates document records with classification results.
+This service processes document classification by listening to Cosmos DB Change Feed for `DocumentContentExtractedEvent` events. It classifies documents using Azure OpenAI API and updates both document records and submission records with classification results.
 
 ## Features
 
 - Listens to Cosmos DB Change Feed for `DocumentContentExtractedEvent` events
 - Classifies documents using Azure OpenAI API with predefined document types
+- Updates document records with classification results (`type` and `summary` fields)
+- Updates submission records with document type for consistency
 - Emits `DocumentClassifiedEvent` after successful classification
 - Stores continuation tokens in Azure Table Storage for stateful processing
 - Supports graceful shutdown and error handling
@@ -24,6 +26,7 @@ Required environment variables:
 - `AZURE_COSMOS_DB_DATABASE_NAME`: Database name
 - `AZURE_COSMOS_DB_EVENTS_CONTAINER_NAME`: Events container name
 - `AZURE_COSMOS_DB_DOCUMENTS_CONTAINER_NAME`: Documents container name
+- `AZURE_COSMOS_DB_SUBMISSIONS_CONTAINER_NAME`: Submissions container name (default: submissions)
 - `AZURE_STORAGE_ACCOUNT_NAME`: Storage account name
 - `AZURE_OPENAI_ENDPOINT`: Azure OpenAI service endpoint
 - `AZURE_OPENAI_MODEL`: Azure OpenAI model deployment name (default: gpt-4o-mini)
@@ -62,7 +65,8 @@ The service classifies documents into the following types:
 2. Fetches document content from Cosmos DB documents container
 3. Classifies document using Azure OpenAI with system prompt template
 4. Updates document record with classification results (`type` and `summary` fields)
-5. Emits `DocumentClassifiedEvent` for downstream processing
+5. Updates submission record with document type for data consistency
+6. Emits `DocumentClassifiedEvent` for downstream processing
 
 ## Logging
 
@@ -88,6 +92,7 @@ The service is deployed as a Container App with:
 - `AZURE_COSMOS_DB_DATABASE_NAME` - Database name
 - `AZURE_COSMOS_DB_EVENTS_CONTAINER_NAME` - Events container for change feed
 - `AZURE_COSMOS_DB_DOCUMENTS_CONTAINER_NAME` - Documents container for updates
+- `AZURE_COSMOS_DB_SUBMISSIONS_CONTAINER_NAME` - Submissions container for consistency updates
 - `AZURE_OPENAI_ENDPOINT` - Azure OpenAI service endpoint
 - `AZURE_OPENAI_MODEL` - GPT-4.1 model deployment name
 - `AZURE_STORAGE_ACCOUNT_NAME` - Storage account name

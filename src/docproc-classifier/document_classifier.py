@@ -18,7 +18,7 @@ from azure.core.exceptions import ResourceNotFoundError
 from jinja2 import Environment, FileSystemLoader
 
 from config import AzureOpenAIConfig, CosmosDBConfig
-from models import DocumentRecord, LLMClassificationResponse, DocumentClassifiedEvent, DocumentClassifiedEventData, DocumentType
+from models import DocumentRecord, LLMClassificationResponse, DocumentClassifiedEvent, DocumentClassifiedEventData, DocumentType, SubmissionRecord
 
 
 class DocumentClassifier:
@@ -183,6 +183,18 @@ class DocumentClassifier:
                 classification=classification
             )
             
+            # Update the submission record with document type
+            try:
+                await self.update_submission_document_type(
+                    submission_id=document.submissionId,
+                    user_id=document.userId,
+                    document_url=document.documentUrl,
+                    document_type=classification.type.value
+                )
+            except Exception as submission_error:
+                self.logger.error(f"Failed to update submission record for document {document.id}: {submission_error}")
+                # Continue processing even if submission update fails
+            
             # Emit DocumentClassifiedEvent
             await self._emit_document_classified_event(document, classification, success=True)
             
@@ -247,6 +259,59 @@ class DocumentClassifier:
         except Exception as e:
             self.logger.error(f"Failed to emit DocumentClassifiedEvent for document {document.id}: {e}")
             # Don't raise exception to avoid breaking the processing pipeline
+
+    async def update_submission_document_type(self, submission_id: str, user_id: str, document_url: str, document_type: str) -> None:
+        """
+        Update document type in the submission record.
+        
+        Args:
+            submission_id: ID of the submission to update (item ID)
+            user_id: User ID (used as partition key for submissions container)
+            document_url: URL of the document to update
+            document_type: Classified document type
+            
+        Note:
+            The submissions container is partitioned by userId, not submissionId.
+            This design allows for efficient queries by user while maintaining
+            submission records grouped by user.
+        """
+        try:
+            database = self.cosmos_client.get_database_client(self.cosmos_config.database_name)
+            container = database.get_container_client(self.cosmos_config.submissions_container_name)
+            
+            # Retrieve the current submission record using userId as partition key
+            try:
+                current_submission = await container.read_item(
+                    item=submission_id,
+                    partition_key=user_id
+                )
+            except ResourceNotFoundError:
+                self.logger.warning(f"Submission record {submission_id} not found for user {user_id}, skipping submission update")
+                return
+            
+            # Update the document type in the documents array
+            updated = False
+            for doc in current_submission.get('documents', []):
+                if doc.get('documentUrl') == document_url:
+                    doc['type'] = document_type
+                    updated = True
+                    break
+            
+            if not updated:
+                self.logger.warning(f"Document URL {document_url} not found in submission {submission_id}")
+                return
+            
+            # Save the updated submission
+            await container.replace_item(
+                item=submission_id,
+                body=current_submission
+            )
+            
+            self.logger.info(f"Updated submission {submission_id} with document type {document_type} for URL {document_url}")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to update submission {submission_id} document type: {str(e)}")
+            # Don't raise exception to avoid breaking the document processing pipeline
 
     async def close(self):
         """Close the Azure OpenAI and Cosmos DB clients."""

@@ -318,3 +318,83 @@ class DocumentClassifiedEvent(BaseModel):
         description="Event data payload"
     )
 
+
+class SubmissionDocument(BaseModel):
+    """
+    Document reference in submission record.
+    
+    This model represents a document within a submission record,
+    tracking its processing status and classified type.
+    
+    Attributes:
+        documentUrl: Azure Blob Storage URL for the document
+        processed: Whether the document has been processed
+        type: Classified document type (optional until classification is complete)
+    """
+    
+    documentUrl: str = Field(
+        ...,
+        description="Azure Blob Storage URL for the document",
+        example="https://storage.blob.core.windows.net/submission-guid/document1.pdf"
+    )
+    
+    processed: bool = Field(
+        ...,
+        description="Whether the document has been processed",
+        example=True
+    )
+    
+    type: Optional[str] = Field(
+        None,
+        description="Classified document type",
+        example="invoice"
+    )
+
+
+class SubmissionRecord(BaseModel):
+    """
+    Submission record stored in Cosmos DB submissions container.
+    
+    This represents a complete submission with metadata and document references.
+    
+    Schema matches the actual Cosmos DB document structure.
+    - Container: submissions
+    - Partition Key: userId
+    - Document ID: Same as submissionId
+    """
+    
+    model_config = ConfigDict(extra="ignore")  # Ignore Cosmos DB internal fields
+    
+    id: str = Field(
+        ...,
+        description="Submission identifier (same as submissionId)",
+        example="123e4567-e89b-12d3-a456-426614174000"
+    )
+    
+    submissionId: str = Field(
+        ...,
+        description="Unique identifier for the submission",
+        example="123e4567-e89b-12d3-a456-426614174000"
+    )
+    
+    userId: str = Field(
+        ...,
+        description="User who created the submission",
+        example="user@example.com"
+    )
+    
+    submittedAt: datetime = Field(
+        ...,
+        description="ISO 8601 timestamp when submission was created"
+    )
+    
+    documents: List[SubmissionDocument] = Field(
+        ...,
+        description="List of documents in the submission"
+    )
+    
+    evaluationResults: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Evaluation results from submission analysis"
+    )
+

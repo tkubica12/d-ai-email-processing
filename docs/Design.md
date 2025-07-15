@@ -112,7 +112,7 @@ This approach uses event-driven architecture with event sourcing patterns to imp
 
 **Submission Store:** Cosmos DB container for submission records
 - Container: `submissions`
-- Partition Key: `submissionId`
+- Partition Key: `userId`
 - Schema:
   ```json
   {
@@ -158,6 +158,7 @@ This approach uses event-driven architecture with event sourcing patterns to imp
    - Listens to Change Feed for `DocumentContentExtractedEvent`
    - Uses LLM to classify document type and generate summary
    - Updates document record with type and summary
+   - Update submission record with document type
    - Emits `DocumentClassifiedEvent`
 
 4. **docproc-search-indexer**

@@ -175,3 +175,31 @@ Deploy infrastructure → Update `.env` → `az login` → `uv run python main.p
   - Robust error handling with fallback strategies
 - **Location**: `src/demo-utils/cleanup_demo_data.py`
 - **Usage**: `python cleanup_demo_data.py` after `az login`
+
+## Recent Updates
+
+### Document Classifier Enhancement (July 15, 2025)
+- **Enhanced** docproc-classifier to update submission records with document types
+- **Added** submissions container configuration to support dual updates
+- **Implemented** submission record models for type-safe operations
+- **Modified** classification workflow to update both document and submission records
+- **Fixed** partition key usage for submissions container (userId, not submissionId)
+- **Architecture**: Document classification now maintains consistency between documents and submissions containers
+
+**Technical Implementation:**
+- Added `update_submission_document_type()` method to DocumentClassifier with correct partition key
+- Extended CosmosDBConfig with submissions_container_name
+- Added SubmissionRecord and SubmissionDocument Pydantic models
+- Updated .env files with AZURE_COSMOS_DB_SUBMISSIONS_CONTAINER_NAME
+- Updated Terraform configuration with submissions container environment variable
+- Modified classify_and_update_document() to perform dual updates using correct partition key
+
+**Benefits:**
+- Ensures data consistency between document and submission records
+- Enables faster submission queries without document container joins
+- Maintains single source of truth for document classification results
+- Supports submission-level analytics and reporting
+
+**Bug Fix:**
+- Corrected partition key usage in submissions container from submissionId to userId
+- Updated Design.md to reflect actual implementation

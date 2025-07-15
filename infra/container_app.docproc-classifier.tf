@@ -64,6 +64,10 @@ resource "azapi_resource" "docproc_classifier" {
                 value = azurerm_cosmosdb_sql_container.documents.name
               },
               {
+                name  = "AZURE_COSMOS_DB_SUBMISSIONS_CONTAINER_NAME"
+                value = azurerm_cosmosdb_sql_container.submissions.name
+              },
+              {
                 name  = "AZURE_OPENAI_ENDPOINT"
                 value = azurerm_cognitive_account.openai.endpoint
               },
