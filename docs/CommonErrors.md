@@ -45,6 +45,21 @@ if hasattr(feed_iterator, 'continuation_token'):
 items = container.query_items(query=sql, enable_cross_partition_query=True)
 ```
 
+## Data Extraction Service
+
+### Model Attribute Errors
+**'LLMDataExtractionResponse' object has no attribute 'type'** → The data extraction response model only contains extracted data fields (invoiceNumber, totalAmount, etc.), not document metadata. Access document type from DocumentRecord:
+
+```python
+# Wrong - accessing type from extraction result
+extraction_result.type  # AttributeError
+
+# Correct - accessing type from document record
+document_record.type or 'unknown'  # Safe access with fallback
+```
+
+**Resolution:** Use `document_record.type` for document classification info, `extraction_result` for extracted data fields.
+
 ## API Development
 
 ### FastAPI

@@ -226,7 +226,7 @@ class ChangeFeedProcessor:
             # Log the extraction result
             self.logger.debug(f"Extraction result for document {document_id}: {extraction_result}")
             
-            self.logger.info(f"Document {document_id} data extracted and updated successfully: type={extraction_result.type}")
+            self.logger.info(f"Document {document_id} data extracted and updated successfully: type={document_record.type or 'unknown'}")
             
             self.logger.info(f"DocumentContentExtractedEvent processed successfully: {event_data.get('id')}")
             
