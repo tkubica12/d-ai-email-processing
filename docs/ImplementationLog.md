@@ -163,3 +163,15 @@ Deploy infrastructure → Update `.env` → `az login` → `uv run python main.p
 - Service-specific Azure resource endpoints
 - Application Insights connection strings
 - Cosmos DB database and container names
+
+## Demo and Testing Tools
+
+### Demo Data Cleanup Utility (July 2025)
+- **Purpose**: Clean up demo data from Azure resources for testing and demos
+- **Features**:
+  - Deletes all records from Cosmos DB containers (events, documents, submissions)
+  - Deletes all storage containers in GUID format (preserves policies-docs)
+  - Automatic partition key detection for Cosmos DB containers
+  - Robust error handling with fallback strategies
+- **Location**: `src/demo-utils/cleanup_demo_data.py`
+- **Usage**: `python cleanup_demo_data.py` after `az login`
