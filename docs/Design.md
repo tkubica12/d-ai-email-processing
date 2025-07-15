@@ -1002,3 +1002,43 @@ Azure Table Storage - FeedRange Assignments
 - Leader election and coordination via Azure Table Storage
 - Container orchestration (Kubernetes, Container Apps) for automatic scaling
 - Health checks and monitoring for replica management
+
+---
+
+### Internal Policy Documents Search (NEW)
+
+The platform must also expose a searchable knowledge base of internal policy documents (e.g., KYC, AML, underwriting policies) that live inside the repository folder `policies-docs`.  
+Unlike user-uploaded documents, these files are processed by a **dedicated Azure AI Search indexer pipeline** that runs on a fixed schedule.
+
+**Blob Storage Configuration**
+- Storage account: `policiesstore`
+- Container: `policy-docs`
+- Build/CI step uploads the contents of `./policies-docs/**` into the container.
+- Public access disabled; access via managed identity used by the indexer.
+
+**Search Index:** `policies-index`
+
+| Field Name      | Type                     | Properties                                   |
+|-----------------|--------------------------|----------------------------------------------|
+| `id`            | Edm.String               | Key, Retrievable                             |
+| `content`       | Edm.String               | Searchable, Retrievable                      |
+| `contentVector` | Collection(Edm.Single)   | Searchable (vector, 3072 dimensions)         |
+| `fileName`      | Edm.String               | Filterable, Retrievable                      |
+| `folderPath`    | Edm.String               | Filterable, Retrievable                      |
+| `timestamp`     | Edm.DateTimeOffset       | Filterable, Retrievable                      |
+
+Search capabilities mirror those of `documents-index`:
+- Full-text search.
+- Vector similarity search using `contentVector`.
+- Semantic ranker enabled for hybrid search (`semanticConfiguration` set to `default`).
+
+**Indexer:**
+- Datasource type: Azure Blob Storage (`policy-docs` container).
+- Skillset: Built-in document cracking + vectorization skill (Azure OpenAI `text-embedding-3-large`).
+- Target index: `policies-index`.
+- Schedule: **Daily** (`interval`: `P1D`), ensuring new or updated policies are picked up automatically.
+- Failures routed to Azure Monitor logs for alerting.
+
+**Security & Access Control**
+- Because policy documents are internal, query filtering uses Azure AD role assignments rather than per-row `userId` trimming.
+- Service-to-service queries originate from backend components (e.g., submission-analyzer) that use a managed identity with `policies-search-reader` role.
