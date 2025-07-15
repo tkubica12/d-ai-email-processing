@@ -114,3 +114,8 @@ output "azure_search_endpoint" {
 #   description = "The URL for the Company APIs service"
 #   value       = "https://${azapi_resource.company_apis.output.fqdn}"
 # }
+
+output "client_web_url" {
+  description = "The URL for the Client Web service"
+  value       = "https://${azapi_resource.client_web.output.properties.configuration.ingress.fqdn}"
+}

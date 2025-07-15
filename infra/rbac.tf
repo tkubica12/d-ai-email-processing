@@ -55,6 +55,13 @@ resource "azurerm_user_assigned_identity" "company_apis" {
   resource_group_name = azurerm_resource_group.main.name
 }
 
+# Managed Identity for Client Web service
+resource "azurerm_user_assigned_identity" "client_web" {
+  location            = azurerm_resource_group.main.location
+  name                = "id-client-web-${local.prefix}"
+  resource_group_name = azurerm_resource_group.main.name
+}
+
 # Allow Company APIs service to read/write blobs in the storage account
 resource "azurerm_role_assignment" "company_apis_storage_blob_contributor" {
   scope                = azapi_resource.main.id
@@ -95,4 +102,25 @@ resource "azurerm_role_assignment" "search_storage_account_reader" {
   scope                = azapi_resource.main.id
   role_definition_name = "Reader"
   principal_id         = azurerm_search_service.main.identity[0].principal_id
+}
+
+# Allow Client Web service to read/write blobs in the storage account
+resource "azurerm_role_assignment" "client_web_storage_blob_contributor" {
+  scope                = azapi_resource.main.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.client_web.principal_id
+}
+
+# Allow Client Web service to read/write tables in the storage account
+resource "azurerm_role_assignment" "client_web_storage_table_contributor" {
+  scope                = azapi_resource.main.id
+  role_definition_name = "Storage Table Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.client_web.principal_id
+}
+
+# Allow Client Web service to send messages to Service Bus
+resource "azurerm_role_assignment" "client_web_service_bus_sender" {
+  scope                = azurerm_servicebus_namespace.main.id
+  role_definition_name = "Azure Service Bus Data Sender"
+  principal_id         = azurerm_user_assigned_identity.client_web.principal_id
 }

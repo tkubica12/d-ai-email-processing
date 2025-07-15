@@ -196,3 +196,35 @@ uv run main.py
 ---
 
 **This log focuses on architectural decisions, critical fixes, and lessons learned. For detailed implementation, see source code and service-specific documentation.**
+
+## Container App Deployment - Client Web (July 15, 2025)
+
+**Infrastructure Enhancement:**
+- Added Container App deployment for client-web service
+- Created user-assigned managed identity for Azure authentication
+- Configured proper RBAC assignments for Storage Account and Service Bus access
+
+**Docker Configuration:**
+- Updated Dockerfile CMD to use uvicorn directly for better container runtime
+- Exposed port 8000 to match FastHTML application default
+- Used uv for efficient dependency management
+
+**Environment Variables:**
+- `AZURE_CLIENT_ID` - Managed identity authentication
+- `AZURE_STORAGE_ACCOUNT_NAME` - Storage account reference
+- `AZURE_SERVICE_BUS_FQDN` - Service Bus namespace endpoint
+- `AZURE_SERVICE_BUS_TOPIC_NAME` - Topic name for submission events
+- `APPLICATIONINSIGHTS_CONNECTION_STRING` - Application monitoring
+
+**GitHub Actions:**
+- Created `client-web-build.yaml` workflow for automated Docker image building
+- Configured to trigger on changes to `src/client-web/**` path
+- Images pushed to GitHub Container Registry
+
+**Security:**
+- Used managed identity instead of connection strings for Azure services
+- Applied principle of least privilege with specific RBAC assignments
+- Configured secure ingress with HTTPS termination
+
+**Architecture Decision:** 
+Container Apps provide better scalability and managed runtime compared to App Service for this stateless web application. The service can scale to zero when not in use and automatically handle traffic spikes.

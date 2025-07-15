@@ -29,4 +29,4 @@ ENV HOST=0.0.0.0
 ENV PORT=8000
 
 # Run the application
-CMD ["uv", "run", "python", "main.py"]
+CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

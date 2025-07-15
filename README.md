@@ -52,7 +52,17 @@ See [Design.md](docs/Design.md) for detailed architecture comparison and impleme
    ```
 
 4. **Access the application**
-   Open your browser to `http://localhost:5001`
+   Open your browser to `http://localhost:8000`
+
+### Running in Container Apps
+
+After infrastructure deployment, the client-web service is automatically deployed as a Container App with the following features:
+- **Managed Identity Authentication**: Secure access to Azure services
+- **Auto-scaling**: Scale to zero when not in use
+- **HTTPS Ingress**: Automatic SSL termination
+- **Monitoring**: Application Insights integration
+
+Access the deployed web application using the `client_web_url` output from Terraform.
 
 ## Infrastructure Components
 
@@ -63,7 +73,10 @@ See [Design.md](docs/Design.md) for detailed architecture comparison and impleme
   - Events container: Event sourcing with change feed
   - Documents container: Processed document results
   - Submissions container: Submission records
-- **RBAC Configuration**: Proper permissions for local development
+- **Azure Container Apps**: Serverless container hosting for web services
+  - Client Web: User interface for document submission
+  - Company APIs: Business data integration endpoints
+- **RBAC Configuration**: Proper permissions for local development and managed identities
 
 ### Cosmos DB Configuration
 The system uses serverless Cosmos DB with three containers:
