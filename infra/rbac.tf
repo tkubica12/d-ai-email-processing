@@ -97,6 +97,13 @@ resource "azurerm_user_assigned_identity" "docproc_search_indexer" {
   resource_group_name = azurerm_resource_group.main.name
 }
 
+# Managed Identity for Submission Trigger service
+resource "azurerm_user_assigned_identity" "submission_trigger" {
+  name                = "submission-trigger-${random_string.suffix.result}"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+}
+
 # Allow Company APIs service to read/write blobs in the storage account
 resource "azurerm_role_assignment" "company_apis_storage_blob_contributor" {
   scope                = azapi_resource.main.id
@@ -277,4 +284,62 @@ resource "azurerm_role_assignment" "docproc_search_indexer_search_index_data_con
   scope                = azurerm_search_service.main.id
   role_definition_name = "Search Index Data Contributor"
   principal_id         = azurerm_user_assigned_identity.docproc_search_indexer.principal_id
+}
+
+# RBAC assignments for submission-trigger service
+
+# Allow Submission Trigger service to send messages to Service Bus
+resource "azurerm_role_assignment" "submission_trigger_service_bus_sender" {
+  scope                = azurerm_servicebus_namespace.main.id
+  role_definition_name = "Azure Service Bus Data Sender"
+  principal_id         = azurerm_user_assigned_identity.submission_trigger.principal_id
+}
+
+# Allow Submission Trigger service to receive messages from Service Bus
+resource "azurerm_role_assignment" "submission_trigger_service_bus_receiver" {
+  scope                = azurerm_servicebus_namespace.main.id
+  role_definition_name = "Azure Service Bus Data Receiver"
+  principal_id         = azurerm_user_assigned_identity.submission_trigger.principal_id
+}
+
+# Allow Submission Trigger service to read/write blobs in the storage account
+resource "azurerm_role_assignment" "submission_trigger_storage_blob_contributor" {
+  scope                = azapi_resource.main.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.submission_trigger.principal_id
+}
+
+# Allow Submission Trigger service to read/write tables in the storage account
+resource "azurerm_role_assignment" "submission_trigger_storage_table_contributor" {
+  scope                = azapi_resource.main.id
+  role_definition_name = "Storage Table Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.submission_trigger.principal_id
+}
+
+# Allow Submission Trigger service to use Document Intelligence service
+resource "azurerm_role_assignment" "submission_trigger_document_intelligence_user" {
+  scope                = azurerm_cognitive_account.document_intelligence.id
+  role_definition_name = "Cognitive Services User"
+  principal_id         = azurerm_user_assigned_identity.submission_trigger.principal_id
+}
+
+# Allow Submission Trigger service to use Azure OpenAI service
+resource "azurerm_role_assignment" "submission_trigger_openai_user" {
+  scope                = azurerm_cognitive_account.openai.id
+  role_definition_name = "Cognitive Services OpenAI User"
+  principal_id         = azurerm_user_assigned_identity.submission_trigger.principal_id
+}
+
+# Allow Submission Trigger service to read blob storage for data source
+resource "azurerm_role_assignment" "submission_trigger_storage_blob_reader" {
+  scope                = azapi_resource.main.id
+  role_definition_name = "Storage Blob Data Reader"
+  principal_id         = azurerm_user_assigned_identity.submission_trigger.principal_id
+}
+
+# Allow Submission Trigger service to read storage account for data source
+resource "azurerm_role_assignment" "submission_trigger_storage_account_reader" {
+  scope                = azapi_resource.main.id
+  role_definition_name = "Reader"
+  principal_id         = azurerm_user_assigned_identity.submission_trigger.principal_id
 }

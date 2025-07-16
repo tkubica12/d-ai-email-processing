@@ -62,6 +62,34 @@ azure-data-tables = "^12.0"
 - Use UUIDs for document IDs
 - Remove explicit `partition_key` parameter in async SDK
 
+**Async SDK partition key error**
+```
+ClientSession._request() got an unexpected keyword argument 'partition_key'
+```
+This occurs when explicitly passing partition_key to create/replace operations:
+```python
+# Wrong - causes the error above
+await container.create_item(body=data, partition_key=key)
+await container.replace_item(item=id, body=data, partition_key=key)
+
+# Correct - SDK handles partition key automatically for create/replace
+await container.create_item(body=data)
+await container.replace_item(item=id, body=data)
+```
+
+**Missing partition key error**
+```
+ContainerProxy.read_item() missing 1 required positional argument: 'partition_key'
+```
+This occurs when NOT passing partition_key to read operations:
+```python
+# Wrong - causes the error above
+await container.read_item(item=id)
+
+# Correct - read operations require explicit partition key
+await container.read_item(item=id, partition_key=key)
+```
+
 ### Change Feed Processing
 **No events despite data exists**
 ```python
@@ -131,8 +159,20 @@ datetime.now(timezone.utc)
 ### Serialization
 **datetime not JSON serializable**
 ```python
-# Use model_dump_json() instead of model_dump()
+# Use model_dump(mode='json') instead of model_dump()
+response = model.model_dump(mode='json')
+
+# Or for older Pydantic versions
 response = model.model_dump_json()
+```
+
+**Common in Cosmos DB operations**
+```python
+# Wrong - causes datetime serialization error
+await container.create_item(body=projection.model_dump())
+
+# Correct - properly serializes datetime objects
+await container.create_item(body=projection.model_dump(mode='json'))
 ```
 
 ## 6. Development Environment

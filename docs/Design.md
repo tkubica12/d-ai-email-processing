@@ -149,9 +149,9 @@ This approach uses event-driven architecture with event sourcing patterns to imp
    - Emits `SubmissionCreated` event with document URLs
    - Emits `DocumentUploadedEvent` for each document
 
-2. **submission-trigger** *(new)*  
+2. **submission-trigger** 
    - Listens to `SubmissionCreated`, `DocumentClassifiedEvent`, `DocumentIndexedEvent`, `DocumentDataExtractedEvent`.  
-   - Maintains an in-memory / Cosmos DB projection of per-document status.  
+   - Maintains an Cosmos DB projection of per-submission per-document status.  
    - When every document in the submission is processed by all three docproc services, emits `SubmissionPreparationCompletedEvent`.  
 
 3. **docproc-parser-foundry**
@@ -179,7 +179,7 @@ This approach uses event-driven architecture with event sourcing patterns to imp
    - Updates document record with extractedData
    - Emits `DocumentDataExtractedEvent`
 
-6. **submission-analyzer**
+7. **submission-analyzer**
    - Listens to Change Feed for `SubmissionPreparationCompletedEvent`
    - AI Foundry agent with advanced capabilities:
      - RAG search into Azure AI Search for user documents and previous conversations (with security trimming by userId)
@@ -190,7 +190,7 @@ This approach uses event-driven architecture with event sourcing patterns to imp
    - Updates submission record with evaluation results
    - Emits `SubmissionAnalysisCompleteEvent`
 
-7. **company-apis**
+8. **company-apis**
    - REST API service providing business-specific tools for submission-analyzer
    - Mock data generation for demonstration purposes
    - Exposes internal company APIs as HTTP endpoints

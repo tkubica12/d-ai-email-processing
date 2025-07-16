@@ -63,6 +63,15 @@ resource "azurerm_cosmosdb_sql_container" "submissions" {
   partition_key_paths = ["/userId"]
 }
 
+# Submission trigger container for tracking document processing status
+resource "azurerm_cosmosdb_sql_container" "submission_trigger" {
+  name                = "submissionstrigger"
+  resource_group_name = azurerm_resource_group.main.name
+  account_name        = azurerm_cosmosdb_account.main.name
+  database_name       = azurerm_cosmosdb_sql_database.main.name
+  partition_key_paths = ["/submissionId"]
+}
+
 # Generate UUIDs for role assignments to ensure uniqueness
 resource "random_uuid" "cosmosdb_role_assignment_guid_self" {}
 
@@ -156,5 +165,18 @@ resource "azurerm_cosmosdb_sql_role_assignment" "docproc_search_indexer" {
   account_name        = azurerm_cosmosdb_account.main.name
   role_definition_id  = azurerm_cosmosdb_sql_role_definition.data_contributor.id
   principal_id        = azurerm_user_assigned_identity.docproc_search_indexer.principal_id
+  scope               = azurerm_cosmosdb_account.main.id
+}
+
+# Generate UUID for submission-trigger role assignment
+resource "random_uuid" "cosmosdb_role_assignment_guid_submission_trigger" {}
+
+# Role assignment for submission-trigger service
+resource "azurerm_cosmosdb_sql_role_assignment" "submission_trigger" {
+  name                = random_uuid.cosmosdb_role_assignment_guid_submission_trigger.result
+  resource_group_name = azurerm_resource_group.main.name
+  account_name        = azurerm_cosmosdb_account.main.name
+  role_definition_id  = azurerm_cosmosdb_sql_role_definition.data_contributor.id
+  principal_id        = azurerm_user_assigned_identity.submission_trigger.principal_id
   scope               = azurerm_cosmosdb_account.main.id
 }

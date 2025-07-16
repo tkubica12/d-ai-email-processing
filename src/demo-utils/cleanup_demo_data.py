@@ -51,6 +51,7 @@ class DemoDataCleanup:
         self.cosmos_events_container = os.getenv('AZURE_COSMOS_DB_EVENTS_CONTAINER_NAME')
         self.cosmos_documents_container = os.getenv('AZURE_COSMOS_DB_DOCUMENTS_CONTAINER_NAME')
         self.cosmos_submissions_container = os.getenv('AZURE_COSMOS_DB_SUBMISSIONS_CONTAINER_NAME')
+        self.cosmos_submissions_trigger_container = os.getenv('AZURE_COSMOS_DB_SUBMISSIONS_TRIGGER_CONTAINER_NAME')
         
         # Storage configuration
         self.storage_account_name = os.getenv('AZURE_STORAGE_ACCOUNT_NAME')
@@ -128,7 +129,8 @@ class DemoDataCleanup:
         containers = [
             self.cosmos_events_container,
             self.cosmos_documents_container,
-            self.cosmos_submissions_container
+            self.cosmos_submissions_container,
+            self.cosmos_submissions_trigger_container
         ]
         
         for container_name in containers:

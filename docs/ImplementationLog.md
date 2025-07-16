@@ -226,3 +226,65 @@ Deploy infrastructure → Update `.env` → `az login` → `uv run python main.p
 - Direct access to original user message from blob storage for AI analysis
 - Maintains backward compatibility with existing processing pipeline and Service Bus message format
 - Email body content accessible without requiring changes to Service Bus message structure
+
+## Submission Trigger Service Implementation (July 16, 2025)
+
+### Architecture Decisions
+
+**Service Purpose**: The submission-trigger service acts as a coordinator that tracks document processing status across the three docproc services (classifier, indexer, data-extractor) and emits completion events when all documents in a submission are fully processed.
+
+**Data Flow**: 
+1. Listens to change feed for: SubmissionCreated, DocumentClassifiedEvent, DocumentIndexedEvent, DocumentDataExtractedEvent
+2. Maintains projection in `submissionstrigger` container tracking per-document processing status
+3. Emits SubmissionPreparationCompletedEvent when all documents completed all processing steps
+
+**Key Components**:
+- `SubmissionTriggerProcessor`: Main change feed processor with event filtering
+- `SubmissionTriggerProjection`: Pydantic model for status tracking document
+- Comprehensive event models for all monitored event types
+- Configuration management with environment variable loading
+
+### Infrastructure Changes
+
+**Cosmos DB**: Added `submissionstrigger` container with partition key `/submissionId` to store processing status projections.
+
+**RBAC**: Added user-assigned identity and role assignments for submission-trigger service in Terraform.
+
+**Container App**: Created container app definition for submission-trigger service deployment.
+
+### Technical Implementation
+
+**Event Filtering**: Service processes only events of interest (SubmissionCreated, DocumentClassifiedEvent, DocumentIndexedEvent, DocumentDataExtractedEvent) and ignores all other event types.
+
+**Status Tracking**: Each document URL is mapped to a status object with three boolean flags:
+- `classified`: Set to true when DocumentClassifiedEvent received
+- `indexed`: Set to true when DocumentIndexedEvent received  
+- `dataExtracted`: Set to true when DocumentDataExtractedEvent received
+
+**Completion Detection**: Service checks if all documents have all three flags set to true, then emits SubmissionPreparationCompletedEvent.
+
+**Error Handling**: Graceful handling of missing projections, duplicate events, and parsing errors with appropriate logging.
+
+### Configuration
+
+Environment variables support both local development and production deployment:
+- Cosmos DB connection settings
+- Container names for events, documents, submissions, and trigger containers
+- Optional Table Storage for continuation token persistence
+- Logging configuration
+
+### Dependencies
+
+Added Azure SDK dependencies:
+- `azure-cosmos>=4.0.0` for Cosmos DB operations
+- `azure-identity>=1.15.0` for Azure authentication
+- `azure-data-tables>=12.0.0` for continuation token storage
+- `pydantic>=2.0.0` for data validation
+- `python-dotenv>=1.0.0` for environment configuration
+
+### Next Steps
+
+1. Deploy infrastructure changes with Terraform
+2. Test event processing with sample data
+3. Validate completion event emission
+4. Integrate with submission-analyzer service
