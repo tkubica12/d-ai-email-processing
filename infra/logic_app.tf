@@ -78,6 +78,10 @@ resource "azapi_resource" "logic_app" {
             value = azurerm_user_assigned_identity.logic_app.id
           },
           {
+            name  = "AzureWebJobsStorage__blobServiceUri"
+            value = "https://${azurerm_storage_account.main.name}.blob.core.windows.net"
+          },
+          {
             name  = "APPINSIGHTS_INSTRUMENTATIONKEY"
             value = azurerm_application_insights.main.instrumentation_key
           },
@@ -88,6 +92,10 @@ resource "azapi_resource" "logic_app" {
           {
             name  = "WEBSITE_SKIP_CONTENTSHARE_VALIDATION"
             value = "1"
+          },
+          {
+            name  = "APP_KIND"
+            value = "workflowApp"
           }
         ]
         minimumElasticInstanceCount = 1
@@ -103,9 +111,9 @@ resource "azapi_resource" "logic_app" {
     ]
   }
 
-#   tags = {
-#     "hidden-link: /app-insights-resource-id" = azurerm_application_insights.main.id
-#   }
+  #   tags = {
+  #     "hidden-link: /app-insights-resource-id" = azurerm_application_insights.main.id
+  #   }
 }
 
 # # Disable basic publishing credentials for FTP
