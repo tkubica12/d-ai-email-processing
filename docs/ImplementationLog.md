@@ -10,6 +10,7 @@ Key architectural decisions, technical insights, and implementation progress for
 - **Azure OpenAI** - Enterprise embeddings and GPT-4.1 with Entra authentication
 - **Terraform** - Infrastructure as Code with RBAC
 - **Pydantic** - Type-safe data models throughout
+- **Azure Logic Apps Standard** - Email processing workflows
 
 **Development Workflow:**
 Deploy infrastructure → Update `.env` → `az login` → `uv run python main.py`
@@ -20,13 +21,15 @@ Deploy infrastructure → Update `.env` → `az login` → `uv run python main.p
 - Vector search with 3072-dimension embeddings (text-embedding-3-large)
 - Security trimming via userId filtering
 - Document chunking: 2000 chars with 200 char overlap
+- Logic Apps for email workflow orchestration
 
 **Processing Pipeline:**
-1. **Submission Intake** - Service Bus worker processing
-2. **Document Parser** - Azure Document Intelligence → Cosmos DB  
-3. **Document Classifier** - Azure OpenAI classification
-4. **Search Indexer** - Chunking + vector embeddings → Azure AI Search
-5. **Data Extractor** - Structured invoice data extraction
+1. **Logic App** - Email processing workflow orchestration
+2. **Submission Intake** - Service Bus worker processing
+3. **Document Parser** - Azure Document Intelligence → Cosmos DB  
+4. **Document Classifier** - Azure OpenAI classification
+5. **Search Indexer** - Chunking + vector embeddings → Azure AI Search
+6. **Data Extractor** - Structured invoice data extraction
 
 ## Major Architecture Evolution
 
@@ -47,6 +50,15 @@ Deploy infrastructure → Update `.env` → `az login` → `uv run python main.p
 - 3072-dimension vector support for Azure OpenAI embeddings
 - Index validation and auto-recreation for schema changes
 - Comprehensive metadata preservation (userId, submissionId, documentId)
+
+### Logic App Standard Implementation (July 2025)
+- **Azure Logic Apps Standard** deployed with managed identity authentication
+- **Service Plan**: Workflow Standard (WS1) with elastic scaling up to 20 instances
+- **Storage Integration**: Reuses main storage account for cost optimization
+- **Monitoring**: Connected to Application Insights and Log Analytics workspace
+- **Security**: Managed identity with RBAC permissions for Storage, Service Bus, OpenAI, and Document Intelligence
+- **Configuration**: Removes Azure Files dependency as recommended for managed identity compliance
+- **Containers**: Required azure-webjobs-hosts and azure-webjobs-secrets containers created in main storage
 
 **Key Technical Achievements:**
 - Vector field definitions with `SearchField(Collection(SearchFieldDataType.Single))`
@@ -286,5 +298,64 @@ Added Azure SDK dependencies:
 
 1. Deploy infrastructure changes with Terraform
 2. Test event processing with sample data
+
+## Logic App Standard Implementation (July 2025)
+
+### Overview
+Implemented Azure Logic Apps Standard for email processing workflow orchestration, replacing the need for custom email polling mechanisms. This provides a robust, scalable solution for processing incoming emails with attachments.
+
+### Architecture Decisions
+
+**Service Plan**: Used azapi provider for Logic Apps Standard with WorkflowStandard (WS1) SKU for elastic scaling capabilities.
+
+**Managed Identity**: Implemented user-assigned managed identity for secure authentication to Azure services without connection strings.
+
+**Storage Account**: Created dedicated storage account for Logic App runtime requirements with minimal required containers (azure-webjobs-hosts, azure-webjobs-secrets).
+
+**Azure Files Removal**: Removed dependency on Azure Files by excluding WEBSITE_CONTENTAZUREFILECONNECTIONSTRING and WEBSITE_CONTENTSHARE settings, enabling full managed identity authentication.
+
+### Security Implementation
+
+**RBAC Permissions**: Granted Logic App managed identity access to:
+- Storage accounts (blob, queue, table contributor)
+- Service Bus (sender/receiver)
+- Azure OpenAI (user)
+- Document Intelligence (user)
+
+**Connection String Elimination**: Removed all connection strings and implemented managed identity authentication for AzureWebJobsStorage using `AzureWebJobsStorage__managedIdentityResourceId`.
+
+**Basic Auth Disabled**: Disabled FTP and SCM basic publishing credentials for enhanced security.
+
+### Infrastructure Components
+
+**Logic App Storage Account**: `st{prefix}logic` with Standard_LRS SKU and required blob containers.
+
+**Service Plan**: `asp-{prefix}` with elastic scaling enabled and maximum 20 worker instances.
+
+**Logic App**: `logic-{prefix}` with proper Application Insights integration and monitoring.
+
+**Monitoring Integration**: Connected to existing Log Analytics workspace and Application Insights for comprehensive observability.
+
+### Technical Configuration
+
+**Runtime Stack**: Node.js 20 with Functions Extension Version ~4 for Logic Apps Standard.
+
+**App Settings**: Configured for managed identity authentication with WEBSITE_SKIP_CONTENTSHARE_VALIDATION=1 to bypass Azure Files validation.
+
+**Scaling**: Configured for elastic scaling with minimum 1 instance and pre-warmed instances for improved performance.
+
+### Known Limitations
+
+**Azure Files Dependency**: Temporary workaround implemented until managed identity support for Azure Files is available (expected September 2025).
+
+**Scaling Constraints**: Without Azure Files, scaling is limited to 20 instances. For higher scale requirements, consider Azure Service Environment (ASE) v3.
+
+### Next Steps
+
+1. Deploy Logic App infrastructure with Terraform
+2. Create email processing workflow definitions
+3. Configure email connector and processing logic
+4. Test end-to-end email processing pipeline
+5. Monitor performance and adjust scaling parameters
 3. Validate completion event emission
 4. Integrate with submission-analyzer service

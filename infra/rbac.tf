@@ -104,6 +104,13 @@ resource "azurerm_user_assigned_identity" "submission_trigger" {
   resource_group_name = azurerm_resource_group.main.name
 }
 
+# Managed Identity for Logic App
+resource "azurerm_user_assigned_identity" "logic_app" {
+  name                = "logic-app-${random_string.suffix.result}"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+}
+
 # Allow Company APIs service to read/write blobs in the storage account
 resource "azurerm_role_assignment" "company_apis_storage_blob_contributor" {
   scope                = azapi_resource.main.id
@@ -342,4 +349,52 @@ resource "azurerm_role_assignment" "submission_trigger_storage_account_reader" {
   scope                = azapi_resource.main.id
   role_definition_name = "Reader"
   principal_id         = azurerm_user_assigned_identity.submission_trigger.principal_id
+}
+
+# RBAC assignments for Logic App
+
+# Allow Logic App to access main storage account with managed identity
+resource "azurerm_role_assignment" "logic_app_storage_blob_contributor" {
+  scope                = azapi_resource.main.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.logic_app.principal_id
+}
+
+resource "azurerm_role_assignment" "logic_app_storage_queue_contributor" {
+  scope                = azapi_resource.main.id
+  role_definition_name = "Storage Queue Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.logic_app.principal_id
+}
+
+resource "azurerm_role_assignment" "logic_app_storage_table_contributor" {
+  scope                = azapi_resource.main.id
+  role_definition_name = "Storage Table Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.logic_app.principal_id
+}
+
+# Allow Logic App to send and receive Service Bus messages
+resource "azurerm_role_assignment" "logic_app_service_bus_sender" {
+  scope                = azurerm_servicebus_namespace.main.id
+  role_definition_name = "Azure Service Bus Data Sender"
+  principal_id         = azurerm_user_assigned_identity.logic_app.principal_id
+}
+
+resource "azurerm_role_assignment" "logic_app_service_bus_receiver" {
+  scope                = azurerm_servicebus_namespace.main.id
+  role_definition_name = "Azure Service Bus Data Receiver"
+  principal_id         = azurerm_user_assigned_identity.logic_app.principal_id
+}
+
+# Allow Logic App to use Azure OpenAI service
+resource "azurerm_role_assignment" "logic_app_openai_user" {
+  scope                = azurerm_cognitive_account.openai.id
+  role_definition_name = "Cognitive Services OpenAI User"
+  principal_id         = azurerm_user_assigned_identity.logic_app.principal_id
+}
+
+# Allow Logic App to use Document Intelligence service
+resource "azurerm_role_assignment" "logic_app_document_intelligence_user" {
+  scope                = azurerm_cognitive_account.document_intelligence.id
+  role_definition_name = "Cognitive Services User"
+  principal_id         = azurerm_user_assigned_identity.logic_app.principal_id
 }

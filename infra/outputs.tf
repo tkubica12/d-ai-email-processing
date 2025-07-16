@@ -119,3 +119,19 @@ output "client_web_url" {
   description = "The URL for the Client Web service"
   value       = "https://${azapi_resource.client_web.output.properties.configuration.ingress.fqdn}"
 }
+
+# Logic App outputs
+output "logic_app_name" {
+  description = "The name of the Logic App"
+  value       = azapi_resource.logic_app.name
+}
+
+output "logic_app_managed_identity_id" {
+  description = "The resource ID of the Logic App managed identity"
+  value       = azurerm_user_assigned_identity.logic_app.id
+}
+
+output "logic_app_managed_identity_principal_id" {
+  description = "The principal ID of the Logic App managed identity"
+  value       = azurerm_user_assigned_identity.logic_app.principal_id
+}
