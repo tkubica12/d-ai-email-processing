@@ -21,14 +21,16 @@ This system processes incoming emails containing submission requests using AI to
    - **Search Indexing**: Content is indexed in Azure AI Search with metadata
    - **Data Extraction**: LLM extracts structured information based on document type
    - **Aggregation**: System tracks completion of all processing steps per document
-5. **Submission Evaluation**: AI agent evaluates the complete submission to:
-   - Identify missing information
-   - Detect inconsistencies or errors
-   - Generate evaluation results
-6. **Operator Support**: AI-powered interface enables operators to:
-   - Chat about user submissions and documents
-   - Get recommended actions
-   - Generate email responses
+6. **Submission Preparation** *(new)*  
+   - `submission-trigger` projects document-level processing status.  
+   - Waits until **all** documents in a submission have received:
+     - `DocumentClassifiedEvent`
+     - `DocumentIndexedEvent`
+     - `DocumentDataExtractedEvent`
+   - Emits `SubmissionPreparationCompletedEvent`.
+7. **Submission Evaluation** *(renumbered, formerly 5/6)*  
+   - Triggered by `SubmissionPreparationCompletedEvent`.  
+   - `submission-analyzer` performs comprehensive AI analysis.  
 
 ## Solution Architectures
 
@@ -147,33 +149,38 @@ This approach uses event-driven architecture with event sourcing patterns to imp
    - Emits `SubmissionCreated` event with document URLs
    - Emits `DocumentUploadedEvent` for each document
 
-2. **docproc-parser-foundry**
+2. **submission-trigger** *(new)*  
+   - Listens to `SubmissionCreated`, `DocumentClassifiedEvent`, `DocumentIndexedEvent`, `DocumentDataExtractedEvent`.  
+   - Maintains an in-memory / Cosmos DB projection of per-document status.  
+   - When every document in the submission is processed by all three docproc services, emits `SubmissionPreparationCompletedEvent`.  
+
+3. **docproc-parser-foundry**
    - Listens to Change Feed for `DocumentUploadedEvent`
    - Processes documents using Azure Document Intelligence to convert to Markdown
    - Stores content in documents container
    - Emits `DocumentContentExtractedEvent`
 
-3. **docproc-classifier**
+4. **docproc-classifier**
    - Listens to Change Feed for `DocumentContentExtractedEvent`
    - Uses LLM to classify document type and generate summary
    - Updates document record with type and summary
    - Update submission record with document type
    - Emits `DocumentClassifiedEvent`
 
-4. **docproc-search-indexer**
+5. **docproc-search-indexer**
    - Listens to Change Feed for `DocumentContentExtractedEvent`
    - Ingests document content into Azure AI Search with metadata
    - Includes userId as filtering metadata for security trimming
    - Emits `DocumentIndexedEvent`
 
-5. **docproc-data-extractor**
+6. **docproc-data-extractor**
    - Listens to Change Feed for `DocumentContentExtractedEvent`
    - Uses LLM to extract structured information
    - Updates document record with extractedData
    - Emits `DocumentDataExtractedEvent`
 
 6. **submission-analyzer**
-   - Listens to Change Feed for `DocumentDataExtractedEvent` and `DocumentClassifiedEvent`
+   - Listens to Change Feed for `SubmissionPreparationCompletedEvent`
    - AI Foundry agent with advanced capabilities:
      - RAG search into Azure AI Search for user documents and previous conversations (with security trimming by userId)
      - Web search for investigating entities (e.g., invoice vendors, companies)
@@ -374,26 +381,42 @@ This approach uses event-driven architecture with event sourcing patterns to imp
 }
 ```
 
+**SubmissionPreparationCompletedEvent**
+```json
+{
+  "id": "uuid",
+  "eventType": "SubmissionPreparationCompletedEvent",
+  "submissionId": "submission-guid",
+  "userId": "user@example.com",
+  "timestamp": "2025-07-07T10:10:00Z",
+  "data": {
+    "documentsProcessed": 3
+  }
+}
+```
+
 #### Data Flow
 
-```
-Service Bus → submission-intake → SubmissionCreated Event
-                                 ↓
-                              DocumentUploadedEvent (per document)
-                                 ↓
-                           docproc-parser-foundry
-                                 ↓
-                         DocumentContentExtractedEvent
-                                 ↓
-              ┌──────────────────┼──────────────────┐
-              ↓                  ↓                  ↓
-    docproc-classifier  docproc-search-indexer  docproc-data-extractor
-              ↓                  ↓                  ↓
-  DocumentClassifiedEvent  DocumentIndexedEvent  DocumentDataExtractedEvent
-              ↓                                   ↓
-              └─────────────→ submission-analyzer ←┘
-                                 ↓
-                      SubmissionAnalysisCompleteEvent
+```mermaid
+graph TD
+    A[Service Bus Topic] --> B[submission-intake]
+    B -->|SubmissionCreated| T[submission-trigger]
+    B --> E[Emit DocumentUploadedEvent per document]
+
+    E --> F[docproc-parser-foundry]
+    F --> J[DocumentContentExtractedEvent]
+
+    J --> K[docproc-classifier]
+    J --> L[docproc-search-indexer]
+    J --> M[docproc-data-extractor]
+
+    K -->|DocumentClassifiedEvent| T
+    L -->|DocumentIndexedEvent| T
+    M -->|DocumentDataExtractedEvent| T
+
+    T -->|SubmissionPreparationCompletedEvent| W[submission-analyzer]
+    W --> GG[Update submission with evaluation results]
+    GG --> HH[Emit SubmissionAnalysisCompleteEvent]
 ```
 
 #### Process Flow Diagram
