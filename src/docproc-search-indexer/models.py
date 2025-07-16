@@ -239,8 +239,8 @@ class DocumentRecord(BaseModel):
         example="AI-generated summary of document content..."
     )
     
-    extractedData: Dict[str, Any] = Field(
-        default_factory=dict,
+    extractedData: Optional[Dict[str, Any]] = Field(
+        None,
         description="Structured data extracted from document (populated by data extractor service)",
         example={
             "invoiceNumber": "INV-2025-001",
