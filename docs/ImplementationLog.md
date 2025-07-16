@@ -2,360 +2,95 @@
 
 Key architectural decisions, technical insights, and implementation progress for the AI Email Processing System.
 
-## Architecture Overview
+## System Architecture
 
 **Technology Stack:**
-- **FastHTML** - Rapid Python web UI development
+- **FastHTML** - Python web UI framework
 - **uv** - Modern Python dependency management  
-- **Azure OpenAI** - Enterprise embeddings and GPT-4.1 with Entra authentication
+- **Azure OpenAI** - Enterprise GPT-4.1 with Entra authentication
 - **Terraform** - Infrastructure as Code with RBAC
-- **Pydantic** - Type-safe data models throughout
+- **Pydantic** - Type-safe data models
 - **Azure Logic Apps Standard** - Email processing workflows
 
 **Development Workflow:**
 Deploy infrastructure → Update `.env` → `az login` → `uv run python main.py`
 
-**Event-Driven Architecture:**
-- Azure Service Bus for message queuing
-- Cosmos DB Change Feed for event processing
-- Vector search with 3072-dimension embeddings (text-embedding-3-large)
-- Security trimming via userId filtering
-- Document chunking: 2000 chars with 200 char overlap
-- Logic Apps for email workflow orchestration
-
-**Processing Pipeline:**
+**Event-Driven Processing Pipeline:**
 1. **Logic App** - Email processing workflow orchestration
 2. **Submission Intake** - Service Bus worker processing
 3. **Document Parser** - Azure Document Intelligence → Cosmos DB  
 4. **Document Classifier** - Azure OpenAI classification
 5. **Search Indexer** - Chunking + vector embeddings → Azure AI Search
 6. **Data Extractor** - Structured invoice data extraction
+7. **Submission Trigger** - Completion event coordination
 
-## Major Architecture Evolution
+**Core Infrastructure:**
+- Azure Service Bus for message queuing
+- Cosmos DB Change Feed for event processing  
+- Vector search with 3072-dimension embeddings (text-embedding-3-large)
+- Security trimming via userId filtering
+- Document chunking: 2000 chars with 200 char overlap
 
-### System Simplification (July 2025)
-- **Removed** docproc-aggregator service for complexity reduction
-- **Enhanced** submission-analyzer with AI Foundry agent capabilities
-- **Added** company-apis service for business data integration
-- **Simplified** event flow with direct document processing
+## Major Architectural Evolution
 
-### AI Agent Integration
-- RAG with Azure AI Search + security trimming
-- Web search for entity verification
-- Company APIs integration for financial data
-- Multi-faceted submission analysis capabilities
+### Infrastructure & Security (July 2025)
+- **Modularized RBAC**: Split rbac.tf into service-specific files (identities, storage, messaging, ai, search)
+- **Logic Apps Standard**: Deployed with managed identity authentication and elastic scaling
+- **Managed Identities**: Eliminated connection strings for enhanced security
+- **Container Apps**: Background services with CPU-based scaling and OTEL monitoring
 
-### Vector Search Implementation
-- Azure AI Search with HNSW algorithm for semantic search
-- 3072-dimension vector support for Azure OpenAI embeddings
-- Index validation and auto-recreation for schema changes
-- Comprehensive metadata preservation (userId, submissionId, documentId)
+### Processing Pipeline Enhancements (July 2025)
+- **Submission Trigger Service**: Coordinates document processing completion across services
+- **Document Classification**: Dual updates to maintain consistency between document and submission records
+- **Schema Simplification**: Removed redundant `processed` field, added `userMessage` field
+- **Event-Driven Coordination**: Tracks processing status via SubmissionTriggerProcessor
 
-### Logic App Standard Implementation (July 2025)
-- **Azure Logic Apps Standard** deployed with managed identity authentication
-- **Service Plan**: Workflow Standard (WS1) with elastic scaling up to 20 instances
-- **Storage Integration**: Reuses main storage account for cost optimization
-- **Monitoring**: Connected to Application Insights and Log Analytics workspace
-- **Security**: Managed identity with RBAC permissions for Storage, Service Bus, OpenAI, and Document Intelligence
-- **Configuration**: Removes Azure Files dependency as recommended for managed identity compliance
-- **Containers**: Required azure-webjobs-hosts and azure-webjobs-secrets containers created in main storage
+### AI & Search Integration
+- **RAG Implementation**: Azure AI Search with security trimming and vector embeddings
+- **Company APIs**: FastAPI service with mock financial data and bearer token auth
+- **Policies Search**: Comprehensive policy document search with HNSW algorithm
+- **AI Foundry Agent**: Multi-faceted submission analysis with web search and company data integration
 
-**Key Technical Achievements:**
-- Vector field definitions with `SearchField(Collection(SearchFieldDataType.Single))`
-- Azure OpenAI migration with Entra authentication
-- Security trimming for multi-tenant access
-- Policies search with blob storage integration
+## Technical Implementation Insights
 
-## Azure Services Integration
+### Azure OpenAI Integration
+- **Authentication**: Entra ID for enterprise compliance
+- **Structured Outputs**: Flat models preferred over nested for better results
+- **API Version**: Stable `2024-06-01` version for production
+- **Template Engine**: Jinja2 for dynamic prompt generation
 
-### Company APIs Service
-- FastAPI with realistic mock data generation
-- Seeded random generation for consistent user data
-- Cross-platform timezone compatibility (`datetime.timezone.utc`)
-- Bearer token authentication
+### Event Processing Patterns
+- **Change Feed**: Direct iteration with continuation token management
+- **Event Structure**: Standardized with `documentId` and `submissionId` partition keys
+- **Serialization**: `model_dump_json()` for datetime handling
+- **Scaling**: Limited replicas (1-3) for stateful processing services
 
-**API Endpoints:**
-- `/users/{userId}/products` - Subscriptions and services
-- `/users/{userId}/financial-score` - 5 financial health dimensions  
-- `/users/{userId}/income` - Configurable granularity aggregation
+### Data Models & Storage
+- **Cosmos DB**: Partition key strategy by userId for submissions, submissionId for triggers
+- **Schema Evolution**: Migrated from dictionaries to Pydantic models with timestamps
+- **Status Tracking**: Event-driven pipeline replaces static boolean flags
+- **Cross-Platform**: `datetime.timezone.utc` for Windows compatibility
 
-### AI Search Tools Integration
-- Azure AI Search tool integration for AI Foundry agent
-- Entra ID authentication for secure access
-- Document search capabilities within agent tools
-- Semantic and keyword search support
+### Azure Search Configuration
+- **Vector Fields**: `SearchField(Collection(SearchFieldDataType.Single))` for embeddings
+- **HNSW Algorithm**: Cosine similarity for semantic search
+- **Security**: Trimming via userId filtering for multi-tenant access
+- **Implementation**: Python scripts preferred over Terraform for complex configurations
 
-**Configuration:**
-- Environment variables: `AZURE_SEARCH_SERVICE_NAME`, `AZURE_SEARCH_INDEX_NAME`, `AZURE_SEARCH_CONNECTION_ID`
-- Authentication via DefaultAzureCredential
-- Uses `AzureAISearchTool` from Azure AI Projects SDK
+## Recent Critical Fixes & Updates
 
-### Policies Search Setup
-- Comprehensive Azure AI Search setup for policy documents
-- Blob storage integration with automatic document upload
-- Skillset pipeline with text splitting and embedding generation
-- Idempotent operations for safe re-execution
+### Document Classification Enhancement (July 15, 2025)
+- **Fixed** partition key usage in submissions container (userId, not submissionId)
+- **Enhanced** docproc-classifier to maintain consistency between document and submission records
+- **Added** dual update capability for both containers with proper partition key handling
+- **Benefit**: Enables faster submission queries without container joins
 
-**Implementation Features:**
-- Index fields: id, title, content, filename, metadata, content_vector
-- HNSW algorithm with cosine similarity
-- Hourly indexer scheduling
-- Python script approach for complex AI Search configuration
-
-## Critical Technical Insights
-
-### Event System Architecture
-- Standardized event structure with `documentId` and `submissionId` partition keys
-- Use `model_dump_json()` for datetime serialization
-- Explicit Azure SDK dependencies in `pyproject.toml`
-- Service Bus renamed `email-events` → `new-submissions` for clarity
-
-### Azure OpenAI Integration Patterns
-- Flatten complex nested models for structured outputs
-- Use stable API versions (`2024-06-01`)
-- Enterprise compliance via Azure OpenAI vs OpenAI API
-- Jinja2 templates for dynamic prompt generation
-
-### Change Feed Processing Best Practices
-- Use `start_time="Beginning"` when no continuation token exists
-- Direct iteration: `async for event_data in feed_iterator`
-- Proper continuation token management after processing
-- Limited replicas (1-3) for stateful processing services
-
-### Cross-Platform Compatibility
-- `datetime.timezone.utc` instead of `ZoneInfo("UTC")` for Windows compatibility
-- Include `tzdata` package for timezone support
-- Test enum values in mock data dictionaries
-
-### Data Model Evolution
-- Migrated dictionaries → Pydantic models with `submittedAt` timestamps
-- Flat models preferred for Azure OpenAI structured outputs
-- Standardized event patterns across all services
-
-### Azure Search Implementation
-- Vector field definitions with `SearchField(Collection(SearchFieldDataType.Single))`
-- HNSW algorithm configuration for semantic search
-- Semantic search requires both service-level enablement and proper index configuration
-- Python scripts preferred over Terraform for complex AI Search configurations
+### Schema Simplification (July 16, 2025)
+- **Removed** redundant `processed` field from documents array
+- **Added** `userMessage` field to submission root level for email body content
+- **Updated** submission-intake service to read user message from `body.txt` in blob storage
+- **Impact**: Event-driven processing state replaces static boolean flags
 
 ---
 
 **This log focuses on architectural decisions and critical technical insights. For detailed implementation, see source code and service-specific documentation.**
-
-## Container App Deployment Strategy
-
-### Infrastructure Architecture
-- **Background Services**: No ingress, minimum 1 replica for continuous processing
-- **Web Services**: Port 8000 with HTTPS ingress
-- **Scaling**: CPU-based scaling at 70% threshold (max 3-5 replicas)
-- **Authentication**: User-assigned managed identities with least-privilege RBAC
-- **Monitoring**: Application Insights with OTEL integration
-
-### Deployed Services
-- **client-web** - FastHTML web application (port 8000)
-- **submission-intake** - Service Bus message processing
-- **docproc-parser-foundry** - Document Intelligence processing
-- **docproc-classifier** - Document classification using Azure OpenAI GPT-4.1
-- **docproc-data-extractor** - Structured data extraction using Azure OpenAI
-- **docproc-search-indexer** - AI Search indexing with vector embeddings
-
-### Key Implementation Decisions
-- **Naming Strategy**: Simplified to `servicename-{random_string}` for cleaner Azure portal experience
-- **Docker Configuration**: Python 3.12 slim base images with uv package manager
-- **CI/CD**: GitHub Actions workflows for each service with automated Docker builds
-- **Security**: Managed identities with specific RBAC assignments per service
-
-**Change Feed Processing Pattern:**
-- Stateful processing with continuation token persistence in Table Storage
-- Limited replicas (1-3) for services processing change feeds
-- Retry logic with exponential backoff for resilient processing
-
-**Environment Variables Pattern:**
-- `AZURE_CLIENT_ID` for managed identity authentication
-- Service-specific Azure resource endpoints
-- Application Insights connection strings
-- Cosmos DB database and container names
-
-## Demo and Testing Tools
-
-### Demo Data Cleanup Utility (July 2025)
-- **Purpose**: Clean up demo data from Azure resources for testing and demos
-- **Features**:
-  - Deletes all records from Cosmos DB containers (events, documents, submissions)
-  - Deletes all storage containers in GUID format (preserves policies-docs)
-  - Automatic partition key detection for Cosmos DB containers
-  - Robust error handling with fallback strategies
-- **Location**: `src/demo-utils/cleanup_demo_data.py`
-- **Usage**: `python cleanup_demo_data.py` after `az login`
-
-## Recent Updates
-
-### Document Classifier Enhancement (July 15, 2025)
-- **Enhanced** docproc-classifier to update submission records with document types
-- **Added** submissions container configuration to support dual updates
-- **Implemented** submission record models for type-safe operations
-- **Modified** classification workflow to update both document and submission records
-- **Fixed** partition key usage for submissions container (userId, not submissionId)
-- **Architecture**: Document classification now maintains consistency between documents and submissions containers
-
-**Technical Implementation:**
-- Added `update_submission_document_type()` method to DocumentClassifier with correct partition key
-- Extended CosmosDBConfig with submissions_container_name
-- Added SubmissionRecord and SubmissionDocument Pydantic models
-- Updated .env files with AZURE_COSMOS_DB_SUBMISSIONS_CONTAINER_NAME
-- Updated Terraform configuration with submissions container environment variable
-- Modified classify_and_update_document() to perform dual updates using correct partition key
-
-**Benefits:**
-- Ensures data consistency between document and submission records
-- Enables faster submission queries without document container joins
-- Maintains single source of truth for document classification results
-- Supports submission-level analytics and reporting
-
-**Bug Fix:**
-- Corrected partition key usage in submissions container from submissionId to userId
-- Updated Design.md to reflect actual implementation
-
-## Schema Updates (July 16, 2025)
-
-### Submission Schema Simplification
-- **Removed** `processed` field from documents array in submissions container
-- **Added** `userMessage` field to submissions container root level for email body content
-- **Updated** submission-intake service to read user message from `body.txt` file in blob storage
-- **Updated** docproc-classifier service models to match new schema
-
-**Technical Details:**
-- Modified `DocumentInfo` model to remove boolean `processed` field
-- Added `userMessage` field to `SubmissionDocument` model  
-- Updated `SubmissionRecord` model in docproc-classifier to include `userMessage`
-- Added Azure Storage client to submission-intake service to read `body.txt` from blob storage
-- User message is read from `{submissionId}/body.txt` in blob storage during submission processing
-- Processing state now tracked through event-driven pipeline rather than static field
-
-**Impact:**
-- Simplified data model removes redundant state tracking
-- Better separation of concerns between processing events and submission data
-- Direct access to original user message from blob storage for AI analysis
-- Maintains backward compatibility with existing processing pipeline and Service Bus message format
-- Email body content accessible without requiring changes to Service Bus message structure
-
-## Submission Trigger Service Implementation (July 16, 2025)
-
-### Architecture Decisions
-
-**Service Purpose**: The submission-trigger service acts as a coordinator that tracks document processing status across the three docproc services (classifier, indexer, data-extractor) and emits completion events when all documents in a submission are fully processed.
-
-**Data Flow**: 
-1. Listens to change feed for: SubmissionCreated, DocumentClassifiedEvent, DocumentIndexedEvent, DocumentDataExtractedEvent
-2. Maintains projection in `submissionstrigger` container tracking per-document processing status
-3. Emits SubmissionPreparationCompletedEvent when all documents completed all processing steps
-
-**Key Components**:
-- `SubmissionTriggerProcessor`: Main change feed processor with event filtering
-- `SubmissionTriggerProjection`: Pydantic model for status tracking document
-- Comprehensive event models for all monitored event types
-- Configuration management with environment variable loading
-
-### Infrastructure Changes
-
-**Cosmos DB**: Added `submissionstrigger` container with partition key `/submissionId` to store processing status projections.
-
-**RBAC**: Added user-assigned identity and role assignments for submission-trigger service in Terraform.
-
-**Container App**: Created container app definition for submission-trigger service deployment.
-
-### Technical Implementation
-
-**Event Filtering**: Service processes only events of interest (SubmissionCreated, DocumentClassifiedEvent, DocumentIndexedEvent, DocumentDataExtractedEvent) and ignores all other event types.
-
-**Status Tracking**: Each document URL is mapped to a status object with three boolean flags:
-- `classified`: Set to true when DocumentClassifiedEvent received
-- `indexed`: Set to true when DocumentIndexedEvent received  
-- `dataExtracted`: Set to true when DocumentDataExtractedEvent received
-
-**Completion Detection**: Service checks if all documents have all three flags set to true, then emits SubmissionPreparationCompletedEvent.
-
-**Error Handling**: Graceful handling of missing projections, duplicate events, and parsing errors with appropriate logging.
-
-### Configuration
-
-Environment variables support both local development and production deployment:
-- Cosmos DB connection settings
-- Container names for events, documents, submissions, and trigger containers
-- Optional Table Storage for continuation token persistence
-- Logging configuration
-
-### Dependencies
-
-Added Azure SDK dependencies:
-- `azure-cosmos>=4.0.0` for Cosmos DB operations
-- `azure-identity>=1.15.0` for Azure authentication
-- `azure-data-tables>=12.0.0` for continuation token storage
-- `pydantic>=2.0.0` for data validation
-- `python-dotenv>=1.0.0` for environment configuration
-
-### Next Steps
-
-1. Deploy infrastructure changes with Terraform
-2. Test event processing with sample data
-
-## Logic App Standard Implementation (July 2025)
-
-### Overview
-Implemented Azure Logic Apps Standard for email processing workflow orchestration, replacing the need for custom email polling mechanisms. This provides a robust, scalable solution for processing incoming emails with attachments.
-
-### Architecture Decisions
-
-**Service Plan**: Used azapi provider for Logic Apps Standard with WorkflowStandard (WS1) SKU for elastic scaling capabilities.
-
-**Managed Identity**: Implemented user-assigned managed identity for secure authentication to Azure services without connection strings.
-
-**Storage Account**: Created dedicated storage account for Logic App runtime requirements with minimal required containers (azure-webjobs-hosts, azure-webjobs-secrets).
-
-**Azure Files Removal**: Removed dependency on Azure Files by excluding WEBSITE_CONTENTAZUREFILECONNECTIONSTRING and WEBSITE_CONTENTSHARE settings, enabling full managed identity authentication.
-
-### Security Implementation
-
-**RBAC Permissions**: Granted Logic App managed identity access to:
-- Storage accounts (blob, queue, table contributor)
-- Service Bus (sender/receiver)
-- Azure OpenAI (user)
-- Document Intelligence (user)
-
-**Connection String Elimination**: Removed all connection strings and implemented managed identity authentication for AzureWebJobsStorage using `AzureWebJobsStorage__managedIdentityResourceId`.
-
-**Basic Auth Disabled**: Disabled FTP and SCM basic publishing credentials for enhanced security.
-
-### Infrastructure Components
-
-**Logic App Storage Account**: `st{prefix}logic` with Standard_LRS SKU and required blob containers.
-
-**Service Plan**: `asp-{prefix}` with elastic scaling enabled and maximum 20 worker instances.
-
-**Logic App**: `logic-{prefix}` with proper Application Insights integration and monitoring.
-
-**Monitoring Integration**: Connected to existing Log Analytics workspace and Application Insights for comprehensive observability.
-
-### Technical Configuration
-
-**Runtime Stack**: Node.js 20 with Functions Extension Version ~4 for Logic Apps Standard.
-
-**App Settings**: Configured for managed identity authentication with WEBSITE_SKIP_CONTENTSHARE_VALIDATION=1 to bypass Azure Files validation.
-
-**Scaling**: Configured for elastic scaling with minimum 1 instance and pre-warmed instances for improved performance.
-
-### Known Limitations
-
-**Azure Files Dependency**: Temporary workaround implemented until managed identity support for Azure Files is available (expected September 2025).
-
-**Scaling Constraints**: Without Azure Files, scaling is limited to 20 instances. For higher scale requirements, consider Azure Service Environment (ASE) v3.
-
-### Next Steps
-
-1. Deploy Logic App infrastructure with Terraform
-2. Create email processing workflow definitions
-3. Configure email connector and processing logic
-4. Test end-to-end email processing pipeline
-5. Monitor performance and adjust scaling parameters
-3. Validate completion event emission
-4. Integrate with submission-analyzer service
