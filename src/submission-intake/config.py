@@ -98,12 +98,24 @@ class LoggingConfig(BaseModel):
         return v.upper()
 
 
+class AzureStorageConfig(BaseModel):
+    """Configuration for Azure Storage connection."""
+    
+    account_name: str = Field(
+        ...,
+        description="Azure Storage account name",
+        example="stemaildevvwyh"
+    )
+
+
 class AppConfig(BaseModel):
     """Main application configuration."""
     
     service_bus: ServiceBusConfig
     cosmos_db: CosmosDBConfig
+    azure_storage: AzureStorageConfig
     logging: LoggingConfig
+    azure_storage: AzureStorageConfig
     
     @classmethod
     def from_env(cls) -> 'AppConfig':
@@ -146,6 +158,15 @@ class AppConfig(BaseModel):
                 "and AZURE_COSMOS_DB_DOCUMENTS_CONTAINER_NAME environment variables."
             )
         
+        # Extract Azure Storage configuration
+        storage_account_name = os.getenv('AZURE_STORAGE_ACCOUNT_NAME')
+        
+        if not storage_account_name:
+            raise ValueError(
+                "Missing required Azure Storage configuration. "
+                "Check AZURE_STORAGE_ACCOUNT_NAME environment variable."
+            )
+        
         # Extract logging configuration
         log_level = os.getenv('LOG_LEVEL', 'INFO')
         
@@ -164,6 +185,9 @@ class AppConfig(BaseModel):
             ),
             logging=LoggingConfig(
                 level=log_level
+            ),
+            azure_storage=AzureStorageConfig(
+                account_name=storage_account_name
             )
         )
 

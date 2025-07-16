@@ -120,15 +120,14 @@ This approach uses event-driven architecture with event sourcing patterns to imp
     "submissionId": "submission-guid", 
     "userId": "user@example.com",
     "submittedAt": "2025-07-07T10:00:00Z",
+    "userMessage": "Please review the attached invoices and contract documents for approval. Let me know if you need any additional information.",
     "documents": [
       {
         "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
-        "processed": true,
         "type": "invoice"
       },
       {
         "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document2.docx",
-        "processed": true,
         "type": "contract"
       }
     ],

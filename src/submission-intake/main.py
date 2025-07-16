@@ -108,7 +108,7 @@ async def listen_for_messages(config: AppConfig) -> NoReturn:
                f"subscription '{config.service_bus.subscription_name}' on '{config.service_bus.fqdn}'")
     
     # Initialize Cosmos DB storage
-    storage = CosmosDBStorage(config.cosmos_db)
+    storage = CosmosDBStorage(config.cosmos_db, config.azure_storage)
     await storage.initialize()
     
     try:

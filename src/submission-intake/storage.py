@@ -9,13 +9,16 @@ import logging
 import uuid
 from datetime import datetime
 from typing import Optional, List, TypeVar
+from urllib.parse import urlparse
 
 from azure.cosmos.aio import CosmosClient, DatabaseProxy, ContainerProxy
 from azure.cosmos.exceptions import CosmosResourceNotFoundError, CosmosHttpResponseError
 from azure.identity.aio import DefaultAzureCredential
+from azure.storage.blob.aio import BlobServiceClient
+from azure.core.exceptions import ResourceNotFoundError as BlobResourceNotFoundError
 from pydantic import BaseModel
 
-from config import CosmosDBConfig
+from config import CosmosDBConfig, AzureStorageConfig
 from models import (
     SubmissionDocument, 
     DocumentInfo, 
@@ -34,62 +37,76 @@ logger = logging.getLogger(__name__)
 
 class CosmosDBStorage:
     """
-    Async storage operations for Cosmos DB.
+    Async storage operations for Cosmos DB and Azure Storage.
     
     This class provides methods to store and retrieve submission documents
-    from Azure Cosmos DB using the async SDK.
+    from Azure Cosmos DB and read user messages from Azure Storage.
     """
     
-    def __init__(self, config: CosmosDBConfig):
+    def __init__(self, cosmos_config: CosmosDBConfig, storage_config: AzureStorageConfig):
         """
-        Initialize the Cosmos DB storage client.
+        Initialize the Cosmos DB and Azure Storage clients.
         
         Args:
-            config: Cosmos DB configuration settings
+            cosmos_config: Cosmos DB configuration settings
+            storage_config: Azure Storage configuration settings
         """
-        self.config = config
+        self.cosmos_config = cosmos_config
+        self.storage_config = storage_config
         self._client: Optional[CosmosClient] = None
         self._database: Optional[DatabaseProxy] = None
         self._submissions_container: Optional[ContainerProxy] = None
         self._events_container: Optional[ContainerProxy] = None
         self._documents_container: Optional[ContainerProxy] = None
+        self._blob_service_client: Optional[BlobServiceClient] = None
         self._credential = DefaultAzureCredential()
         
     async def initialize(self) -> None:
         """
-        Initialize the Cosmos DB client and containers.
+        Initialize the Cosmos DB and Azure Storage clients.
         
         This method should be called once before using the storage operations.
-        It establishes the connection to Cosmos DB and gets references to
+        It establishes the connection to Cosmos DB and Azure Storage and gets references to
         the required containers.
         
         Raises:
             CosmosHttpResponseError: If connection to Cosmos DB fails
         """
         try:
+            # Initialize Cosmos DB client
             self._client = CosmosClient(
-                url=self.config.endpoint,
+                url=self.cosmos_config.endpoint,
                 credential=self._credential
             )
             
             self._database = self._client.get_database_client(
-                database=self.config.database_name
+                database=self.cosmos_config.database_name
             )
             
             self._submissions_container = self._database.get_container_client(
-                container=self.config.submissions_container_name
+                container=self.cosmos_config.submissions_container_name
             )
             
             self._events_container = self._database.get_container_client(
-                container=self.config.events_container_name
+                container=self.cosmos_config.events_container_name
             )
             
             self._documents_container = self._database.get_container_client(
-                container=self.config.documents_container_name
+                container=self.cosmos_config.documents_container_name
+            )
+            
+            # Initialize Azure Storage client
+            storage_account_url = f"https://{self.storage_config.account_name}.blob.core.windows.net"
+            self._blob_service_client = BlobServiceClient(
+                account_url=storage_account_url,
+                credential=self._credential
             )
             
             logger.info(
-                f"Initialized Cosmos DB client for database '{self.config.database_name}'"
+                f"Initialized Cosmos DB client for database '{self.cosmos_config.database_name}'"
+            )
+            logger.info(
+                f"Initialized Azure Storage client for account '{self.storage_config.account_name}'"
             )
             
         except Exception as e:
@@ -101,7 +118,8 @@ class CosmosDBStorage:
         Store a new submission document in Cosmos DB.
         
         This method creates a new submission document based on the Service Bus
-        message and stores it in the submissions container.
+        message and stores it in the submissions container. It reads the user message
+        from the body.txt file in the blob storage container.
         
         Args:
             submission_message: The submission message from Service Bus
@@ -115,11 +133,13 @@ class CosmosDBStorage:
         if not self._submissions_container:
             raise RuntimeError("Storage not initialized. Call initialize() first.")
         
+        # Read user message from blob storage
+        user_message = await self._read_user_message_from_blob(submission_message.submissionId)
+        
         # Create document info list from URLs
         documents = [
             DocumentInfo(
                 documentUrl=url,
-                processed=None,
                 type=None
             )
             for url in submission_message.documentUrls
@@ -131,6 +151,7 @@ class CosmosDBStorage:
             submissionId=submission_message.submissionId,
             userId=submission_message.userId,
             submittedAt=submission_message.submittedAt,
+            userMessage=user_message,
             documents=documents,
             evaluationResults=None
         )
@@ -431,11 +452,55 @@ class CosmosDBStorage:
     
     async def close(self) -> None:
         """
-        Close the Cosmos DB client connection.
+        Close the Cosmos DB and Azure Storage client connections.
         
         This method should be called when shutting down the application
-        to properly close the connection.
+        to properly close the connections.
         """
         if self._client:
             await self._client.close()
             logger.info("Closed Cosmos DB client connection")
+        
+        if self._blob_service_client:
+            await self._blob_service_client.close()
+            logger.info("Closed Azure Storage client connection")
+    
+    async def _read_user_message_from_blob(self, submission_id: str) -> str:
+        """
+        Read the user message from the body.txt file in the submission's blob container.
+        
+        Args:
+            submission_id: The submission ID which is also the container name
+            
+        Returns:
+            str: The user message content from body.txt
+            
+        Raises:
+            Exception: If the body.txt file cannot be read
+        """
+        if not self._blob_service_client:
+            raise RuntimeError("Storage not initialized. Call initialize() first.")
+        
+        try:
+            # Get the blob client for body.txt in the submission container
+            blob_client = self._blob_service_client.get_blob_client(
+                container=submission_id,
+                blob="body.txt"
+            )
+            
+            # Download the blob content
+            blob_data = await blob_client.download_blob()
+            user_message = await blob_data.readall()
+            
+            # Decode the content to string
+            user_message_text = user_message.decode('utf-8')
+            
+            logger.info(f"Successfully read user message from blob: {submission_id}/body.txt")
+            return user_message_text
+            
+        except BlobResourceNotFoundError:
+            logger.warning(f"body.txt not found in container {submission_id}, using empty message")
+            return ""
+        except Exception as e:
+            logger.error(f"Failed to read user message from blob {submission_id}/body.txt: {e}")
+            raise

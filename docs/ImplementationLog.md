@@ -203,3 +203,26 @@ Deploy infrastructure → Update `.env` → `az login` → `uv run python main.p
 **Bug Fix:**
 - Corrected partition key usage in submissions container from submissionId to userId
 - Updated Design.md to reflect actual implementation
+
+## Schema Updates (July 16, 2025)
+
+### Submission Schema Simplification
+- **Removed** `processed` field from documents array in submissions container
+- **Added** `userMessage` field to submissions container root level for email body content
+- **Updated** submission-intake service to read user message from `body.txt` file in blob storage
+- **Updated** docproc-classifier service models to match new schema
+
+**Technical Details:**
+- Modified `DocumentInfo` model to remove boolean `processed` field
+- Added `userMessage` field to `SubmissionDocument` model  
+- Updated `SubmissionRecord` model in docproc-classifier to include `userMessage`
+- Added Azure Storage client to submission-intake service to read `body.txt` from blob storage
+- User message is read from `{submissionId}/body.txt` in blob storage during submission processing
+- Processing state now tracked through event-driven pipeline rather than static field
+
+**Impact:**
+- Simplified data model removes redundant state tracking
+- Better separation of concerns between processing events and submission data
+- Direct access to original user message from blob storage for AI analysis
+- Maintains backward compatibility with existing processing pipeline and Service Bus message format
+- Email body content accessible without requiring changes to Service Bus message structure

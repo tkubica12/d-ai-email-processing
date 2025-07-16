@@ -324,11 +324,10 @@ class SubmissionDocument(BaseModel):
     Document reference in submission record.
     
     This model represents a document within a submission record,
-    tracking its processing status and classified type.
+    tracking its classified type.
     
     Attributes:
         documentUrl: Azure Blob Storage URL for the document
-        processed: Whether the document has been processed
         type: Classified document type (optional until classification is complete)
     """
     
@@ -336,12 +335,6 @@ class SubmissionDocument(BaseModel):
         ...,
         description="Azure Blob Storage URL for the document",
         example="https://storage.blob.core.windows.net/submission-guid/document1.pdf"
-    )
-    
-    processed: bool = Field(
-        ...,
-        description="Whether the document has been processed",
-        example=True
     )
     
     type: Optional[str] = Field(
@@ -386,6 +379,12 @@ class SubmissionRecord(BaseModel):
     submittedAt: datetime = Field(
         ...,
         description="ISO 8601 timestamp when submission was created"
+    )
+    
+    userMessage: str = Field(
+        ...,
+        description="Email body content from the user's submission",
+        example="Please review the attached invoices and contract documents for approval. Let me know if you need any additional information."
     )
     
     documents: List[SubmissionDocument] = Field(

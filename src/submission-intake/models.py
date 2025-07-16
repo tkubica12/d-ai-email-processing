@@ -5,6 +5,8 @@ This module contains Pydantic models used for data validation and serialization
 in the email processing system.
 """
 
+import logging
+import json
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from uuid import UUID
@@ -15,12 +17,10 @@ class DocumentInfo(BaseModel):
     """
     Document information as stored in submission records (Design.md schema).
     
-    This represents the document structure within a submission record,
-    tracking the processing state of each document.
+    This represents the document structure within a submission record.
     
     Attributes:
         documentUrl: Azure Blob Storage URL for the document
-        processed: Boolean indicating if document processing completed
         type: Document type detected during processing (null until processed)
     """
     
@@ -28,12 +28,6 @@ class DocumentInfo(BaseModel):
         ...,
         description="Azure Blob Storage URL for the document",
         example="https://storage.blob.core.windows.net/submission-guid/document1.pdf"
-    )
-    
-    processed: Optional[bool] = Field(
-        None,
-        description="Boolean indicating if document processing completed",
-        example=True
     )
     
     type: Optional[str] = Field(
@@ -206,6 +200,12 @@ class SubmissionDocument(BaseModel):
         ...,
         description="ISO 8601 timestamp when the submission was created",
         example="2025-07-07T10:00:00Z"
+    )
+    
+    userMessage: str = Field(
+        ...,
+        description="Email body content from the user's submission",
+        example="Please review the attached invoices and contract documents for approval. Let me know if you need any additional information."
     )
     
     documents: List[DocumentInfo] = Field(

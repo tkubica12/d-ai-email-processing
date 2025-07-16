@@ -61,10 +61,10 @@ Following the Design.md specification:
   "submissionId": "submission-guid",
   "userId": "user@example.com",
   "submittedAt": "2025-07-07T10:00:00Z",
+  "userMessage": "Please review the attached invoices and contract documents for approval. Let me know if you need any additional information.",
   "documents": [
     {
       "documentUrl": "https://storage.blob.core.windows.net/submission-guid/document1.pdf",
-      "processed": null,
       "type": null
     }
   ],
