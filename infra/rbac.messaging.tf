@@ -41,14 +41,10 @@ resource "azurerm_role_assignment" "submission_trigger_service_bus_receiver" {
 }
 
 # Logic App Service Bus permissions
-resource "azurerm_role_assignment" "logic_app_service_bus_sender" {
+# Note: Logic App Standard built-in connectors require system-assigned identity
+# and need "Azure Service Bus Data Owner" role for full access including management operations
+resource "azurerm_role_assignment" "logic_app_service_bus_owner" {
   scope                = azurerm_servicebus_namespace.main.id
-  role_definition_name = "Azure Service Bus Data Sender"
-  principal_id         = azurerm_user_assigned_identity.logic_app.principal_id
-}
-
-resource "azurerm_role_assignment" "logic_app_service_bus_receiver" {
-  scope                = azurerm_servicebus_namespace.main.id
-  role_definition_name = "Azure Service Bus Data Receiver"
-  principal_id         = azurerm_user_assigned_identity.logic_app.principal_id
+  role_definition_name = "Azure Service Bus Data Owner"
+  principal_id         = azapi_resource.logic_app.identity[0].principal_id
 }

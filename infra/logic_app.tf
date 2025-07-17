@@ -89,10 +89,6 @@ resource "azapi_resource" "logic_app" {
             name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
             value = azurerm_application_insights.main.connection_string
           },
-        #   {
-        #     name  = "WEBSITE_SKIP_CONTENTSHARE_VALIDATION"
-        #     value = "1"
-        #   },
           {
             name  = "APP_KIND"
             value = "workflowApp"

@@ -33,3 +33,17 @@ resource "azurerm_servicebus_subscription" "submission_intake" {
   dead_lettering_on_message_expiration = true
   dead_lettering_on_filter_evaluation_error = true
 }
+
+# Service Bus Subscription for Logic App
+resource "azurerm_servicebus_subscription" "submission_intake_logicapp" {
+  name                = "submission-intake-logicapp"
+  topic_id            = azurerm_servicebus_topic.new_submissions.id
+  
+  # Configure subscription settings
+  max_delivery_count  = 10
+  default_message_ttl = "P14D"  # 14 days
+  
+  # Enable dead lettering for expired messages
+  dead_lettering_on_message_expiration = true
+  dead_lettering_on_filter_evaluation_error = true
+}
