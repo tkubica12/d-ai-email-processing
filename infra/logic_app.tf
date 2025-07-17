@@ -2,7 +2,7 @@
 resource "azapi_resource" "logic_app_blob_container_hosts" {
   type      = "Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01"
   name      = "azure-webjobs-hosts"
-  parent_id = "${azapi_resource.main.id}/blobServices/default"
+  parent_id = "${azapi_resource.storage_account.id}/blobServices/default"
 
   body = {
     properties = {
@@ -10,18 +10,6 @@ resource "azapi_resource" "logic_app_blob_container_hosts" {
     }
   }
 }
-
-# resource "azapi_resource" "logic_app_blob_container_secrets" {
-#   type      = "Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01"
-#   name      = "azure-webjobs-secrets"
-#   parent_id = "${azapi_resource.main.id}/blobServices/default"
-
-#   body = {
-#     properties = {
-#       publicAccess = "None"
-#     }
-#   }
-# }
 
 # Service Plan for Logic App Standard
 resource "azapi_resource" "logic_app_service_plan" {
@@ -79,7 +67,19 @@ resource "azapi_resource" "logic_app" {
           },
           {
             name  = "AzureWebJobsStorage__blobServiceUri"
-            value = "https://${azurerm_storage_account.main.name}.blob.core.windows.net"
+            value = "https://${azapi_resource.storage_account.name}.blob.core.windows.net"
+          },
+          {
+            name  = "AzureWebJobsStorage__queueServiceUri"
+            value = "https://${azapi_resource.storage_account.name}.queue.core.windows.net"
+          },
+          {
+            name  = "AzureWebJobsStorage__tableServiceUri"
+            value = "https://${azapi_resource.storage_account.name}.table.core.windows.net"
+          },
+          {
+            name  = "AzureWebJobsStorage__credential"
+            value = "managedIdentity"
           },
           {
             name  = "APPINSIGHTS_INSTRUMENTATIONKEY"
@@ -89,10 +89,10 @@ resource "azapi_resource" "logic_app" {
             name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
             value = azurerm_application_insights.main.connection_string
           },
-          {
-            name  = "WEBSITE_SKIP_CONTENTSHARE_VALIDATION"
-            value = "1"
-          },
+        #   {
+        #     name  = "WEBSITE_SKIP_CONTENTSHARE_VALIDATION"
+        #     value = "1"
+        #   },
           {
             name  = "APP_KIND"
             value = "workflowApp"
@@ -110,35 +110,5 @@ resource "azapi_resource" "logic_app" {
       azurerm_user_assigned_identity.logic_app.id
     ]
   }
-
-  #   tags = {
-  #     "hidden-link: /app-insights-resource-id" = azurerm_application_insights.main.id
-  #   }
 }
-
-# # Disable basic publishing credentials for FTP
-# resource "azapi_resource" "logic_app_ftp_policy" {
-#   type      = "Microsoft.Web/sites/basicPublishingCredentialsPolicies@2024-04-01"
-#   name      = "ftp"
-#   parent_id = azapi_resource.logic_app.id
-
-#   body = {
-#     properties = {
-#       allow = false
-#     }
-#   }
-# }
-
-# # Disable basic publishing credentials for SCM
-# resource "azapi_resource" "logic_app_scm_policy" {
-#   type      = "Microsoft.Web/sites/basicPublishingCredentialsPolicies@2024-04-01"
-#   name      = "scm"
-#   parent_id = azapi_resource.logic_app.id
-
-#   body = {
-#     properties = {
-#       allow = false
-#     }
-#   }
-# }
 

@@ -57,7 +57,7 @@ resource "azapi_resource" "client_web" {
               },
               {
                 name  = "AZURE_STORAGE_ACCOUNT_NAME"
-                value = azapi_resource.main.name
+                value = azapi_resource.storage_account.name
               },
               {
                 name  = "AZURE_SERVICE_BUS_FQDN"

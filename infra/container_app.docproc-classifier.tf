@@ -77,7 +77,7 @@ resource "azapi_resource" "docproc_classifier" {
               },
               {
                 name  = "AZURE_STORAGE_ACCOUNT_NAME"
-                value = azapi_resource.main.name
+                value = azapi_resource.storage_account.name
               },
               {
                 name  = "AZURE_TABLE_STORAGE_ENABLED"

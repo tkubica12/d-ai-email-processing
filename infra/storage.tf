@@ -1,5 +1,5 @@
 # Storage Account for email content and attachments
-resource "azapi_resource" "main" {
+resource "azapi_resource" "storage_account" {
   type      = "Microsoft.Storage/storageAccounts@2023-05-01"
   name      = "st${local.storage_prefix}email"
   location  = azurerm_resource_group.main.location

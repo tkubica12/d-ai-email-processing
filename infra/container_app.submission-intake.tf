@@ -81,7 +81,7 @@ resource "azapi_resource" "submission_intake" {
               },
               {
                 name  = "AZURE_STORAGE_ACCOUNT_NAME"
-                value = azapi_resource.main.name
+                value = azapi_resource.storage_account.name
               },
               {
                 name  = "LOG_LEVEL"

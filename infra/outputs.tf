@@ -10,7 +10,7 @@ output "AZURE_RESOURCE_GROUP" {
 
 output "storage_account_name" {
   description = "The name of the storage account"
-  value       = azapi_resource.main.name
+  value       = azapi_resource.storage_account.name
 }
 
 output "service_bus_namespace_name" {
@@ -37,7 +37,7 @@ output "service_bus_subscription_name" {
 # Additional outputs for client application
 output "storage_account_blob_endpoint" {
   description = "The blob endpoint URL for the storage account"
-  value       = azapi_resource.main.output.properties.primaryEndpoints.blob
+  value       = azapi_resource.storage_account.output.properties.primaryEndpoints.blob
 }
 
 output "service_bus_fqdn" {

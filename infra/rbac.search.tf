@@ -21,13 +21,13 @@ resource "azurerm_role_assignment" "search_openai_user" {
 }
 
 resource "azurerm_role_assignment" "search_storage_blob_reader" {
-  scope                = azapi_resource.main.id
+  scope                = azapi_resource.storage_account.id
   role_definition_name = "Storage Blob Data Reader"
   principal_id         = azurerm_search_service.main.identity[0].principal_id
 }
 
 resource "azurerm_role_assignment" "search_storage_account_reader" {
-  scope                = azapi_resource.main.id
+  scope                = azapi_resource.storage_account.id
   role_definition_name = "Reader"
   principal_id         = azurerm_search_service.main.identity[0].principal_id
 }

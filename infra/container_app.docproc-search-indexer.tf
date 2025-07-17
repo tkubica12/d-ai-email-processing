@@ -69,7 +69,7 @@ resource "azapi_resource" "docproc_search_indexer" {
               },
               {
                 name  = "AZURE_STORAGE_ACCOUNT_NAME"
-                value = azapi_resource.main.name
+                value = azapi_resource.storage_account.name
               },
               {
                 name  = "AZURE_SEARCH_SERVICE_NAME"
