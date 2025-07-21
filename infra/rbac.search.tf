@@ -32,6 +32,19 @@ resource "azurerm_role_assignment" "search_storage_account_reader" {
   principal_id         = azurerm_search_service.main.identity[0].principal_id
 }
 
+# Logic App system identity AI Search permissions
+resource "azurerm_role_assignment" "logic_app_system_identity_search_service_contributor" {
+  scope                = azurerm_search_service.main.id
+  role_definition_name = "Search Service Contributor"
+  principal_id         = azapi_resource.logic_app.identity[0].principal_id
+}
+
+resource "azurerm_role_assignment" "logic_app_system_identity_search_index_data_contributor" {
+  scope                = azurerm_search_service.main.id
+  role_definition_name = "Search Index Data Contributor"
+  principal_id         = azapi_resource.logic_app.identity[0].principal_id
+}
+
 # Document Search Indexer service AI Search permissions
 resource "azurerm_role_assignment" "docproc_search_indexer_search_service_contributor" {
   scope                = azurerm_search_service.main.id

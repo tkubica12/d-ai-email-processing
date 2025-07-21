@@ -153,3 +153,29 @@ resource "azurerm_role_assignment" "logic_app_storage_account_contributor" {
   role_definition_name = "Storage Account Contributor"
   principal_id         = azurerm_user_assigned_identity.logic_app.principal_id
 }
+
+# Logic App system-assigned identity storage permissions
+# Required for built-in connectors (Blob, Queue, Table)
+resource "azurerm_role_assignment" "logic_app_system_storage_blob_contributor" {
+  scope                = azapi_resource.storage_account.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azapi_resource.logic_app.identity[0].principal_id
+}
+
+resource "azurerm_role_assignment" "logic_app_system_storage_queue_contributor" {
+  scope                = azapi_resource.storage_account.id
+  role_definition_name = "Storage Queue Data Contributor"
+  principal_id         = azapi_resource.logic_app.identity[0].principal_id
+}
+
+resource "azurerm_role_assignment" "logic_app_system_storage_table_contributor" {
+  scope                = azapi_resource.storage_account.id
+  role_definition_name = "Storage Table Data Contributor"
+  principal_id         = azapi_resource.logic_app.identity[0].principal_id
+}
+
+resource "azurerm_role_assignment" "logic_app_system_storage_account_contributor" {
+  scope                = azapi_resource.storage_account.id
+  role_definition_name = "Storage Account Contributor"
+  principal_id         = azapi_resource.logic_app.identity[0].principal_id
+}

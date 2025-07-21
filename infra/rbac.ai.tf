@@ -61,6 +61,12 @@ resource "azurerm_role_assignment" "logic_app_openai_user" {
   principal_id         = azurerm_user_assigned_identity.logic_app.principal_id
 }
 
+resource "azurerm_role_assignment" "logic_app_system_identity_openai_user" {
+  scope                = azurerm_cognitive_account.openai.id
+  role_definition_name = "Cognitive Services OpenAI User"
+  principal_id         = azapi_resource.logic_app.identity[0].principal_id
+}
+
 resource "azurerm_role_assignment" "logic_app_document_intelligence_user" {
   scope                = azurerm_cognitive_account.document_intelligence.id
   role_definition_name = "Cognitive Services User"

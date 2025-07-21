@@ -20,7 +20,7 @@ resource "azurerm_cognitive_deployment" "text_embedding_3_large" {
 
   scale {
     type = "GlobalStandard"
-    capacity = 100
+    capacity = 180
   }
 }
 
@@ -36,6 +36,6 @@ resource "azurerm_cognitive_deployment" "gpt_41" {
 
   scale {
     type     = "GlobalStandard"
-    capacity = 100
+    capacity = 180
   }
 }

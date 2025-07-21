@@ -92,6 +92,14 @@ resource "azapi_resource" "logic_app" {
           {
             name  = "APP_KIND"
             value = "workflowApp"
+          },
+          {
+            name  = "serviceBus_fullyQualifiedNamespace"
+            value = "${azurerm_servicebus_namespace.main.name}.servicebus.windows.net"
+          },
+          {
+            name  = "AzureBlob_blobStorageEndpoint"
+            value = "https://${azapi_resource.storage_account.name}.blob.core.windows.net"
           }
         ]
         minimumElasticInstanceCount = 1
