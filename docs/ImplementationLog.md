@@ -99,6 +99,13 @@ Deploy infrastructure → Update `.env` → `az login` → `uv run python main.p
 - **Updated** submission-intake service to read user message from `body.txt` in blob storage
 - **Impact**: Event-driven processing state replaces static boolean flags
 
+### Azure AI Foundry Agent Creation Script (July 21, 2025)
+- **Created** `create_agent_for_logic_app.py` in demo-utils for automated agent setup
+- **Integrated** multiple tools: Bing Grounding, AI Search (documents + policies indexes), OpenAPI connections
+- **Added** comprehensive configuration management with environment variables
+- **Features** agent testing capabilities and structured error handling
+- **Purpose** Enables Logic Apps integration with AI Foundry agents for advanced document processing
+
 ---
 
 **This log focuses on architectural decisions and critical technical insights. For detailed implementation, see source code and service-specific documentation.**

@@ -4,6 +4,32 @@ Scripts to help with demos and testing.
 
 ## Available Scripts
 
+### create_agent_for_logic_app.py
+A script to create an Azure AI Foundry Agent with multiple tools configured for email processing and document analysis.
+
+**What it does:**
+- Creates an agent with Bing Grounding Tool, AI Search tools for documents and policies indexes, and OpenAPI tool
+- Configures the agent with specialized instructions for email processing
+- Optionally tests the created agent
+
+**Prerequisites:**
+- Azure AI Foundry project set up with required connections (Bing Search, AI Search, OpenAPI)
+- Azure CLI installed and logged in (`az login`)
+- Environment variables configured (see `.env.foundry.template`)
+
+**Usage:**
+```bash
+# Install dependencies
+uv sync
+
+# Configure environment
+cp .env.foundry.template .env.foundry
+# Edit .env.foundry with your actual values
+
+# Run the script
+uv run python create_agent_for_logic_app.py
+```
+
 ### cleanup_demo_data.py
 A utility script to clean up demo data from Azure resources.
 
