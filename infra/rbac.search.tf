@@ -15,7 +15,7 @@ resource "azurerm_role_assignment" "current_user_search_index_data_contributor" 
 
 # Azure AI Search service permissions to access other resources
 resource "azurerm_role_assignment" "search_openai_user" {
-  scope                = azurerm_cognitive_account.openai.id
+  scope                = azapi_resource.ai_foundry.id
   role_definition_name = "Cognitive Services OpenAI User"
   principal_id         = azurerm_search_service.main.identity[0].principal_id
 }

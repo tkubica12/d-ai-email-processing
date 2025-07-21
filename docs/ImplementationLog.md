@@ -7,7 +7,7 @@ Key architectural decisions, technical insights, and implementation progress for
 **Technology Stack:**
 - **FastHTML** - Python web UI framework
 - **uv** - Modern Python dependency management  
-- **Azure OpenAI** - Enterprise GPT-4.1 with Entra authentication
+- **Azure AI Foundry** - Enterprise AI services with GPT-4.1 and project management
 - **Terraform** - Infrastructure as Code with RBAC
 - **Pydantic** - Type-safe data models
 - **Azure Logic Apps Standard** - Email processing workflows
@@ -32,6 +32,14 @@ Deploy infrastructure → Update `.env` → `az login` → `uv run python main.p
 - Document chunking: 2000 chars with 200 char overlap
 
 ## Major Architectural Evolution
+
+### Azure AI Foundry Migration (January 2025)
+- **AI Foundry Hub**: Migrated from traditional Azure OpenAI to AI Foundry with project management capabilities
+- **API Compatibility**: Updated to `2024-06-01-preview` API version using azapi provider
+- **Model Deployments**: Preserved GPT-4.1 and text-embedding-3-large deployments
+- **RBAC Updates**: All identity and role assignments updated for new resource structure
+- **Container Apps**: Updated environment variables to use AI Foundry endpoints
+- **Deprecation Fixes**: Replaced deprecated `connection_strings` with `primary_sql_connection_string`
 
 ### Infrastructure & Security (July 2025)
 - **Modularized RBAC**: Split rbac.tf into service-specific files (identities, storage, messaging, ai, search)

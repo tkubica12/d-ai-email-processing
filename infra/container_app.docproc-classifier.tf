@@ -69,11 +69,11 @@ resource "azapi_resource" "docproc_classifier" {
               },
               {
                 name  = "AZURE_OPENAI_ENDPOINT"
-                value = azurerm_cognitive_account.openai.endpoint
+                value = "https://${azapi_resource.ai_foundry.body.properties.customSubDomainName}.cognitiveservices.azure.com"
               },
               {
                 name  = "AZURE_OPENAI_MODEL"
-                value = azurerm_cognitive_deployment.gpt_41.name
+                value = azapi_resource.gpt_41_deployment.name
               },
               {
                 name  = "AZURE_STORAGE_ACCOUNT_NAME"

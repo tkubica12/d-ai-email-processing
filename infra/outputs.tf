@@ -69,7 +69,7 @@ output "cosmosdb_primary_key" {
 
 output "cosmosdb_connection_strings" {
   description = "The connection strings for the Cosmos DB account"
-  value       = azurerm_cosmosdb_account.main.connection_strings
+  value       = azurerm_cosmosdb_account.main.primary_sql_connection_string
   sensitive   = true
 }
 
@@ -98,10 +98,20 @@ output "document_intelligence_endpoint" {
   value       = azurerm_cognitive_account.document_intelligence.endpoint
 }
 
-# Azure OpenAI outputs
+# Azure AI Foundry outputs
 output "azure_openai_endpoint" {
-  description = "The endpoint URL for the Azure OpenAI service"
-  value       = azurerm_cognitive_account.openai.endpoint
+  description = "The endpoint URL for the Azure AI Foundry service"
+  value       = "https://${azapi_resource.ai_foundry.body.properties.customSubDomainName}.cognitiveservices.azure.com"
+}
+
+output "ai_foundry_name" {
+  description = "The name of the AI Foundry"
+  value       = azapi_resource.ai_foundry.name
+}
+
+output "ai_project_name" {
+  description = "The name of the AI Project"
+  value       = azapi_resource.ai_project.name
 }
 
 # Azure AI Search outputs
