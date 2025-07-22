@@ -2,13 +2,22 @@
 
 An Azure-based email processing system that uses AI to analyze incoming submission requests, extract information from documents, and assist operators with generating responses. The system supports both email triggers and web form submissions with file attachments.
 
-## Architecture
+## Why This System?
 
-The system offers two architectural approaches:
-- **Workflow Orchestration**: Using Azure Logic Apps for centralized orchestration
-- **Event Sourcing**: Using event-driven architecture with Cosmos DB
+Modern businesses receive countless document submissions that require human review and processing. This system automates the initial analysis using AI to:
+- **Extract and classify** document content using Azure Document Intelligence
+- **Analyze submissions** with AI agents that can search previous documents, investigate entities, and access company data
+- **Generate insights** to help operators make faster, more informed decisions
+- **Ensure security** through user-specific document isolation and access controls
 
-See [Design.md](docs/Design.md) for detailed architecture comparison and implementation options.
+## Architecture Overview
+
+The system offers multiple architectural approaches for different scalability and complexity needs:
+- **Event Sourcing**: Event-driven architecture with Cosmos DB for extreme scale and audit trails
+- **Workflow Orchestration**: Azure Logic Apps for simpler, visual workflow management
+- **Agentic Orchestration**: AI-driven coordination without predetermined paths
+
+📖 **See [Design.md](docs/Design.md) for detailed architecture comparison, data models, and implementation patterns.**
 
 ## Quick Start
 
@@ -27,181 +36,109 @@ See [Design.md](docs/Design.md) for detailed architecture comparison and impleme
    terraform apply
    ```
 
-2. **Configure Environment Variables**
-   After deployment, update your application's `.env` file with the output values:
+2. **Get deployment outputs for configuration**
    ```bash
-   # Get outputs from Terraform
    terraform output -json
    ```
 
-### Running the Web Client
+### Running Services
 
-1. **Navigate to client application**
-   ```bash
-   cd src/client-web
-   ```
+The system consists of multiple services that work together:
 
-2. **Install dependencies**
-   ```bash
-   uv sync
-   ```
+#### Web Client (User Interface)
+```bash
+cd src/client-web
+uv sync
+uv run python main.py
+# Access at http://localhost:8000
+```
 
-3. **Run the application**
-   ```bash
-   uv run python main.py
-   ```
+#### Background Processing Services
 
-4. **Access the application**
-   Open your browser to `http://localhost:8000`
+**Document Processing Pipeline:**
+```bash
+# Document content extraction
+cd src/docproc-parser-foundry && uv sync && uv run python main.py
 
-### Running the Submission Intake Service (Background)
+# Document classification
+cd src/docproc-classifier && uv sync && uv run python main.py
 
-The submission-intake service is a background worker that processes Service Bus messages:
+# Data extraction
+cd src/docproc-data-extractor && uv sync && uv run python main.py
 
-1. **Navigate to submission-intake service**
-   ```bash
-   cd src/submission-intake
-   ```
+# Search indexing
+cd src/docproc-search-indexer && uv sync && uv run python main.py
+```
 
-2. **Install dependencies**
-   ```bash
-   uv sync
-   ```
+**Submission Processing:**
+```bash
+# Intake processing
+cd src/submission-intake && uv sync && uv run python main.py
+```
 
-3. **Run the service**
-   ```bash
-   uv run python main.py
-   ```
+**Business APIs:**
+```bash
+# Company data APIs
+cd src/company-apis && uv sync && uv run python main.py
+```
 
-The service will continuously listen for messages from the Service Bus topic and process them.
+## Key Features
 
-### Running the Document Parser Foundry Service (Background)
+### Document Processing
+- **Multi-format support**: PDF, DOCX, images via Azure Document Intelligence
+- **AI Classification**: Automatic document type detection (invoices, contracts, etc.)
+- **Data Extraction**: Structured data extraction using Azure OpenAI
+- **Vector Search**: Semantic search with user-specific security trimming
 
-The docproc-parser-foundry service is a background worker that processes Cosmos DB Change Feed events:
+### AI Agent Capabilities
+- **RAG Search**: Retrieve user's previous documents and conversations
+- **Entity Investigation**: Web search for vendor/company verification
+- **Company Integration**: Access internal APIs for user products, financial scores, income data
+- **Comprehensive Analysis**: Generate insights combining all data sources
 
-1. **Navigate to docproc-parser-foundry service**
-   ```bash
-   cd src/docproc-parser-foundry
-   ```
-
-2. **Install dependencies**
-   ```bash
-   uv sync
-   ```
-
-3. **Run the service**
-   ```bash
-   uv run python main.py
-   ```
-
-The service will continuously monitor the Cosmos DB Change Feed for DocumentUploadedEvent events and process them using Azure Document Intelligence.
-
-### Running the Document Classifier Service (Background)
-
-The docproc-classifier service is a background worker that processes Cosmos DB Change Feed events for document classification:
-
-1. **Navigate to docproc-classifier service**
-   ```bash
-   cd src/docproc-classifier
-   ```
-
-2. **Install dependencies**
-   ```bash
-   uv sync
-   ```
-
-3. **Run the service**
-   ```bash
-   uv run python main.py
-   ```
-
-The service will continuously monitor the Cosmos DB Change Feed for DocumentContentExtractedEvent events and classify them using Azure OpenAI.
-
-### Running the Document Data Extractor Service (Background)
-
-The docproc-data-extractor service is a background worker that processes Cosmos DB Change Feed events for structured data extraction:
-
-1. **Navigate to docproc-data-extractor service**
-   ```bash
-   cd src/docproc-data-extractor
-   ```
-
-2. **Install dependencies**
-   ```bash
-   uv sync
-   ```
-
-3. **Run the service**
-   ```bash
-   uv run python main.py
-   ```
-
-The service will continuously monitor the Cosmos DB Change Feed for DocumentContentExtractedEvent events and extract structured data using Azure OpenAI.
-
-### Running the Document Search Indexer Service (Background)
-
-The docproc-search-indexer service is a background worker that processes Cosmos DB Change Feed events for Azure AI Search indexing:
-
-1. **Navigate to docproc-search-indexer service**
-   ```bash
-   cd src/docproc-search-indexer
-   ```
-
-2. **Install dependencies**
-   ```bash
-   uv sync
-   ```
-
-3. **Run the service**
-   ```bash
-   uv run python main.py
-   ```
-
-The service will continuously monitor the Cosmos DB Change Feed for DocumentContentExtractedEvent events and index document content into Azure AI Search with embeddings.
-
-### Running in Container Apps
-
-After infrastructure deployment, the client-web service is automatically deployed as a Container App with the following features:
-- **Managed Identity Authentication**: Secure access to Azure services
-- **Auto-scaling**: Scale to zero when not in use
-- **HTTPS Ingress**: Automatic SSL termination
-- **Monitoring**: Application Insights integration
-
-Access the deployed web application using the `client_web_url` output from Terraform.
+### Security & Compliance
+- **User Isolation**: Documents are strictly separated by user identity
+- **Managed Identity**: Secure service-to-service authentication
+- **Audit Trail**: Complete event history in Cosmos DB
+- **Access Controls**: RBAC-based permissions for all Azure resources
 
 ## Infrastructure Components
 
-### Current Deployment Includes:
-- **Azure Storage Account**: Blob storage for submission files
-- **Azure Service Bus**: Event messaging for processing pipeline
-- **Azure Cosmos DB**: Serverless database for event sourcing and data persistence
-  - Events container: Event sourcing with change feed
-  - Documents container: Processed document results
-  - Submissions container: Submission records
-- **Azure Container Apps**: Serverless container hosting for web services
-  - Client Web: User interface for document submission
-  - Company APIs: Business data integration endpoints
-  - Submission Intake: Background service for processing Service Bus messages
-  - Document Parser Foundry: Change feed processor for document content extraction
-  - Document Classifier: AI-powered document classification using Azure OpenAI
-  - Document Data Extractor: Structured data extraction from documents using Azure OpenAI
-  - Document Search Indexer: AI-powered search indexing with vector embeddings using Azure AI Search
-- **Azure AI Search**: Vector search with semantic capabilities for document retrieval
-- **Azure OpenAI**: GPT-4.1 for classification/extraction and text-embedding-3-large for vector search
-- **RBAC Configuration**: Proper permissions for local development and managed identities
+### Core Services
+- **Azure Storage**: Document blob storage with container-per-submission isolation
+- **Azure Service Bus**: Reliable message queuing for processing pipeline
+- **Azure Cosmos DB**: Serverless database with change feed for event processing
+- **Azure Container Apps**: Auto-scaling serverless container hosting
+- **Azure AI Search**: Vector search with semantic capabilities and security trimming
+- **Azure OpenAI**: GPT-4 for analysis and text-embedding-3-large for search
 
-### Cosmos DB Configuration
-The system uses serverless Cosmos DB with three containers:
-- `events`: Change feed enabled for event processing pipeline
-- `documents`: Document analysis results with `/documentUrl` partition key
-- `submissions`: Submission records with `/submissionId` partition key
+### Processing Architecture
+The system uses an event-driven architecture where document uploads trigger a cascade of AI processing:
+1. **Document Upload** → Content extraction → Classification → Data extraction → Search indexing
+2. **Submission Analysis** → AI agent combines search, web lookup, and company APIs
+3. **Results Generation** → Comprehensive insights and recommendations
+
+📖 **See [Design.md](docs/Design.md) for detailed service interactions, data schemas, and scaling patterns.**
+
+## Container Apps Deployment
+
+After infrastructure deployment, services are automatically deployed to Azure Container Apps with:
+- **Auto-scaling**: Scale to zero when idle, scale up under load
+- **Managed Identity**: Secure access to Azure services without secrets
+- **HTTPS Ingress**: Automatic SSL termination for web services
+- **Monitoring**: Application Insights integration for observability
+
+Access the deployed web application using the `client_web_url` output from Terraform.
 
 ## Development
 
-### Local Development Setup
-1. Ensure you're authenticated with Azure CLI: `az login`
+### Local Development
+1. Authenticate with Azure: `az login`
 2. Deploy infrastructure with Terraform
-3. Configure environment variables from Terraform outputs
-4. Install dependencies and run applications
+3. Configure services with Terraform outputs
+4. Run services locally for development and testing
 
-See [ImplementationLog.md](docs/ImplementationLog.md) for detailed implementation progress and technical decisions.
+### Documentation
+- **[Design.md](docs/Design.md)**: Complete architecture, data models, and service interactions
+- **[ImplementationLog.md](docs/ImplementationLog.md)**: Development progress and technical decisions
+- **[CommonErrors.md](docs/CommonErrors.md)**: Known issues and solutions
