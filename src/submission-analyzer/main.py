@@ -5,6 +5,8 @@ Main entry point for the submission analyzer service.
 import logging
 from agent import SubmissionAnalyzerAgent
 from config import AppConfig, setup_logging
+from datetime import datetime, timezone
+import uuid
 
 
 def format_analysis_results(result, pretty_print=True):
@@ -236,7 +238,7 @@ def main():
     try:
         # Create and use the agent with context manager for automatic cleanup
         with SubmissionAnalyzerAgent(config) as agent:
-            # Example submission content that would benefit from both tools
+            # Example submission content that would benefit from all tools
             sample_submission = """
             Dear Support Team,
             
@@ -246,8 +248,9 @@ def main():
             
             My email is john.doe@example.com and I would like to:
             1. Get my current financial score and whether some of my products might have negative impacts on it
-            2. As accountant, I need to understand by financial prospects given Artificial Intelligence taking over.
+            2. As an accountant, I need to understand my financial prospects given Artificial Intelligence taking over.
             3. Have I provided PUMA invoice already?
+            4. What are the company policies regarding credit limit increases?
             
             Please provide simple structured answers to these questions.
 
@@ -259,13 +262,31 @@ def main():
                 print("🔄 Analyzing submission...")
             logger.info("Analyzing sample submission...")
             
-            # Analyze the submission
-            result = agent.analyze_submission(sample_submission)
+            # Generate test data for Service Bus message
+            submission_id = str(uuid.uuid4())
+            user_id = "john.doe@example.com"
+            submitted_at = datetime.now(timezone.utc)
+            
+            # Analyze the submission with Service Bus integration
+            result = agent.analyze_submission(
+                submission_content=sample_submission,
+                submission_id=submission_id,
+                user_id=user_id,
+                submitted_at=submitted_at
+            )
             
             logger.info(f"Analysis completed with status: {result['run_result']['status']}")
             
             # Display the formatted results
             format_analysis_results(result, config.pretty_print)
+            
+            # Show Service Bus information if available
+            if config.pretty_print:
+                print(f"\n📤 Service Bus Message:")
+                print(f"   Topic: {config.service_bus.topic_name}")
+                print(f"   Submission ID: {submission_id}")
+                print(f"   User ID: {user_id}")
+                print(f"   Message sent with analysis results")
             
     except Exception as e:
         if config.pretty_print:

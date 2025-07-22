@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "azure-ai-projects>=1.0.0b12",
     "azure-identity>=1.23.0",
+    "azure-servicebus>=7.12.0",
     "python-dotenv>=1.1.1",
     "pydantic>=2.0.0",
     "jsonref>=1.1.0",

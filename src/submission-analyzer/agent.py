@@ -7,6 +7,7 @@ import jsonref
 import logging
 import os
 from typing import Optional, List, Dict, Any
+from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
 from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential
@@ -15,18 +16,21 @@ from azure.ai.agents.models import (
     OpenApiTool,
     OpenApiAnonymousAuthDetails,
     AzureAISearchTool,
-    AzureAISearchQueryType
+    AzureAISearchQueryType,
+    ConnectedAgentTool
 )
 
 from config import AppConfig, setup_logging
-
+from agent_company_policies import create_company_policies_config
+from service_bus_client import SubmissionServiceBusClient
 
 class SubmissionAnalyzerAgent:
     """
     Azure AI Agent for analyzing email submissions.
     
     This class provides a wrapper around Azure AI Projects agent functionality
-    to analyze and process email submissions.
+    to analyze and process email submissions with connected policy agent and
+    Service Bus messaging capabilities.
     """
     
     def __init__(
@@ -60,7 +64,11 @@ class SubmissionAnalyzerAgent:
             credential=DefaultAzureCredential(),
         )
         
+        # Initialize Service Bus client
+        self.service_bus_client = SubmissionServiceBusClient(self.config.service_bus)
+        
         self.agent_id: Optional[str] = None
+        self.policies_agent_id: Optional[str] = None
         self.thread_id: Optional[str] = None
         
         self.logger.info(f"Initialized SubmissionAnalyzerAgent with endpoint: {self.config.ai_projects.project_endpoint}")
@@ -126,7 +134,7 @@ class SubmissionAnalyzerAgent:
     
     def create_agent(self) -> str:
         """
-        Create an Azure AI agent with Bing grounding, Company API, and AI Search tools.
+        Create an Azure AI agent with Bing grounding, Company API, AI Search tools, and connected policies agent.
         
         Returns:
             str: The created agent ID
@@ -135,7 +143,33 @@ class SubmissionAnalyzerAgent:
             Exception: If agent creation fails
         """
         try:
-            self._log_or_print("Setting up agent tools...", "info", "🛠️")
+            # First create the Company Policies Agent (subordinate agent)
+            self._log_or_print("Creating Company Policies Agent...", "info", "🏛️")
+            policies_agent_config = create_company_policies_config(
+                ai_search_connection_id=self.config.search.connection_id,
+                policies_index_name="policies-index",  # Use policies index
+                model_deployment_name=self.config.ai_projects.model_deployment_name
+            )
+            
+            policies_agent = self.project_client.agents.create_agent(
+                model=policies_agent_config["model"],
+                name=policies_agent_config["name"],
+                instructions=policies_agent_config["instructions"],
+                tools=policies_agent_config["tools"],
+                tool_resources=policies_agent_config.get("tool_resources"),
+            )
+            
+            self.policies_agent_id = policies_agent.id
+            self._log_or_print(f"Company Policies Agent created with ID: {self.policies_agent_id}", "info", "✅")
+            
+            # Create connected agent tool for the policies agent
+            connected_policies_agent = ConnectedAgentTool(
+                id=policies_agent.id,
+                name="company_policies_advisor",
+                description="Specialized agent for company policy guidance and regulatory compliance. Use when queries involve policy interpretation, compliance checking, regulatory requirements, or need for policy-specific guidance."
+            )
+            
+            self._log_or_print("Setting up main agent tools...", "info", "🛠️")
             
             # Create Bing grounding tool
             self._log_or_print("Configuring Bing search tool...", "info", "🔍")
@@ -146,7 +180,7 @@ class SubmissionAnalyzerAgent:
             ai_search = AzureAISearchTool(
                 index_connection_id=self.config.search.connection_id,
                 index_name=self.config.search.index_name,
-                query_type=AzureAISearchQueryType.VECTOR_SEMANTIC_HYBRID,  # Use hybrid search (vector + semantic)
+                # query_type=AzureAISearchQueryType.VECTOR_SEMANTIC_HYBRID,  # Use hybrid search (vector + semantic)
                 top_k=5,  # Retrieve top 5 results
                 filter=""  # No additional filters (security trimming handled by agent context)
             )
@@ -166,8 +200,8 @@ class SubmissionAnalyzerAgent:
             ]
             self._log_or_print(f"Company API endpoint: {self.config.company_api.base_url}", "info", "🌐")
             
-            # Create Company API OpenAPI tool with autonomous authentication (no auth required)
-            self._log_or_print("Using autonomous authentication (no auth required)", "info", "🔓")
+            # Create Company API OpenAPI tool with anonymous authentication
+            self._log_or_print("Using anonymous authentication (no auth required)", "info", "🔓")
             auth = OpenApiAnonymousAuthDetails()
             company_api_tool = OpenApiTool(
                 name="company_apis",
@@ -176,11 +210,15 @@ class SubmissionAnalyzerAgent:
                 auth=auth
             )
             
-            # Combine tool definitions
-            all_tools = bing.definitions + ai_search.definitions + company_api_tool.definitions
-            self._log_or_print(f"Configured {len(all_tools)} tool functions", "info", "✅")
+            # Combine tool definitions including connected agent
+            all_tools = (bing.definitions + 
+                        ai_search.definitions + 
+                        company_api_tool.definitions + 
+                        connected_policies_agent.definitions)
             
-            self._log_or_print("Creating AI agent...", "info", "🤖")
+            self._log_or_print(f"Configured {len(all_tools)} tool functions (including connected agent)", "info", "✅")
+            
+            self._log_or_print("Creating main AI agent...", "info", "🤖")
             agent = self.project_client.agents.create_agent(
                 model=self.config.ai_projects.model_deployment_name,
                 name=self.agent_name,
@@ -190,7 +228,8 @@ class SubmissionAnalyzerAgent:
             )
             
             self.agent_id = agent.id
-            self._log_or_print(f"Agent created successfully with ID: {self.agent_id}", "info", "✅")
+            self._log_or_print(f"Main agent created successfully with ID: {self.agent_id}", "info", "✅")
+            self._log_or_print("Connected agents setup complete", "info", "🔗")
             self.logger.info(f"Created agent with ID: {self.agent_id}")
             return self.agent_id
             
@@ -580,12 +619,21 @@ class SubmissionAnalyzerAgent:
             self.logger.error(f"Failed to retrieve messages: {e}")
             raise
     
-    def analyze_submission(self, submission_content: str) -> Dict[str, Any]:
+    def analyze_submission(
+        self, 
+        submission_content: str,
+        submission_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        submitted_at: Optional[datetime] = None
+    ) -> Dict[str, Any]:
         """
-        Analyze a submission using the AI agent.
+        Analyze a submission using the AI agent and send results to Service Bus.
         
         Args:
             submission_content: The submission content to analyze
+            submission_id: Optional submission ID for Service Bus message
+            user_id: Optional user ID for Service Bus message
+            submitted_at: Optional submission timestamp for Service Bus message
             
         Returns:
             Dict[str, Any]: Analysis results including messages and run status
@@ -606,31 +654,123 @@ class SubmissionAnalyzerAgent:
             # Get all messages
             messages = self.get_messages()
             
+            # Extract assistant response for Service Bus
+            assistant_response = None
+            if messages and messages[0]['role'] == 'assistant':
+                assistant_response = self._parse_message_content(messages[0]['content'])
+            
+            # Send to Service Bus if we have the required information
+            if all([submission_id, user_id, submitted_at, assistant_response]):
+                try:
+                    self._log_or_print("Sending analysis results to Service Bus...", "info", "📤")
+                    self.service_bus_client.send_analysis_complete_message(
+                        submission_id=submission_id,
+                        user_id=user_id,
+                        submitted_at=submitted_at,
+                        results=assistant_response
+                    )
+                    self._log_or_print("Analysis results sent to Service Bus successfully", "info", "✅")
+                except Exception as e:
+                    self._log_or_print_warning(f"Failed to send Service Bus message: {e}")
+                    self.logger.warning(f"Failed to send Service Bus message: {e}")
+            else:
+                self._log_or_print("Skipping Service Bus message - missing required parameters", "info", "⏭️")
+            
             return {
                 "message_id": message_id,
                 "run_result": run_result,
-                "messages": messages
+                "messages": messages,
+                "assistant_response": assistant_response
             }
             
         except Exception as e:
             self.logger.error(f"Failed to analyze submission: {e}")
             raise
     
+    def _parse_message_content(self, content):
+        """
+        Parse message content which can be either a string or a list of content objects.
+        
+        Args:
+            content: Message content (string or list)
+            
+        Returns:
+            str: Parsed content as a string
+        """
+        if isinstance(content, str):
+            return content
+        elif isinstance(content, list):
+            # Handle list of content objects
+            parsed_parts = []
+            for item in content:
+                if isinstance(item, dict):
+                    # Handle different content types
+                    if 'type' in item and item['type'] == 'text':
+                        # Extract text content
+                        if 'text' in item:
+                            if isinstance(item['text'], dict) and 'value' in item['text']:
+                                parsed_parts.append(item['text']['value'])
+                            elif isinstance(item['text'], str):
+                                parsed_parts.append(item['text'])
+                            else:
+                                parsed_parts.append(str(item['text']))
+                        else:
+                            parsed_parts.append(str(item))
+                    elif 'type' in item and item['type'] == 'image_file':
+                        parsed_parts.append(f"[Image: {item.get('image_file', {}).get('file_id', 'unknown')}]")
+                    elif 'type' in item and item['type'] == 'image_url':
+                        parsed_parts.append(f"[Image URL: {item.get('image_url', {}).get('url', 'unknown')}]")
+                    elif 'text' in item:
+                        # Handle cases where there's no type but there's text
+                        if isinstance(item['text'], dict) and 'value' in item['text']:
+                            parsed_parts.append(item['text']['value'])
+                        else:
+                            parsed_parts.append(str(item['text']))
+                    else:
+                        parsed_parts.append(str(item))
+                else:
+                    parsed_parts.append(str(item))
+            
+            # Join parts and clean up
+            result = '\n'.join(parsed_parts)
+            result = result.replace('\\n', '\n')
+            return result
+        else:
+            return str(content)
+
     def cleanup(self):
         """
-        Clean up resources by deleting the agent.
+        Clean up resources by deleting the agents and closing Service Bus client.
         """
         if self.agent_id:
             try:
-                self._log_or_print("Cleaning up agent resources...", "info", "🧹")
+                self._log_or_print("Cleaning up main agent resources...", "info", "🧹")
                 self.project_client.agents.delete_agent(self.agent_id)
-                self._log_or_print("Agent deleted successfully", "info", "✅")
-                self.logger.info(f"Deleted agent with ID: {self.agent_id}")
+                self._log_or_print("Main agent deleted successfully", "info", "✅")
+                self.logger.info(f"Deleted main agent with ID: {self.agent_id}")
                 self.agent_id = None
-                self.thread_id = None
             except Exception as e:
-                self._log_or_print_error(f"Failed to delete agent: {e}")
-                self.logger.error(f"Failed to delete agent: {e}")
+                self._log_or_print_error(f"Failed to delete main agent: {e}")
+                self.logger.error(f"Failed to delete main agent: {e}")
+        
+        if self.policies_agent_id:
+            try:
+                self._log_or_print("Cleaning up policies agent resources...", "info", "🧹")
+                self.project_client.agents.delete_agent(self.policies_agent_id)
+                self._log_or_print("Policies agent deleted successfully", "info", "✅")
+                self.logger.info(f"Deleted policies agent with ID: {self.policies_agent_id}")
+                self.policies_agent_id = None
+            except Exception as e:
+                self._log_or_print_error(f"Failed to delete policies agent: {e}")
+                self.logger.error(f"Failed to delete policies agent: {e}")
+        
+        # Close Service Bus client
+        try:
+            self.service_bus_client.close()
+        except Exception as e:
+            self.logger.error(f"Failed to close Service Bus client: {e}")
+        
+        self.thread_id = None
     
     def __enter__(self):
         """Context manager entry."""

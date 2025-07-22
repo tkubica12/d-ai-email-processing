@@ -139,6 +139,22 @@ class TableStorageConfig(BaseModel):
     )
 
 
+class ServiceBusConfig(BaseModel):
+    """Configuration for Azure Service Bus."""
+    
+    fqdn: str = Field(
+        ...,
+        description="Azure Service Bus fully qualified domain name",
+        example="sb-email-dev-vwyh.servicebus.windows.net"
+    )
+    
+    topic_name: str = Field(
+        ...,
+        description="Service Bus topic name for processed submissions",
+        example="processed-submissions"
+    )
+
+
 class LoggingConfig(BaseModel):
     """Configuration for application logging."""
     
@@ -177,6 +193,7 @@ class AppConfig(BaseModel):
     company_api: CompanyAPIConfig
     logging: LoggingConfig
     search: AISearchConfig
+    service_bus: ServiceBusConfig
     pretty_print: bool = Field(
         default=True,
         description="Enable pretty console output for debugging",
@@ -256,6 +273,16 @@ class AppConfig(BaseModel):
                 "Check AZURE_SEARCH_SERVICE_NAME, AZURE_SEARCH_INDEX_NAME, and AZURE_SEARCH_CONNECTION_ID environment variables."
             )
         
+        # Extract Service Bus configuration
+        service_bus_fqdn = os.getenv('AZURE_SERVICE_BUS_FQDN')
+        service_bus_topic = os.getenv('AZURE_SERVICE_BUS_TOPIC_NAME')
+        
+        if not all([service_bus_fqdn, service_bus_topic]):
+            raise ValueError(
+                "Missing required Service Bus configuration. "
+                "Check AZURE_SERVICE_BUS_FQDN and AZURE_SERVICE_BUS_TOPIC_NAME environment variables."
+            )
+        
         return cls(
             ai_projects=AzureAIProjectsConfig(
                 project_endpoint=project_endpoint,
@@ -287,6 +314,10 @@ class AppConfig(BaseModel):
                 service_name=search_service_name,
                 index_name=index_name,
                 connection_id=connection_id
+            ),
+            service_bus=ServiceBusConfig(
+                fqdn=service_bus_fqdn,
+                topic_name=service_bus_topic
             ),
             pretty_print=pretty_print
         )
