@@ -180,3 +180,16 @@ resource "azurerm_cosmosdb_sql_role_assignment" "submission_trigger" {
   principal_id        = azurerm_user_assigned_identity.submission_trigger.principal_id
   scope               = azurerm_cosmosdb_account.main.id
 }
+
+# Generate UUID for submission-analyzer role assignment
+resource "random_uuid" "cosmosdb_role_assignment_guid_submission_analyzer" {}
+
+# Role assignment for submission-analyzer service
+resource "azurerm_cosmosdb_sql_role_assignment" "submission_analyzer" {
+  name                = random_uuid.cosmosdb_role_assignment_guid_submission_analyzer.result
+  resource_group_name = azurerm_resource_group.main.name
+  account_name        = azurerm_cosmosdb_account.main.name
+  role_definition_id  = azurerm_cosmosdb_sql_role_definition.data_contributor.id
+  principal_id        = azurerm_user_assigned_identity.submission_analyzer.principal_id
+  scope               = azurerm_cosmosdb_account.main.id
+}

@@ -99,6 +99,12 @@ class CosmosDBConfig(BaseModel):
         description="Cosmos DB documents container name",
         example="documents"
     )
+    
+    submissions_container_name: str = Field(
+        default="submissions",
+        description="Cosmos DB submissions container name",
+        example="submissions"
+    )
 
 
 class AzureOpenAIConfig(BaseModel):
@@ -293,7 +299,8 @@ class AppConfig(BaseModel):
                 endpoint=cosmos_db_endpoint,
                 database_name=database_name,
                 events_container_name=events_container_name,
-                documents_container_name=documents_container_name
+                documents_container_name=documents_container_name,
+                submissions_container_name=os.getenv('AZURE_COSMOS_DB_SUBMISSIONS_CONTAINER_NAME', 'submissions')
             ),
             openai=AzureOpenAIConfig(
                 endpoint=azure_openai_endpoint,

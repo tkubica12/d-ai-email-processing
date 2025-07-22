@@ -129,6 +129,31 @@ resource "azurerm_role_assignment" "submission_trigger_storage_account_reader" {
   principal_id         = azurerm_user_assigned_identity.submission_trigger.principal_id
 }
 
+# Submission Analyzer storage permissions
+resource "azurerm_role_assignment" "submission_analyzer_storage_blob_contributor" {
+  scope                = azapi_resource.storage_account.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.submission_analyzer.principal_id
+}
+
+resource "azurerm_role_assignment" "submission_analyzer_storage_table_contributor" {
+  scope                = azapi_resource.storage_account.id
+  role_definition_name = "Storage Table Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.submission_analyzer.principal_id
+}
+
+resource "azurerm_role_assignment" "submission_analyzer_storage_blob_reader" {
+  scope                = azapi_resource.storage_account.id
+  role_definition_name = "Storage Blob Data Reader"
+  principal_id         = azurerm_user_assigned_identity.submission_analyzer.principal_id
+}
+
+resource "azurerm_role_assignment" "submission_analyzer_storage_account_reader" {
+  scope                = azapi_resource.storage_account.id
+  role_definition_name = "Reader"
+  principal_id         = azurerm_user_assigned_identity.submission_analyzer.principal_id
+}
+
 # Logic App storage permissions
 resource "azurerm_role_assignment" "logic_app_storage_blob_contributor" {
   scope                = azapi_resource.storage_account.id

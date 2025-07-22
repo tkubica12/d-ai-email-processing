@@ -56,6 +56,13 @@ resource "azurerm_user_assigned_identity" "submission_trigger" {
   resource_group_name = azurerm_resource_group.main.name
 }
 
+# Managed Identity for Submission Analyzer service
+resource "azurerm_user_assigned_identity" "submission_analyzer" {
+  name                = "submission-analyzer-${random_string.suffix.result}"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+}
+
 # Managed Identity for Logic App
 resource "azurerm_user_assigned_identity" "logic_app" {
   name                = "logic-app-${random_string.suffix.result}"
