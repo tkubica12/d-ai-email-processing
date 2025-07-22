@@ -39,6 +39,16 @@ output "service_bus_subscription_logicapp_name" {
   value       = azurerm_servicebus_subscription.submission_intake_logicapp.name
 }
 
+output "service_bus_processed_submissions_topic_name" {
+  description = "The name of the Service Bus topic for processed submissions"
+  value       = azurerm_servicebus_topic.processed_submissions.name
+}
+
+output "service_bus_processed_submissions_subscription_name" {
+  description = "The name of the Service Bus subscription for processed submissions"
+  value       = azurerm_servicebus_subscription.processed_submissions.name
+}
+
 # Additional outputs for client application
 output "storage_account_blob_endpoint" {
   description = "The blob endpoint URL for the storage account"
