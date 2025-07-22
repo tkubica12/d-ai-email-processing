@@ -4,30 +4,29 @@ Scripts to help with demos and testing.
 
 ## Available Scripts
 
-### create_agent_for_logic_app.py
-A script to create an Azure AI Foundry Agent with multiple tools configured for email processing and document analysis.
+### agent_create.py
+A script to create two connected Azure AI Foundry Agents for comprehensive email processing and document analysis.
 
 **What it does:**
-- Creates an agent with Bing Grounding Tool, AI Search tools for documents and policies indexes, and OpenAPI tool
-- Configures the agent with specialized instructions for email processing
-- Optionally tests the created agent
+- Creates `companyPoliciesAgent` - Subordinate agent specializing in policy and regulatory guidance with AI Search access to company policies
+- Creates `submissionAnalyzer` - Primary agent with Bing Search, AI Search (documents), Company APIs, and connected to the policies agent
+- Automatically configures the connected agent relationship for seamless policy delegation
 
 **Prerequisites:**
 - Azure AI Foundry project set up with required connections (Bing Search, AI Search, OpenAPI)
 - Azure CLI installed and logged in (`az login`)
-- Environment variables configured (see `.env.foundry.template`)
+- Connection IDs configured in the script (modify PROJECT_ENDPOINT and connection IDs as needed)
 
 **Usage:**
 ```bash
 # Install dependencies
 uv sync
 
-# Configure environment
-cp .env.foundry.template .env.foundry
-# Edit .env.foundry with your actual values
+# Ensure you're logged into Azure
+az login
 
-# Run the script
-uv run python create_agent_for_logic_app.py
+# Run the script (modify connection IDs in the script first)
+uv run python agent_create.py
 ```
 
 ### cleanup_demo_data.py

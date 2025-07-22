@@ -55,7 +55,7 @@ resource "azapi_resource" "gpt_41_deployment" {
   body = {
     sku = {
       name     = "GlobalStandard"
-      capacity = 30
+      capacity = 150
     }
     properties = {
       model = {
@@ -75,7 +75,7 @@ resource "azapi_resource" "text_embedding_deployment" {
   body = {
     sku = {
       name     = "GlobalStandard"
-      capacity = 30
+      capacity = 150
     }
     properties = {
       model = {

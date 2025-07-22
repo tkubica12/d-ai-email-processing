@@ -116,3 +116,87 @@ resource "azapi_resource" "logic_app" {
   }
 }
 
+# Logic App connection to Azure AI Document Intelligence
+resource "azapi_resource" "logic_app_connection_document_intelligence" {
+  type      = "Microsoft.Web/connections@2018-07-01-preview"
+  name      = "document-intelligence-${local.prefix}"
+  location  = azurerm_resource_group.main.location
+  parent_id = azurerm_resource_group.main.id
+
+  body = {
+    kind = "V2"
+    properties = {
+      displayName           = "document-intelligence"
+      customParameterValues = {}
+      parameterValues = {
+        siteUrl = azurerm_cognitive_account.document_intelligence.endpoint
+        api_key = azurerm_cognitive_account.document_intelligence.primary_access_key
+      }
+      api = {
+        id = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Web/locations/${var.location}/managedApis/formrecognizer"
+      }
+    }
+  }
+
+  schema_validation_enabled = false
+}
+
+# Logic App connection to Azure OpenAI
+resource "azapi_resource" "logic_app_connection_openai" {
+  type      = "Microsoft.Web/connections@2018-07-01-preview"
+  name      = "openai-${local.prefix}"
+  location  = azurerm_resource_group.main.location
+  parent_id = azurerm_resource_group.main.id
+
+  body = {
+    kind = "V2"
+    properties = {
+      displayName           = "openai"
+      customParameterValues = {}
+      parameterValueSet = {
+        name = "managedIdentityAuth"
+        values = {
+          azureOpenAIResourceName = {
+            value = azapi_resource.ai_foundry.name
+          }
+        }
+      }
+      api = {
+        id = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Web/locations/${var.location}/managedApis/azureopenai"
+      }
+    }
+  }
+
+  schema_validation_enabled = false
+}
+
+# Logic App connection to Azure AI Foundry Agent Service
+resource "azapi_resource" "logic_app_connection_foundry_agent" {
+  type      = "Microsoft.Web/connections@2018-07-01-preview"
+  name      = "foundry-agent-${local.prefix}"
+  location  = azurerm_resource_group.main.location
+  parent_id = azurerm_resource_group.main.id
+
+  body = {
+    kind = "V2"
+    properties = {
+      displayName           = "foundry-agent"
+      customParameterValues = {}
+      parameterValueSet = {
+        name = "managedIdentityAuth"
+        values = {
+          azureAgentAIResourceName = {
+            value = "https://${azapi_resource.ai_foundry.name}.services.ai.azure.com/api/projects/${azapi_resource.ai_project.name}"
+          }
+        }
+      }
+      api = {
+        id = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Web/locations/${var.location}/managedApis/azureagentservice"
+      }
+    }
+  }
+
+  schema_validation_enabled = false
+}
+
+

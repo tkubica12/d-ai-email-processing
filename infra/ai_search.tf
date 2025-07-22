@@ -5,6 +5,7 @@ resource "azurerm_search_service" "main" {
   sku                          = "standard"
   local_authentication_enabled = true
   semantic_search_sku          = "standard"
+  authentication_failure_mode  = "http401WithBearerChallenge"
 
   identity {
     type = "SystemAssigned"

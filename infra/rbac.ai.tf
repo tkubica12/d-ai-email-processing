@@ -72,3 +72,15 @@ resource "azurerm_role_assignment" "logic_app_document_intelligence_user" {
   role_definition_name = "Cognitive Services User"
   principal_id         = azurerm_user_assigned_identity.logic_app.principal_id
 }
+
+resource "azurerm_role_assignment" "logic_app_ai_user" {
+  scope                = azapi_resource.ai_foundry.id
+  role_definition_name = "Azure AI User"
+  principal_id         = azurerm_user_assigned_identity.logic_app.principal_id
+}
+
+resource "azurerm_role_assignment" "logic_app_system_identity_ai_user" {
+  scope                = azapi_resource.ai_foundry.id
+  role_definition_name = "Azure AI User"
+  principal_id         = azapi_resource.logic_app.identity[0].principal_id
+}
