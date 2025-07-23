@@ -39,3 +39,13 @@ variable "container_app_min_replicas" {
   type        = number
   default     = 0
 }
+
+variable "operator_user_name" {
+  description = <<-EOT
+    The email address of the operator user for Microsoft Teams connection.
+    This user will be authenticated for Teams integration in Logic Apps.
+    Example: admin@company.com
+  EOT
+  type        = string
+  default     = "admin@tkubica.net"
+}

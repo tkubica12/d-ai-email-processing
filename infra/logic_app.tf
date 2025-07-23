@@ -199,4 +199,29 @@ resource "azapi_resource" "logic_app_connection_foundry_agent" {
   schema_validation_enabled = false
 }
 
+# Logic App connection to Microsoft Teams
+resource "azapi_resource" "logic_app_connection_teams" {
+  type      = "Microsoft.Web/connections@2018-07-01-preview"
+  name      = "teams-${local.prefix}"
+  location  = azurerm_resource_group.main.location
+  parent_id = azurerm_resource_group.main.id
+
+  body = {
+    kind = "V2"
+    properties = {
+      displayName = var.operator_user_name
+      authenticatedUser = {
+        name = var.operator_user_name
+      }
+      parameterValues       = {}
+      customParameterValues = {}
+      api = {
+        id = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Web/locations/${var.location}/managedApis/teams"
+      }
+    }
+  }
+
+  schema_validation_enabled = false
+}
+
 

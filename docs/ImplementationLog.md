@@ -4,6 +4,20 @@ Key architectural decisions, technical insights, and implementation progress for
 
 ## Recent Updates
 
+### 2025-07-23 - Demo Utility Enhancement
+**Addition**: Created `submit_demo_processed.py` utility script for testing processed submissions.
+**Purpose**: 
+- Sends demo processed submission messages to Service Bus topic
+- Uses predefined JSON payload matching expected processed message format
+- Enables testing of downstream components that consume processed submissions
+- Follows same authentication and configuration patterns as other demo utilities
+
+**Technical Implementation**: 
+- Uses Azure Service Bus SDK with DefaultAzureCredential
+- Configurable via `AZURE_SERVICE_BUS_PROCESSED_TOPIC_NAME` environment variable
+- JSON message includes submissionId, userId, timestamps, and processing results
+- Comprehensive error handling and logging
+
 ### 2025-07-23 - Logic Apps GitHub Actions Deployment Fix
 **Issue**: GitHub Actions workflow was incorrectly configured to build .NET code for Logic Apps Standard deployment.
 **Resolution**: 

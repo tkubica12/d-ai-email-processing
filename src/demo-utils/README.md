@@ -48,6 +48,26 @@ az login
 uv run python cleanup_demo_data.py
 ```
 
+### submit_demo_processed.py
+A utility script to send a demo processed submission message to Service Bus.
+
+**What it does:**
+- Sends a single demo message to the processed submissions Service Bus topic
+- Uses predefined JSON content with sample processed submission data
+- Useful for testing downstream components that consume processed submission messages
+
+**Usage:**
+```bash
+# Install dependencies
+uv sync
+
+# Ensure you're logged into Azure
+az login
+
+# Run the demo processed message submission
+uv run python submit_demo_processed.py
+```
+
 ### submit_demo_data.py
 A utility script to submit demo data from the demo-submissions folder.
 
