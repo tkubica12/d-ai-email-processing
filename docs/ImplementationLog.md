@@ -2,6 +2,19 @@
 
 Key architectural decisions, technical insights, and implementation progress for the AI Email Processing System.
 
+## Recent Updates
+
+### 2025-07-23 - Logic Apps GitHub Actions Deployment Fix
+**Issue**: GitHub Actions workflow was incorrectly configured to build .NET code for Logic Apps Standard deployment.
+**Resolution**: 
+- Removed unnecessary .NET build steps and dotnet-version configuration
+- Logic Apps Standard workflows are JSON-based and don't require compilation
+- Updated workflow to use direct zip deployment approach with Azure Functions action
+- Changed runner from windows-latest to ubuntu-latest for better performance
+- Updated Azure login and functions-action to use current versions (v2 and v1 respectively)
+
+**Technical Decision**: Logic Apps Standard uses the same deployment mechanism as Azure Functions (zip deploy) but without the build requirement since workflows are JSON definitions.
+
 ## Architecture Overview
 
 ### Technology Stack
