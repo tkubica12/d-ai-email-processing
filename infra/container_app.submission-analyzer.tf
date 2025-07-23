@@ -85,7 +85,7 @@ resource "azapi_resource" "submission_analyzer" {
               },
               {
                 name  = "AZURE_OPENAI_MODEL"
-                value = "gpt-4o"
+                value = "gpt-4.1"
               },
               {
                 name  = "BING_CONNECTION_ID"

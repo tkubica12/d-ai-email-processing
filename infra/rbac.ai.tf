@@ -13,6 +13,12 @@ resource "azurerm_role_assignment" "current_user_openai_user" {
   principal_id         = data.azurerm_client_config.current.object_id
 }
 
+resource "azurerm_role_assignment" "current_user_ai_developer" {
+  scope                = azapi_resource.ai_foundry.id
+  role_definition_name = "Azure AI User"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
 # Document Parser Foundry service AI permissions
 resource "azurerm_role_assignment" "docproc_parser_foundry_document_intelligence_user" {
   scope                = azurerm_cognitive_account.document_intelligence.id
@@ -64,6 +70,12 @@ resource "azurerm_role_assignment" "submission_analyzer_document_intelligence_us
 resource "azurerm_role_assignment" "submission_analyzer_openai_user" {
   scope                = azapi_resource.ai_foundry.id
   role_definition_name = "Cognitive Services OpenAI User"
+  principal_id         = azurerm_user_assigned_identity.submission_analyzer.principal_id
+}
+
+resource "azurerm_role_assignment" "submission_analyzer_ai_developer" {
+  scope                = azapi_resource.ai_foundry.id
+  role_definition_name = "Azure AI User"
   principal_id         = azurerm_user_assigned_identity.submission_analyzer.principal_id
 }
 

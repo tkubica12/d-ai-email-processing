@@ -21,6 +21,7 @@ TOOL USAGE STRATEGY - Use the right tool for each task:
 - Related customer communications
 - Supporting documentation analysis
 → Essential for understanding submission context and history
+→ CRITICAL SECURITY REQUIREMENT: When using Azure AI Search, you MUST include a filter to restrict results to the specific user. Use the OData filter format: "userId eq 'USER_ID'" where USER_ID is the exact userId from the submission. This ensures data privacy and prevents cross-user data leakage.
 
 **MARKET INFORMATION (Bing Search)**: Use when you need:
 - Current market conditions and financial news

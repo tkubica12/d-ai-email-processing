@@ -48,6 +48,19 @@ Enhanced security and modularity:
 - **Structured Outputs**: Flat Pydantic models preferred over nested structures
 - **Template Engine**: Jinja2 for dynamic prompt generation
 - **API Version**: Stable `2024-06-01` for production reliability
+- **Rate Limit Handling**: Tenacity retry decorators with exponential backoff for Azure AI agent calls
+
+### Error Handling & Resilience
+- **Retry Logic**: Implemented on submission-analyzer agent calls using tenacity
+  - 3 retry attempts with exponential backoff (4-10 seconds)
+  - Specific handling for 429 (rate limit), 401/403 (auth), and connection errors
+  - Comprehensive logging for retry attempts and failures
+
+### Security & Data Isolation
+- **User-specific Document Filtering**: Azure AI Search tool configured with OData filters
+  - Filter syntax: `userId eq 'user_value'` applied at tool creation time
+  - New agent instance created per submission for proper security isolation
+  - Prevents cross-user data access in document search results
 
 ### Data Processing & Storage
 - **Event Processing**: Change feed with continuation token management

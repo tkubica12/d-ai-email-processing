@@ -11,6 +11,7 @@ from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
 from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential
+from azure.core.exceptions import HttpResponseError, ClientAuthenticationError
 from azure.ai.agents.models import (
     BingGroundingTool, 
     OpenApiTool,
@@ -18,6 +19,14 @@ from azure.ai.agents.models import (
     AzureAISearchTool,
     AzureAISearchQueryType,
     ConnectedAgentTool
+)
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    before_sleep_log,
+    after_log
 )
 
 from config import AppConfig, setup_logging
@@ -132,9 +141,12 @@ class SubmissionAnalyzerAgent:
         """Helper for warning messages."""
         self._log_or_print(message, "warning", emoji)
     
-    def create_agent(self) -> str:
+    def create_agent(self, user_id: Optional[str] = None) -> str:
         """
         Create an Azure AI agent with Bing grounding, Company API, AI Search tools, and connected policies agent.
+        
+        Args:
+            user_id: Optional user ID to filter search results. If provided, Azure AI Search will only return documents for this user.
         
         Returns:
             str: The created agent ID
@@ -177,12 +189,21 @@ class SubmissionAnalyzerAgent:
             
             # Create Azure AI Search tool for document search
             self._log_or_print("Configuring Azure AI Search tool...", "info", "🔍")
+            
+            # Create user-specific filter for security
+            search_filter = ""
+            if user_id:
+                search_filter = f"userId eq '{user_id}'"
+                self._log_or_print(f"Applying security filter: {search_filter}", "info", "🔒")
+            else:
+                self._log_or_print("No user filter applied - agent will see all documents", "warning", "⚠️")
+            
             ai_search = AzureAISearchTool(
                 index_connection_id=self.config.search.connection_id,
                 index_name=self.config.search.index_name,
                 # query_type=AzureAISearchQueryType.VECTOR_SEMANTIC_HYBRID,  # Use hybrid search (vector + semantic)
                 top_k=5,  # Retrieve top 5 results
-                filter=""  # No additional filters (security trimming handled by agent context)
+                filter=search_filter  # Security filter to restrict documents by userId
             )
             
             # Load Company API OpenAPI specification
@@ -296,7 +317,14 @@ class SubmissionAnalyzerAgent:
             self._log_or_print_error(f"Failed to send message: {e}")
             self.logger.error(f"Failed to send message: {e}")
             raise
-    
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10),
+        retry=retry_if_exception_type((HttpResponseError, ClientAuthenticationError, TimeoutError, ConnectionError)),
+        before_sleep=before_sleep_log(logging.getLogger(__name__), logging.WARNING),
+        after=after_log(logging.getLogger(__name__), logging.INFO)
+    )
     def run_agent(self) -> Dict[str, Any]:
         """
         Execute the agent to process messages in the thread.
@@ -443,6 +471,17 @@ class SubmissionAnalyzerAgent:
                 "tool_usage": tool_usage
             }
             
+        except HttpResponseError as e:
+            if e.status_code == 429:
+                self.logger.warning(f"Rate limit exceeded (429). Will retry after backoff. Error: {e}")
+                raise  # Let tenacity handle the retry
+            elif e.status_code in [401, 403]:
+                self.logger.warning(f"Authentication error ({e.status_code}). Will retry after backoff. Error: {e}")
+                raise ClientAuthenticationError(f"Authentication failed: {e}") from e
+            else:
+                self.logger.error(f"HTTP error {e.status_code} from Azure AI Projects: {e}")
+                self._log_or_print(f"❌ HTTP error {e.status_code} from Azure AI Projects: {e}", "error")
+                raise
         except Exception as e:
             self._log_or_print(f"❌ Failed to run agent: {e}", "error")
             self.logger.error(f"Failed to run agent: {e}")
@@ -641,12 +680,21 @@ class SubmissionAnalyzerAgent:
         try:
             # Create agent and thread if not already created
             if not self.agent_id:
-                self.create_agent()
+                self.create_agent(user_id=user_id)
             if not self.thread_id:
                 self.create_thread()
             
             # Send the submission for analysis
-            message_id = self.send_message(f"Please analyze this submission: {submission_content}")
+            analysis_message = f"""Please analyze this submission for user {user_id}:
+
+User ID: {user_id}
+{f"Submission ID: {submission_id}" if submission_id else ""}
+
+{submission_content}
+
+Note: When searching documents, please filter results to only include documents for user ID: {user_id}"""
+            
+            message_id = self.send_message(analysis_message)
             
             # Run the agent
             run_result = self.run_agent()

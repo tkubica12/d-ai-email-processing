@@ -35,6 +35,7 @@ from models import (
 )
 from continuation_token_storage import ContinuationTokenStorage
 from agent import SubmissionAnalyzerAgent
+from service_bus_client import SubmissionServiceBusClient
 
 
 class ChangeFeedProcessor:
@@ -57,7 +58,7 @@ class ChangeFeedProcessor:
         self.cosmos_client: Optional[CosmosClient] = None
         self.continuation_token: Optional[str] = None
         self.token_storage: Optional[ContinuationTokenStorage] = None
-        self.analyzer_agent: Optional[SubmissionAnalyzerAgent] = None
+        self.service_bus_client: Optional[SubmissionServiceBusClient] = None
         self.processor_id = "submission-analyzer"
         
     async def initialize(self) -> None:
@@ -81,8 +82,11 @@ class ChangeFeedProcessor:
             self.token_storage = ContinuationTokenStorage(self.config.table_storage)
             await self.token_storage.initialize()
             
-            # Initialize analyzer agent
-            self.analyzer_agent = SubmissionAnalyzerAgent(self.config)
+            # Initialize Service Bus client
+            self.service_bus_client = SubmissionServiceBusClient(self.config.service_bus)
+            
+            # Note: We don't initialize analyzer_agent here anymore
+            # Each submission will get its own agent instance with proper user filtering
             
             # Load continuation token if available
             if self.token_storage.config.enabled:
@@ -333,24 +337,32 @@ class ChangeFeedProcessor:
             for doc in submission_record.documents:
                 submission_content += f"- {doc.type}: {doc.documentUrl}\n"
             
-            # Use agent to analyze submission
-            result = self.analyzer_agent.analyze_submission(
-                submission_content=submission_content,
-                submission_id=submission_record.submissionId,
-                user_id=submission_record.userId,
-                submitted_at=submission_record.submittedAt
-            )
+            # Create a new agent instance for this user to ensure proper filtering
+            analyzer_agent = SubmissionAnalyzerAgent(self.config)
             
-            # Extract analysis results from agent response
-            # This is a simplified parsing - in practice you might need more sophisticated parsing
-            analysis_text = result.get('messages', [{}])[0].get('content', '')
+            try:
+                # Use agent to analyze submission
+                result = analyzer_agent.analyze_submission(
+                    submission_content=submission_content,
+                    submission_id=submission_record.submissionId,
+                    user_id=submission_record.userId,
+                    submitted_at=submission_record.submittedAt
+                )
+                
+                # Extract analysis results from agent response
+                # This is a simplified parsing - in practice you might need more sophisticated parsing
+                analysis_text = result.get('messages', [{}])[0].get('content', '')
+                
+                # For now, return mock results - you should implement proper parsing of the agent response
+                return AnalysisResults(
+                    completeness=0.85,
+                    recommendations=["Review documents for completeness", "Verify vendor information"],
+                    issues=[]
+                )
             
-            # For now, return mock results - you should implement proper parsing of the agent response
-            return AnalysisResults(
-                completeness=0.85,
-                recommendations=["Review documents for completeness", "Verify vendor information"],
-                issues=[]
-            )
+            finally:
+                # Clean up the agent instance to avoid resource leaks
+                analyzer_agent.cleanup()
             
         except Exception as e:
             self.logger.error(f"Failed to analyze submission {submission_record.submissionId}: {str(e)}")
@@ -451,8 +463,8 @@ class ChangeFeedProcessor:
                 for issue in analysis_result.issues:
                     results_text += f"- {issue}\n"
             
-            # Use the analyzer agent's service bus client
-            self.analyzer_agent.service_bus_client.send_analysis_complete_message(
+            # Use the service bus client
+            self.service_bus_client.send_analysis_complete_message(
                 submission_id=event.submissionId,
                 user_id=event.userId,
                 submitted_at=event.timestamp,
@@ -475,7 +487,7 @@ class ChangeFeedProcessor:
         if self.token_storage:
             await self.token_storage.close()
             
-        if self.analyzer_agent:
-            self.analyzer_agent.cleanup()
+        if self.service_bus_client:
+            self.service_bus_client.close()
             
         self.logger.info("Change Feed processor closed")
