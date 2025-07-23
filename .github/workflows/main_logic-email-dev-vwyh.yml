@@ -5,19 +5,19 @@ name: Build and deploy Logic Apps to Azure - logic-email-dev-vwyh
 
 on:
   push:
-    branches:
-      - main
+    paths:
+      - 'logic-apps/**'
   workflow_dispatch:
 
 env:
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: 'logic-apps' # set this to the path to your logic app project
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: 'logic-apps' 
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write #This is required for requesting the JWT
-      contents: read #This is required for actions/checkout
+      id-token: write 
+      contents: read 
 
     steps:
       - name: 'Checkout GitHub Action'
