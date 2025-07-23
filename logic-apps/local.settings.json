@@ -1,0 +1,24 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage__queueServiceUri": "https://stemaildevvwyhemail.queue.core.windows.net",
+    "FUNCTIONS_EXTENSION_VERSION": "~4",
+    "AzureWebJobsStorage__blobServiceUri": "https://stemaildevvwyhemail.blob.core.windows.net",
+    "WEBSITE_SITE_NAME": "logic-email-dev-vwyh",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet",
+    "APP_KIND": "workflowApp",
+    "WEBSITE_AUTH_ENABLED": "False",
+    "ScmType": "None",
+    "AzureBlob_blobStorageEndpoint": "https://stemaildevvwyhemail.blob.core.windows.net",
+    "serviceBus_fullyQualifiedNamespace": "sb-email-dev-vwyh.servicebus.windows.net",
+    "FUNCTIONS_RUNTIME_SCALE_MONITORING_ENABLED": "1",
+    "WEBSITE_SLOT_NAME": "Production",
+    "APPLICATIONINSIGHTS_CONNECTION_STRING": "InstrumentationKey=f32286fb-e1b2-4b09-b74f-8769f649923c;IngestionEndpoint=https://swedencentral-0.in.applicationinsights.azure.com/;LiveEndpoint=https://swedencentral.livediagnostics.monitor.azure.com/;ApplicationId=c5568f40-29a1-4cce-b3bb-278ed8546438",
+    "WEBSITE_NODE_DEFAULT_VERSION": "20.18.3",
+    "WEBSITE_DEFAULT_HOSTNAME": "logic-email-dev-vwyh.azurewebsites.net",
+    "AzureWebJobsStorage__credential": "managedIdentity",
+    "AzureWebJobsStorage__managedIdentityResourceId": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/resourceGroups/rg-email-dev-vwyh/providers/Microsoft.ManagedIdentity/userAssignedIdentities/logic-app-vwyh",
+    "APPINSIGHTS_INSTRUMENTATIONKEY": "f32286fb-e1b2-4b09-b74f-8769f649923c",
+    "AzureWebJobsStorage__tableServiceUri": "https://stemaildevvwyhemail.table.core.windows.net"
+  }
+}

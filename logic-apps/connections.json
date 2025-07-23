@@ -1,0 +1,207 @@
+{
+  "serviceProviderConnections": {
+    "azureaisearch": {
+      "parameterValues": {
+        "searchServiceEndpoint": "@appsetting('azureaisearch_searchServiceEndpoint')",
+        "authProvider": {
+          "Type": "ManagedServiceIdentity"
+        }
+      },
+      "parameterSetName": "ManagedServiceIdentity",
+      "serviceProvider": {
+        "id": "/serviceProviders/azureaisearch"
+      },
+      "displayName": "search"
+    },
+    "azureaisearch-1": {
+      "parameterValues": {
+        "searchServiceEndpoint": "@appsetting('azureaisearch_11_searchServiceEndpoint')",
+        "authProvider": {
+          "Type": "ManagedServiceIdentity"
+        }
+      },
+      "parameterSetName": "ManagedServiceIdentity",
+      "serviceProvider": {
+        "id": "/serviceProviders/azureaisearch"
+      },
+      "displayName": "search-new"
+    },
+    "azureaisearch-2": {
+      "parameterValues": {
+        "searchServiceEndpoint": "@appsetting('azureaisearch_12_searchServiceEndpoint')",
+        "searchServiceAdminKey": "@appsetting('azureaisearch_12_searchServiceAdminKey')"
+      },
+      "parameterSetName": "ConnectionString",
+      "serviceProvider": {
+        "id": "/serviceProviders/azureaisearch"
+      },
+      "displayName": "new_conn_bb3a8"
+    },
+    "serviceBus": {
+      "parameterValues": {
+        "fullyQualifiedNamespace": "@appsetting('serviceBus_fullyQualifiedNamespace')",
+        "authProvider": {
+          "Type": "ManagedServiceIdentity"
+        }
+      },
+      "parameterSetName": "ManagedServiceIdentity",
+      "serviceProvider": {
+        "id": "/serviceProviders/serviceBus"
+      },
+      "displayName": "service-bus-topic-new-submission"
+    },
+    "AzureBlob": {
+      "parameterValues": {
+        "blobStorageEndpoint": "@appsetting('AzureBlob_blobStorageEndpoint')",
+        "authProvider": {
+          "Type": "ManagedServiceIdentity"
+        }
+      },
+      "parameterSetName": "ManagedServiceIdentity",
+      "serviceProvider": {
+        "id": "/serviceProviders/AzureBlob"
+      },
+      "displayName": "storage_account"
+    },
+    "azureaisearch-3": {
+      "parameterValues": {
+        "searchServiceEndpoint": "@appsetting('azureaisearch_13_searchServiceEndpoint')",
+        "authProvider": {
+          "Type": "ManagedServiceIdentity"
+        }
+      },
+      "parameterSetName": "ManagedServiceIdentity",
+      "serviceProvider": {
+        "id": "/serviceProviders/azureaisearch"
+      },
+      "displayName": "new_conn_299b4"
+    }
+  },
+  "managedApiConnections": {
+    "formrecognizer": {
+      "api": {
+        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/providers/Microsoft.Web/locations/swedencentral/managedApis/formrecognizer"
+      },
+      "connection": {
+        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/resourceGroups/rg-email-dev-vwyh/providers/Microsoft.Web/connections/formrecognizer"
+      },
+      "authentication": {
+        "type": "ManagedServiceIdentity"
+      },
+      "connectionRuntimeUrl": "https://796b941889f7c49e.10.common.logic-swedencentral.azure-apihub.net/apim/formrecognizer/78a6ae3de61746a78bb254014960a41d"
+    },
+    "azureopenai": {
+      "api": {
+        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/providers/Microsoft.Web/locations/swedencentral/managedApis/azureopenai"
+      },
+      "connection": {
+        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/resourceGroups/rg-email-dev-vwyh/providers/Microsoft.Web/connections/azureopenai"
+      },
+      "authentication": {
+        "type": "ManagedServiceIdentity"
+      },
+      "connectionRuntimeUrl": "https://796b941889f7c49e.10.common.logic-swedencentral.azure-apihub.net/apim/azureopenai/63c127d0264341a2b2fcd79338767e6b",
+      "connectionProperties": {
+        "authentication": {
+          "type": "ManagedServiceIdentity",
+          "audience": "https://cognitiveservices.azure.com/"
+        }
+      }
+    },
+    "azureagentservice": {
+      "api": {
+        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/providers/Microsoft.Web/locations/swedencentral/managedApis/azureagentservice"
+      },
+      "connection": {
+        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/resourceGroups/rg-email-dev-vwyh/providers/Microsoft.Web/connections/azureagentservice"
+      },
+      "authentication": {
+        "type": "ManagedServiceIdentity"
+      },
+      "connectionRuntimeUrl": "https://796b941889f7c49e.10.common.logic-swedencentral.azure-apihub.net/apim/azureagentservice/91d5396e27ba416a96cdae3b7cbf182c",
+      "connectionProperties": {
+        "authentication": {
+          "type": "ManagedServiceIdentity",
+          "audience": "https://ai.azure.com/"
+        }
+      }
+    },
+    "formrecognizer-1": {
+      "api": {
+        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/providers/Microsoft.Web/locations/swedencentral/managedApis/formrecognizer"
+      },
+      "connection": {
+        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/resourceGroups/rg-email-dev-vwyh/providers/Microsoft.Web/connections/document-intelligence-email-dev-vwyh"
+      },
+      "authentication": {
+        "type": "ManagedServiceIdentity"
+      },
+      "connectionRuntimeUrl": "https://796b941889f7c49e.10.common.logic-swedencentral.azure-apihub.net/apim/formrecognizer/099e700f746142a9a5a420df96576e31"
+    },
+    "azureopenai-1": {
+      "api": {
+        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/providers/Microsoft.Web/locations/swedencentral/managedApis/azureopenai"
+      },
+      "connection": {
+        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/resourceGroups/rg-email-dev-vwyh/providers/Microsoft.Web/connections/openai-email-dev-vwyh"
+      },
+      "authentication": {
+        "type": "ManagedServiceIdentity"
+      },
+      "connectionRuntimeUrl": "https://796b941889f7c49e.10.common.logic-swedencentral.azure-apihub.net/apim/azureopenai/07a4f906f5c049138b0bbb7b9fdee601",
+      "connectionProperties": {
+        "authentication": {
+          "type": "ManagedServiceIdentity",
+          "audience": "https://cognitiveservices.azure.com/"
+        }
+      }
+    },
+    "azureagentservice-1": {
+      "api": {
+        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/providers/Microsoft.Web/locations/swedencentral/managedApis/azureagentservice"
+      },
+      "connection": {
+        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/resourceGroups/rg-email-dev-vwyh/providers/Microsoft.Web/connections/foundry-agent-email-dev-vwyh"
+      },
+      "authentication": {
+        "type": "ManagedServiceIdentity"
+      },
+      "connectionRuntimeUrl": "https://796b941889f7c49e.10.common.logic-swedencentral.azure-apihub.net/apim/azureagentservice/869e38a72b904c8092e57ada632ab3c9",
+      "connectionProperties": {
+        "authentication": {
+          "type": "ManagedServiceIdentity",
+          "audience": "https://ai.azure.com/"
+        }
+      }
+    },
+    "azureagentservice-2": {
+      "api": {
+        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/providers/Microsoft.Web/locations/swedencentral/managedApis/azureagentservice"
+      },
+      "connection": {
+        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/resourceGroups/rg-email-dev-vwyh/providers/Microsoft.Web/connections/azureagentservice-2"
+      },
+      "authentication": {
+        "type": "ManagedServiceIdentity"
+      },
+      "connectionRuntimeUrl": "https://796b941889f7c49e.10.common.logic-swedencentral.azure-apihub.net/apim/azureagentservice/4857a8ab792f481daffd379e355d6197",
+      "connectionProperties": {
+        "authentication": {
+          "type": "ManagedServiceIdentity",
+          "audience": "https://ai.azure.com/"
+        }
+      }
+    }
+  },
+  "agentConnections": {
+    "agent": {
+      "displayName": "FoundryOpenAI",
+      "authentication": {
+        "type": "ManagedServiceIdentity"
+      },
+      "endpoint": "@appsetting('agent_openAIEndpoint')",
+      "resourceId": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/resourceGroups/rg-email-dev-vwyh/providers/Microsoft.CognitiveServices/accounts/openai-email-dev-vwyh",
+      "type": "model"
+    }
+  }
+}
