@@ -41,6 +41,12 @@ The system offers multiple architectural approaches for different scalability an
    terraform output -json
    ```
 
+3. **Deploy Logic Apps via GitHub Actions**
+   - Logic Apps workflows and connections are deployed automatically via GitHub Actions
+   - Terraform creates the Logic Apps infrastructure and connectors
+   - GitHub Actions deploys the workflow definitions and configuration
+   - Push to `main` branch triggers automatic deployment of Logic Apps Standard
+
 ### Running Services
 
 The system consists of multiple services that work together:
@@ -129,6 +135,22 @@ After infrastructure deployment, services are automatically deployed to Azure Co
 - **Monitoring**: Application Insights integration for observability
 
 Access the deployed web application using the `client_web_url` output from Terraform.
+
+## Logic Apps Deployment
+
+The system uses a hybrid deployment approach for Logic Apps:
+
+### Infrastructure (Terraform)
+- **Logic Apps Standard runtime**: Creates the hosting environment
+- **API Connections**: Deploys connectors for external services (email, storage, etc.)
+- **Access policies**: Configures managed identity and RBAC permissions
+
+### Workflows (GitHub Actions)
+- **Workflow definitions**: JSON-based Logic Apps workflows in `logic-apps/` folder
+- **Connections configuration**: Runtime connection settings and parameters
+- **Automatic deployment**: Triggered on push to main branch via `.github/workflows/`
+
+This separation allows infrastructure to be managed through IaC while enabling rapid iteration on workflow logic through version control.
 
 ## Development
 

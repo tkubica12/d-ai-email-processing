@@ -13,7 +13,7 @@
     "serviceBus_fullyQualifiedNamespace": "sb-email-dev-vwyh.servicebus.windows.net",
     "FUNCTIONS_RUNTIME_SCALE_MONITORING_ENABLED": "1",
     "WEBSITE_SLOT_NAME": "Production",
-    "APPLICATIONINSIGHTS_CONNECTION_STRING": "InstrumentationKey=f32286fb-e1b2-4b09-b74f-8769f649923c;IngestionEndpoint=https://swedencentral-0.in.applicationinsights.azure.com/;LiveEndpoint=https://swedencentral.livediagnostics.monitor.azure.com/;ApplicationId=c5568f40-29a1-4cce-b3bb-278ed8546438",
+    "APPLICATIONINSIGHTS_CONNECTION_STRING": "InstrumentationKey",
     "WEBSITE_NODE_DEFAULT_VERSION": "20.18.3",
     "WEBSITE_DEFAULT_HOSTNAME": "logic-email-dev-vwyh.azurewebsites.net",
     "AzureWebJobsStorage__credential": "managedIdentity",
