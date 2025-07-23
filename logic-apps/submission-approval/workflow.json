@@ -1,0 +1,248 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Post_adaptive_card_and_wait_for_a_response": {
+        "type": "ApiConnectionWebhook",
+        "inputs": {
+          "host": {
+            "connection": {
+              "referenceName": "teams-1"
+            }
+          },
+          "body": {
+            "notificationUrl": "@listCallbackUrl()",
+            "body": {
+              "messageBody": "{\n  \"type\": \"AdaptiveCard\",\n  \"body\": [\n    {\n      \"type\": \"TextBlock\",\n      \"text\": \"I have processed @{body('Parse_JSON_message')?['submissionId']} submission from @{body('Parse_JSON_message')?['userId']}\",\n      \"wrap\": true\n    },\n    {\n      \"type\": \"TextBlock\",\n      \"text\": \"@{body('Parse_JSON_message')?['results']}\",\n      \"wrap\": true\n    }\n  ],\n  \"actions\": [\n    {\n      \"type\": \"Action.Submit\",\n      \"title\": \"Approve\",\n      \"data\": {\n        \"response\": \"approve\"\n      }\n    },\n    {\n      \"type\": \"Action.Submit\",\n      \"title\": \"Disapprove\",\n      \"data\": {\n        \"response\": \"disapprove\"\n      }\n    }\n  ],\n  \"$schema\": \"http://adaptivecards.io/schemas/adaptive-card.json\",\n  \"version\": \"1.4\"\n}\n",
+              "updateMessage": "Thanks for your response!",
+              "recipient": {
+                "groupId": "fbdd6860-b5b5-4b72-9adf-0a52e4d5c481",
+                "channelId": "19:n38POrtuWSFWYJjN0JpwXBYmJCCMvKOc5-E7GglA7Fs1@thread.tacv2"
+              }
+            }
+          },
+          "path": "/v1.0/teams/conversation/gatherinput/poster/Flow bot/location/@{encodeURIComponent('Channel')}/$subscriptions"
+        },
+        "runAfter": {
+          "Parse_JSON_message": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "Parse_JSON_message": {
+        "type": "ParseJson",
+        "inputs": {
+          "content": "@triggerBody()?['contentData']",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "submissionId": {
+                "type": "string"
+              },
+              "userId": {
+                "type": "string"
+              },
+              "submittedAt": {
+                "type": "string"
+              },
+              "processedAt": {
+                "type": "string"
+              },
+              "results": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "runAfter": {}
+      },
+      "Is_approved": {
+        "type": "If",
+        "expression": {
+          "and": [
+            {
+              "equals": [
+                "@body('Parse_JSON_Teams_response')?['submitActionId']",
+                "Approve"
+              ]
+            }
+          ]
+        },
+        "actions": {
+          "Reply_with_sent_message": {
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connection": {
+                  "referenceName": "teams-1"
+                }
+              },
+              "method": "post",
+              "body": {
+                "parentMessageId": "@body('Parse_JSON_Teams_response')?['messageId']",
+                "recipient": {
+                  "groupId": "fbdd6860-b5b5-4b72-9adf-0a52e4d5c481",
+                  "channelId": "19:n38POrtuWSFWYJjN0JpwXBYmJCCMvKOc5-E7GglA7Fs1@thread.tacv2"
+                },
+                "messageBody": "<p class=\"editor-paragraph\">Great! Response was sent to customer.</p>"
+              },
+              "path": "/v1.0/teams/conversation/replyWithMessage/poster/Flow bot/location/@{encodeURIComponent('Channel')}"
+            },
+            "runAfter": {
+              "Send_an_email_(V2)": [
+                "SUCCEEDED"
+              ]
+            }
+          },
+          "Send_an_email_(V2)": {
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connection": {
+                  "referenceName": "office365-1"
+                }
+              },
+              "method": "post",
+              "body": {
+                "To": "@body('Parse_JSON_message')?['userId']",
+                "Subject": "Thanks for your request!",
+                "Body": "<p class=\"editor-paragraph\">@{body('Parse_JSON_message')?['results']}</p>",
+                "Importance": "Normal"
+              },
+              "path": "/v2/Mail"
+            }
+          }
+        },
+        "else": {
+          "actions": {
+            "Reply_with_followup_message": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "referenceName": "teams-1"
+                  }
+                },
+                "method": "post",
+                "body": {
+                  "parentMessageId": "@body('Parse_JSON_Teams_response')?['messageId']",
+                  "recipient": {
+                    "groupId": "fbdd6860-b5b5-4b72-9adf-0a52e4d5c481",
+                    "channelId": "19:n38POrtuWSFWYJjN0JpwXBYmJCCMvKOc5-E7GglA7Fs1@thread.tacv2"
+                  },
+                  "messageBody": "<p class=\"editor-paragraph\">OK, please followup with customer.</p>"
+                },
+                "path": "/v1.0/teams/conversation/replyWithMessage/poster/Flow bot/location/@{encodeURIComponent('Channel')}"
+              },
+              "runAfter": {
+                "Draft_an_email_message": [
+                  "SUCCEEDED"
+                ]
+              }
+            },
+            "Draft_an_email_message": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "referenceName": "office365-1"
+                  }
+                },
+                "method": "post",
+                "body": {
+                  "To": "@body('Parse_JSON_message')?['userId']",
+                  "Subject": "Thanks for your request!",
+                  "Body": "<p class=\"editor-paragraph\">@{body('Parse_JSON_message')?['results']}</p>",
+                  "Importance": "Normal"
+                },
+                "path": "/Draft"
+              }
+            }
+          }
+        },
+        "runAfter": {
+          "Parse_JSON_Teams_response": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "Parse_JSON_Teams_response": {
+        "type": "ParseJson",
+        "inputs": {
+          "content": "@body('Post_adaptive_card_and_wait_for_a_response')",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "responseTime": {
+                "type": "string"
+              },
+              "responder": {
+                "type": "object",
+                "properties": {
+                  "objectId": {
+                    "type": "string"
+                  },
+                  "tenantId": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "userPrincipalName": {
+                    "type": "string"
+                  },
+                  "displayName": {
+                    "type": "string"
+                  }
+                }
+              },
+              "submitActionId": {
+                "type": "string"
+              },
+              "messageId": {
+                "type": "string"
+              },
+              "messageLink": {
+                "type": "string"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "response": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "runAfter": {
+          "Post_adaptive_card_and_wait_for_a_response": [
+            "SUCCEEDED"
+          ]
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "When_messages_are_available_in_a_topic": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "topicName": "processed-submissions",
+            "subscriptionName": "processed-submissions-consumer",
+            "isSessionsEnabled": false
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "receiveTopicMessages",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "splitOn": "@triggerOutputs()?['body']"
+      }
+    }
+  },
+  "kind": "Stateful"
+}

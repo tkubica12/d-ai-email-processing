@@ -224,4 +224,29 @@ resource "azapi_resource" "logic_app_connection_teams" {
   schema_validation_enabled = false
 }
 
+# Logic App connection to Office 365 Outlook
+resource "azapi_resource" "logic_app_connection_office365" {
+  type      = "Microsoft.Web/connections@2018-07-01-preview"
+  name      = "office365-${local.prefix}"
+  location  = azurerm_resource_group.main.location
+  parent_id = azurerm_resource_group.main.id
+
+  body = {
+    kind = "V2"
+    properties = {
+      displayName = var.operator_user_name
+      authenticatedUser = {
+        name = var.operator_user_name
+      }
+      parameterValues       = {}
+      customParameterValues = {}
+      api = {
+        id = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Web/locations/${var.location}/managedApis/office365"
+      }
+    }
+  }
+
+  schema_validation_enabled = false
+}
+
 
