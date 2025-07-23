@@ -152,6 +152,14 @@ The system uses a hybrid deployment approach for Logic Apps:
 
 This separation allows infrastructure to be managed through IaC while enabling rapid iteration on workflow logic through version control.
 
+### Teams Integration Setup
+After deployment, the Microsoft Teams connector requires manual authorization:
+
+1. **Navigate to Azure Portal** → Logic Apps → your logic app → API connections
+2. **Find the Teams connection** and click on it
+3. **Click "Authorize"** to authenticate and grant permissions
+4. **Configure operator account**: Set the `operator_user_name` variable in `terraform.tfvars` to specify which user account will be used for Teams notifications (default: `admin@tkubica.net`)
+
 ## Development
 
 ### Local Development
