@@ -1,0 +1,153 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Initialize_submissionId": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "submissionId",
+              "type": "string",
+              "value": "@{guid()}"
+            }
+          ]
+        },
+        "runAfter": {}
+      },
+      "Upload_message_body_to_storage": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "containerName": "@variables('submissionId')",
+            "blobName": "body.txt",
+            "content": "@triggerBody()?['body']",
+            "overrideIfExists": "true"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "AzureBlob",
+            "operationId": "uploadBlob",
+            "serviceProviderId": "/serviceProviders/AzureBlob"
+          }
+        },
+        "runAfter": {
+          "Initialize_submissionId": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "Initialize_urls_array": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "urls",
+              "type": "array"
+            }
+          ]
+        },
+        "runAfter": {
+          "Upload_message_body_to_storage": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "For_each": {
+        "type": "foreach",
+        "foreach": "@triggerBody()?['attachments']",
+        "actions": {
+          "Upload_document_to_storage": {
+            "type": "ServiceProvider",
+            "inputs": {
+              "parameters": {
+                "containerName": "@variables('submissionId')",
+                "blobName": "@items('For_each')?['name']",
+                "content": "@item()?['contentBytes']",
+                "overrideIfExists": "true"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "AzureBlob",
+                "operationId": "uploadBlob",
+                "serviceProviderId": "/serviceProviders/AzureBlob"
+              }
+            }
+          },
+          "Append_to_urls_array": {
+            "type": "AppendToArrayVariable",
+            "inputs": {
+              "name": "urls",
+              "value": "@concat(appsetting('AzureBlob_blobStorageEndpoint'),body('Upload_document_to_storage')?['properties']?['blobFullPathWithContainer'])"
+            },
+            "runAfter": {
+              "Upload_document_to_storage": [
+                "SUCCEEDED"
+              ]
+            }
+          }
+        },
+        "runAfter": {
+          "Initialize_urls_array": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "Compose_message": {
+        "type": "Compose",
+        "inputs": {
+          "submissionId": "@{variables('submissionId')}",
+          "userId": "user@example.com",
+          "documentUrls": "@variables('urls')",
+          "submittedAt": "@{formatDateTime(utcNow(),'yyyy-MM-ddTHH:mm:ss.ffffffZ')}"
+        },
+        "runAfter": {
+          "For_each": [
+            "SUCCEEDED"
+          ]
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "When_a_new_email_arrives_(V3)": {
+        "type": "ApiConnectionNotification",
+        "inputs": {
+          "host": {
+            "connection": {
+              "referenceName": "office365-1"
+            }
+          },
+          "fetch": {
+            "pathTemplate": {
+              "template": "/v3/Mail/OnNewEmail"
+            },
+            "method": "get",
+            "queries": {
+              "importance": "Any",
+              "fetchOnlyWithAttachment": false,
+              "includeAttachments": true,
+              "subjectFilter": "SUBMISSION",
+              "folderPath": "Inbox"
+            }
+          },
+          "subscribe": {
+            "body": {
+              "NotificationUrl": "@listCallbackUrl()"
+            },
+            "pathTemplate": {
+              "template": "/GraphMailSubscriptionPoke/$subscriptions"
+            },
+            "method": "post",
+            "queries": {
+              "importance": "Any",
+              "fetchOnlyWithAttachment": false,
+              "folderPath": "Inbox"
+            }
+          }
+        },
+        "splitOn": "@triggerBody()?['value']"
+      }
+    }
+  },
+  "kind": "Stateful"
+}

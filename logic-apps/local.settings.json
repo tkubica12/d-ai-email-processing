@@ -7,6 +7,7 @@
     "WEBSITE_SITE_NAME": "logic-email-dev-vwyh",
     "FUNCTIONS_WORKER_RUNTIME": "dotnet",
     "APP_KIND": "workflowApp",
+    "WEBSITE_ENABLE_SYNC_UPDATE_SITE": "true",
     "WEBSITE_AUTH_ENABLED": "False",
     "ScmType": "None",
     "AzureBlob_blobStorageEndpoint": "https://stemaildevvwyhemail.blob.core.windows.net",

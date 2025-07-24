@@ -18,6 +18,9 @@
     <None Update="submission-approval/workflow.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="submission-email-receiver/workflow.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="submission-processing/workflow.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

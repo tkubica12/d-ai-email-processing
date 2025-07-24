@@ -1,42 +1,5 @@
 {
   "serviceProviderConnections": {
-    "azureaisearch": {
-      "parameterValues": {
-        "searchServiceEndpoint": "@appsetting('azureaisearch_searchServiceEndpoint')",
-        "authProvider": {
-          "Type": "ManagedServiceIdentity"
-        }
-      },
-      "parameterSetName": "ManagedServiceIdentity",
-      "serviceProvider": {
-        "id": "/serviceProviders/azureaisearch"
-      },
-      "displayName": "search"
-    },
-    "azureaisearch-1": {
-      "parameterValues": {
-        "searchServiceEndpoint": "@appsetting('azureaisearch_11_searchServiceEndpoint')",
-        "authProvider": {
-          "Type": "ManagedServiceIdentity"
-        }
-      },
-      "parameterSetName": "ManagedServiceIdentity",
-      "serviceProvider": {
-        "id": "/serviceProviders/azureaisearch"
-      },
-      "displayName": "search-new"
-    },
-    "azureaisearch-2": {
-      "parameterValues": {
-        "searchServiceEndpoint": "@appsetting('azureaisearch_12_searchServiceEndpoint')",
-        "searchServiceAdminKey": "@appsetting('azureaisearch_12_searchServiceAdminKey')"
-      },
-      "parameterSetName": "ConnectionString",
-      "serviceProvider": {
-        "id": "/serviceProviders/azureaisearch"
-      },
-      "displayName": "new_conn_bb3a8"
-    },
     "AzureBlob": {
       "parameterValues": {
         "blobStorageEndpoint": "@appsetting('AzureBlob_blobStorageEndpoint')",
@@ -78,54 +41,6 @@
     }
   },
   "managedApiConnections": {
-    "formrecognizer": {
-      "api": {
-        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/providers/Microsoft.Web/locations/swedencentral/managedApis/formrecognizer"
-      },
-      "connection": {
-        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/resourceGroups/rg-email-dev-vwyh/providers/Microsoft.Web/connections/formrecognizer"
-      },
-      "authentication": {
-        "type": "ManagedServiceIdentity"
-      },
-      "connectionRuntimeUrl": "https://796b941889f7c49e.10.common.logic-swedencentral.azure-apihub.net/apim/formrecognizer/78a6ae3de61746a78bb254014960a41d"
-    },
-    "azureopenai": {
-      "api": {
-        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/providers/Microsoft.Web/locations/swedencentral/managedApis/azureopenai"
-      },
-      "connection": {
-        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/resourceGroups/rg-email-dev-vwyh/providers/Microsoft.Web/connections/azureopenai"
-      },
-      "authentication": {
-        "type": "ManagedServiceIdentity"
-      },
-      "connectionRuntimeUrl": "https://796b941889f7c49e.10.common.logic-swedencentral.azure-apihub.net/apim/azureopenai/63c127d0264341a2b2fcd79338767e6b",
-      "connectionProperties": {
-        "authentication": {
-          "type": "ManagedServiceIdentity",
-          "audience": "https://cognitiveservices.azure.com/"
-        }
-      }
-    },
-    "azureagentservice": {
-      "api": {
-        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/providers/Microsoft.Web/locations/swedencentral/managedApis/azureagentservice"
-      },
-      "connection": {
-        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/resourceGroups/rg-email-dev-vwyh/providers/Microsoft.Web/connections/azureagentservice"
-      },
-      "authentication": {
-        "type": "ManagedServiceIdentity"
-      },
-      "connectionRuntimeUrl": "https://796b941889f7c49e.10.common.logic-swedencentral.azure-apihub.net/apim/azureagentservice/91d5396e27ba416a96cdae3b7cbf182c",
-      "connectionProperties": {
-        "authentication": {
-          "type": "ManagedServiceIdentity",
-          "audience": "https://ai.azure.com/"
-        }
-      }
-    },
     "formrecognizer-1": {
       "api": {
         "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/providers/Microsoft.Web/locations/swedencentral/managedApis/formrecognizer"
@@ -174,36 +89,6 @@
         }
       }
     },
-    "azureagentservice-2": {
-      "api": {
-        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/providers/Microsoft.Web/locations/swedencentral/managedApis/azureagentservice"
-      },
-      "connection": {
-        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/resourceGroups/rg-email-dev-vwyh/providers/Microsoft.Web/connections/azureagentservice-2"
-      },
-      "authentication": {
-        "type": "ManagedServiceIdentity"
-      },
-      "connectionRuntimeUrl": "https://796b941889f7c49e.10.common.logic-swedencentral.azure-apihub.net/apim/azureagentservice/4857a8ab792f481daffd379e355d6197",
-      "connectionProperties": {
-        "authentication": {
-          "type": "ManagedServiceIdentity",
-          "audience": "https://ai.azure.com/"
-        }
-      }
-    },
-    "teams": {
-      "api": {
-        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/providers/Microsoft.Web/locations/swedencentral/managedApis/teams"
-      },
-      "connection": {
-        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/resourceGroups/rg-email-dev-vwyh/providers/Microsoft.Web/connections/teams"
-      },
-      "authentication": {
-        "type": "ManagedServiceIdentity"
-      },
-      "connectionRuntimeUrl": "https://796b941889f7c49e.10.common.logic-swedencentral.azure-apihub.net/apim/teams/042a4319541e4df2953a9270c082cf82"
-    },
     "teams-1": {
       "api": {
         "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/providers/Microsoft.Web/locations/swedencentral/managedApis/teams"
@@ -215,18 +100,6 @@
         "type": "ManagedServiceIdentity"
       },
       "connectionRuntimeUrl": "https://796b941889f7c49e.10.common.logic-swedencentral.azure-apihub.net/apim/teams/3f5e579f7ca848b4aa1928a743cb2b5b"
-    },
-    "office365": {
-      "api": {
-        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/providers/Microsoft.Web/locations/swedencentral/managedApis/office365"
-      },
-      "connection": {
-        "id": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/resourceGroups/rg-email-dev-vwyh/providers/Microsoft.Web/connections/office365"
-      },
-      "authentication": {
-        "type": "ManagedServiceIdentity"
-      },
-      "connectionRuntimeUrl": "https://796b941889f7c49e.10.common.logic-swedencentral.azure-apihub.net/apim/office365/7a3c5efb06004e31b8fe3e198390b29e"
     },
     "office365-1": {
       "api": {
