@@ -69,3 +69,10 @@ resource "azurerm_user_assigned_identity" "logic_app" {
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
 }
+
+# Managed Identity for Durable Functions
+resource "azurerm_user_assigned_identity" "durable_functions" {
+  name                = "durable-functions-${random_string.suffix.result}"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+}

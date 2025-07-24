@@ -61,3 +61,11 @@ resource "azurerm_role_assignment" "logic_app_service_bus_owner" {
   role_definition_name = "Azure Service Bus Data Owner"
   principal_id         = azapi_resource.logic_app.identity[0].principal_id
 }
+
+
+# Durable Functions service Service Bus permissions (for future deployment)
+resource "azurerm_role_assignment" "durable_functions_service_bus_data_receiver" {
+  scope                = azurerm_servicebus_namespace.main.id
+  role_definition_name = "Azure Service Bus Data Receiver"
+  principal_id         = azurerm_user_assigned_identity.durable_functions.principal_id
+}

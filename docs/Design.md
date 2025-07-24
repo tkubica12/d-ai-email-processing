@@ -932,7 +932,7 @@ Azure Table Storage - FeedRange Assignments
 ```
 
 ### Code-first with orchestration framework
-TBD
+Azure Durable Functions offer code-first orchestration capabilities. We will reuse all data structure and CosmosDB containers for submission and documents storage, but we will have no events and event store between steps because orchestration framework will handle state management and execution flow.
 
 ### Workflow Orchestration with Logic Apps
 

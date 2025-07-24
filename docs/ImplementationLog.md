@@ -4,6 +4,33 @@ Key architectural decisions, technical insights, and implementation progress for
 
 ## Recent Updates
 
+### 2025-07-24 - Azure Durable Functions Implementation
+**Major Addition**: Implemented alternative orchestration approach using Azure Durable Functions for submission processing.
+**Purpose**: 
+- Alternative to event sourcing microservices architecture
+- Single-function orchestration with stateful workflow management
+- Parallel document processing with built-in retry mechanisms
+- Simplified deployment and monitoring compared to distributed services
+
+**Technical Implementation**:
+- **Azure Durable Functions** with Python runtime for orchestration patterns
+- **Document Intelligence Integration** with proper API parameter usage (`body` not `analyze_request`)
+- **Enhanced Retry Logic** specific to Document Intelligence overload scenarios (429, 503, 500+ status codes)
+- **Storage Permissions** comprehensive RBAC for blob, table, and queue access required by Durable Functions
+- **Entra ID Authentication** throughout with no connection strings for security
+- **Proper File Organization** with config, models, and actions modules for maintainability
+
+**Architecture Decisions**:
+- **body.txt Special Handling**: Stored as plain text without Document Intelligence processing
+- **No Fallback Processing**: Document Intelligence failures raise errors instead of falling back to raw bytes
+- **Exponential Backoff**: 5 retries with 8s→16s→32s→60s→60s delays for Document Intelligence
+- **Metadata Differentiation**: Plain text vs markdown content types properly tracked
+
+**Key Technical Fixes**:
+- Document Intelligence API requires `body=analyze_request` parameter, not `analyze_request=analyze_request`
+- Durable Functions needs Storage Queue Data Contributor permissions beyond just blob/table access
+- Proper exception handling prevents storing raw PDF bytes instead of parsed markdown content
+
 ### 2025-07-23 - Demo Utility Enhancement
 **Addition**: Created `submit_demo_processed.py` utility script for testing processed submissions.
 **Purpose**: 

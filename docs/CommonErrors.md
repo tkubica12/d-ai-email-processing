@@ -46,7 +46,64 @@ azure-data-tables = "^12.0"
 - Use `list` instead of `typing.List`
 - Use `dict` instead of `typing.Dict`
 
-## 3. Cosmos DB Issues
+## 3. Azure Durable Functions Issues
+**Purpose**: Durable Functions orchestration and activity function debugging.
+
+### Document Intelligence Integration
+**'begin_analyze_document() missing 1 required positional argument: 'body''**
+```python
+# Wrong - causes parameter error
+poller = await client.begin_analyze_document(
+    model_id="prebuilt-layout",
+    analyze_request=request,  # ❌ Wrong parameter name
+    output_content_format=DocumentContentFormat.MARKDOWN
+)
+
+# Correct - uses proper parameter name
+poller = await client.begin_analyze_document(
+    model_id="prebuilt-layout", 
+    body=request,  # ✅ Correct parameter name
+    output_content_format=DocumentContentFormat.MARKDOWN
+)
+```
+
+### Storage Permissions
+**DurableTaskStorageException: An error occurred while communicating with Azure Storage**
+- Durable Functions requires **three** storage permissions: Blob, Table, AND Queue
+- Missing "Storage Queue Data Contributor" role is common cause
+```terraform
+# Required RBAC roles for Durable Functions
+resource "azurerm_role_assignment" "durable_functions_storage_blob_data_reader" {
+  role_definition_name = "Storage Blob Data Reader"
+}
+resource "azurerm_role_assignment" "durable_functions_storage_table_contributor" {
+  role_definition_name = "Storage Table Data Contributor"  
+}
+resource "azurerm_role_assignment" "durable_functions_storage_queue_contributor" {
+  role_definition_name = "Storage Queue Data Contributor"  # Often forgotten
+}
+```
+
+### Document Processing
+**Storing raw PDF bytes instead of parsed markdown**
+- Occurs when Document Intelligence calls fail silently and fallback to text processing
+- Remove fallback logic to ensure proper error handling
+```python
+# Wrong - hides Document Intelligence failures
+try:
+    result = await document_intelligence_call()
+except:
+    return raw_document_bytes.decode()  # ❌ Returns PDF content as text
+
+# Correct - forces proper Document Intelligence usage  
+try:
+    result = await document_intelligence_call()
+except Exception as e:
+    logger.error(f"Document Intelligence failed: {e}")
+    raise  # ✅ Propagates error for proper handling
+```
+
+## 4. Cosmos DB Issues
 **Purpose**: Database operations and change feed processing.
 
 ### Basic Operations

@@ -3,3 +3,12 @@
 # azure-monitor-opentelemetry 
 
 azure-functions
+azure-functions-durable
+azure-cosmos
+azure-identity
+azure-storage-blob
+azure-ai-documentintelligence
+azure-servicebus
+pydantic
+python-dotenv
+tenacity

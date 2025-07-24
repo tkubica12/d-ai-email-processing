@@ -13,6 +13,12 @@ resource "azurerm_role_assignment" "current_user_storage_table_contributor" {
   principal_id         = data.azurerm_client_config.current.object_id
 }
 
+resource "azurerm_role_assignment" "current_user_storage_queue_contributor" {
+  scope                = azapi_resource.storage_account.id
+  role_definition_name = "Storage Queue Data Contributor"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
 # Company APIs service storage permissions
 resource "azurerm_role_assignment" "company_apis_storage_blob_contributor" {
   scope                = azapi_resource.storage_account.id
@@ -203,4 +209,23 @@ resource "azurerm_role_assignment" "logic_app_system_storage_account_contributor
   scope                = azapi_resource.storage_account.id
   role_definition_name = "Storage Account Contributor"
   principal_id         = azapi_resource.logic_app.identity[0].principal_id
+}
+
+# Durable Functions service storage permissions (for future deployment)
+resource "azurerm_role_assignment" "durable_functions_storage_blob_data_reader" {
+  scope                = azapi_resource.storage_account.id
+  role_definition_name = "Storage Blob Data Reader"
+  principal_id         = azurerm_user_assigned_identity.durable_functions.principal_id
+}
+
+resource "azurerm_role_assignment" "durable_functions_storage_table_contributor" {
+  scope                = azapi_resource.storage_account.id
+  role_definition_name = "Storage Table Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.durable_functions.principal_id
+}
+
+resource "azurerm_role_assignment" "durable_functions_storage_queue_contributor" {
+  scope                = azapi_resource.storage_account.id
+  role_definition_name = "Storage Queue Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.durable_functions.principal_id
 }
