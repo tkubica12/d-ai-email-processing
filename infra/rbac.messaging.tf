@@ -47,6 +47,12 @@ resource "azurerm_role_assignment" "submission_analyzer_service_bus_sender" {
   principal_id         = azurerm_user_assigned_identity.submission_analyzer.principal_id
 }
 
+resource "azurerm_role_assignment" "submission_analyzer_service_bus_receiver" {
+  scope                = azurerm_servicebus_namespace.main.id
+  role_definition_name = "Azure Service Bus Data Receiver"
+  principal_id         = azurerm_user_assigned_identity.submission_analyzer.principal_id
+}
+
 # Logic App Service Bus permissions
 # Note: Logic App Standard built-in connectors require system-assigned identity
 # and need "Azure Service Bus Data Owner" role for full access including management operations

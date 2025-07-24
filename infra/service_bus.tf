@@ -48,6 +48,20 @@ resource "azurerm_servicebus_subscription" "submission_intake_logicapp" {
   dead_lettering_on_filter_evaluation_error = true
 }
 
+# Service Bus Subscription for Durable Function
+resource "azurerm_servicebus_subscription" "submission_intake_functions" {
+  name                = "submission-intake-functions"
+  topic_id            = azurerm_servicebus_topic.new_submissions.id
+  
+  # Configure subscription settings
+  max_delivery_count  = 10
+  default_message_ttl = "P14D"  # 14 days
+  
+  # Enable dead lettering for expired messages
+  dead_lettering_on_message_expiration = true
+  dead_lettering_on_filter_evaluation_error = true
+}
+
 # Service Bus Topic for processed submissions
 resource "azurerm_servicebus_topic" "processed_submissions" {
   name                = "processed-submissions"
