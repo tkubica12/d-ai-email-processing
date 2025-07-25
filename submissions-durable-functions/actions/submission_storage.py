@@ -49,19 +49,6 @@ class SubmissionStorage:
                 credential=self.credential
             )
     
-    def store_submission(self, submission_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Store submission record in Cosmos DB (synchronous wrapper).
-        
-        Args:
-            submission_data: Submission data from Service Bus message
-            
-        Returns:
-            Dict containing the storage results
-        """
-        import asyncio
-        return asyncio.run(self.store_submission_async(submission_data))
-    
     async def store_submission_async(self, submission_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Store submission record in Cosmos DB.
@@ -72,15 +59,17 @@ class SubmissionStorage:
         Returns:
             Dict containing the storage results
         """
-        await self._ensure_client_initialized()
-        
-        submission_id = submission_data.get("submissionId")
-        user_id = submission_data.get("userId")
+        submission_id = submission_data.get("submissionId", "unknown")
+        user_id = submission_data.get("userId", "unknown")
         document_urls = submission_data.get("documentUrls", [])
         
-        self.logger.info(f'Storing submission record for {submission_id}')
-        
         try:
+            self.logger.info(f'Starting submission storage for {submission_id}')
+            
+            # Ensure client is initialized
+            await self._ensure_client_initialized()
+            self.logger.info(f'Cosmos DB client initialized successfully for submission {submission_id}')
+            
             # Create submission record
             submission_record = SubmissionRecord(
                 id=submission_id,
@@ -97,6 +86,8 @@ class SubmissionStorage:
                 }
             )
             
+            self.logger.info(f'Created submission record for {submission_id}, attempting to store in Cosmos DB')
+            
             # Store in Cosmos DB
             await self._store_submission_record(submission_record)
             
@@ -109,10 +100,15 @@ class SubmissionStorage:
             }
             
         except Exception as e:
-            self.logger.error(f'Failed to store submission record for {submission_id}: {e}')
+            self.logger.error(f'CRITICAL ERROR: Failed to store submission record for {submission_id}: {str(e)}', exc_info=True)
+            # Re-raise to let the activity function handle it
             raise
         finally:
-            await self._close_client()
+            try:
+                await self._close_client()
+                self.logger.info(f'Closed Cosmos DB client for submission {submission_id}')
+            except Exception as e:
+                self.logger.warning(f'Failed to close Cosmos DB client for submission {submission_id}: {e}')
     
     @retry(
         stop=stop_after_attempt(3),
@@ -128,17 +124,25 @@ class SubmissionStorage:
         Args:
             submission_record: Submission record to store
         """
-        database = self.cosmos_client.get_database_client(self.config.cosmos_db.database_name)
-        container = database.get_container_client(self.config.cosmos_db.submissions_container_name)
-        
-        # Convert to dict for Cosmos DB
-        submission_dict = submission_record.dict()
-        submission_dict['createdAt'] = submission_record.createdAt.isoformat()
-        submission_dict['updatedAt'] = submission_record.updatedAt.isoformat()
-        
-        await container.create_item(body=submission_dict)
-        
-        self.logger.info(f'Stored submission record {submission_record.id} in Cosmos DB')
+        try:
+            self.logger.info(f'Attempting to store submission record {submission_record.id} to Cosmos DB')
+            
+            database = self.cosmos_client.get_database_client(self.config.cosmos_db.database_name)
+            container = database.get_container_client(self.config.cosmos_db.submissions_container_name)
+            
+            # Convert to dict for Cosmos DB
+            submission_dict = submission_record.dict()
+            submission_dict['createdAt'] = submission_record.createdAt.isoformat()
+            submission_dict['updatedAt'] = submission_record.updatedAt.isoformat()
+            
+            self.logger.info(f'Calling Cosmos DB create_item for submission {submission_record.id}')
+            
+            await container.create_item(body=submission_dict)
+            
+            self.logger.info(f'SUCCESS: Stored submission record {submission_record.id} in Cosmos DB')
+        except Exception as e:
+            self.logger.error(f'ERROR storing submission record {submission_record.id} in Cosmos DB: {str(e)}', exc_info=True)
+            raise
     
     async def _close_client(self):
         """Close Cosmos DB client."""

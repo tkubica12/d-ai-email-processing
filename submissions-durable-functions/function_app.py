@@ -11,8 +11,12 @@ import json
 import logging
 from typing import Dict, Any
 
-from models import SubmissionMessage
-from actions import DocumentParser, SubmissionStorage
+# Configure logging for Azure SDK libraries
+logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.WARNING)
+logging.getLogger("azure.identity").setLevel(logging.WARNING)
+logging.getLogger("azure.cosmos").setLevel(logging.WARNING)
+logging.getLogger("azure.storage").setLevel(logging.WARNING)
+logging.getLogger("azure.ai.documentintelligence").setLevel(logging.WARNING)
 
 app = df.DFApp(http_auth_level=func.AuthLevel.FUNCTION)
 
@@ -38,23 +42,21 @@ async def submission_trigger(azservicebus: func.ServiceBusMessage, client):
     message_body = azservicebus.get_body().decode('utf-8')
     logging.info(f'Received submission message: {message_body}')
     
-    try:
-        # Parse the message
-        submission_data = json.loads(message_body)
-        submission_message = SubmissionMessage(**submission_data)
-        
-        # Start the orchestration
-        instance_id = await client.start_new(
-            "submission_processor_orchestrator", 
-            None, 
-            submission_message.dict()
-        )
-        
-        logging.info(f'Started orchestration {instance_id} for submission {submission_message.submissionId}')
-        
-    except Exception as e:
-        logging.error(f'Failed to process submission message: {e}')
-        raise
+    # Import here to avoid module-level import issues
+    from models import SubmissionMessage
+    
+    # Parse the message
+    submission_data = json.loads(message_body)
+    submission_message = SubmissionMessage(**submission_data)
+    
+    # Start the orchestration
+    instance_id = await client.start_new(
+        "submission_processor_orchestrator", 
+        None, 
+        submission_message.dict()
+    )
+    
+    logging.info(f'Started orchestration {instance_id} for submission {submission_message.submissionId}')
 
 
 @app.orchestration_trigger(context_name="context")
@@ -139,6 +141,8 @@ async def store_submission_activity(submission_data: Dict[str, Any]) -> Dict[str
     Returns:
         Dict containing storage results
     """
+    from actions import SubmissionStorage
+    
     storage = SubmissionStorage()
     return await storage.store_submission_async(submission_data)
 
@@ -154,9 +158,24 @@ async def parse_document_activity(document_task_input: Dict[str, Any]) -> Dict[s
     Returns:
         Dict containing parsing results
     """
-    parser = DocumentParser()
-    return await parser.parse_document_async(
-        document_task_input["submissionId"],
-        document_task_input["documentUrl"],
-        document_task_input["userId"]
-    )
+    import uuid
+    from actions import DocumentParser
+    
+    submission_id = document_task_input.get("submissionId", "unknown")
+    document_url = document_task_input.get("documentUrl", "unknown")
+    user_id = document_task_input.get("userId")
+    
+    try:
+        parser = DocumentParser()
+        return await parser.parse_document_async(
+            submission_id=submission_id,
+            document_url=document_url,
+            user_id=user_id
+        )
+    except Exception as e:
+        return {
+            "documentId": f"error-{uuid.uuid4()}",
+            "fileName": document_url.split('/')[-1] if '/' in document_url else "unknown",
+            "contentLength": 0,
+            "status": f"error: {str(e)}"
+        }

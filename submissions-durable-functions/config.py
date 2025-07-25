@@ -6,7 +6,6 @@ for the durable functions orchestration workflow.
 """
 
 import os
-from typing import Optional
 from pydantic import BaseModel, Field
 
 
@@ -76,26 +75,40 @@ class AppConfig(BaseModel):
         Raises:
             ValueError: If required environment variables are missing
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         # Extract Cosmos DB configuration
         cosmos_db_endpoint = os.getenv('AZURE_COSMOS_DB_ENDPOINT')
         database_name = os.getenv('AZURE_COSMOS_DB_DATABASE_NAME', 'email-processing-durable-functions')
         documents_container_name = os.getenv('AZURE_COSMOS_DB_DOCUMENTS_CONTAINER_NAME', 'documents')
         submissions_container_name = os.getenv('AZURE_COSMOS_DB_SUBMISSIONS_CONTAINER_NAME', 'submissions')
         
+        logger.info(f'Loading configuration: COSMOS_ENDPOINT={cosmos_db_endpoint}, DB_NAME={database_name}')
+        
         if not cosmos_db_endpoint:
+            logger.error('AZURE_COSMOS_DB_ENDPOINT environment variable is missing!')
             raise ValueError('AZURE_COSMOS_DB_ENDPOINT environment variable is required')
         
         # Extract Document Intelligence configuration
         document_intelligence_endpoint = os.getenv('AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT')
         
+        logger.info(f'Loading configuration: DOC_INTEL_ENDPOINT={document_intelligence_endpoint}')
+        
         if not document_intelligence_endpoint:
+            logger.error('AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT environment variable is missing!')
             raise ValueError('AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT environment variable is required')
         
         # Extract Storage configuration
         storage_account_name = os.getenv('AZURE_STORAGE_ACCOUNT_NAME')
         
+        logger.info(f'Loading configuration: STORAGE_ACCOUNT={storage_account_name}')
+        
         if not storage_account_name:
+            logger.error('AZURE_STORAGE_ACCOUNT_NAME environment variable is missing!')
             raise ValueError('AZURE_STORAGE_ACCOUNT_NAME environment variable is required')
+        
+        logger.info('Configuration loaded successfully')
         
         return cls(
             cosmos_db=CosmosDBConfig(

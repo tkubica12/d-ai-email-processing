@@ -2,6 +2,7 @@
 Actions package for Azure Durable Functions submission processing.
 
 This package contains activity functions for the durable functions orchestration workflow.
+All functions are async to work properly with the Durable Functions framework.
 """
 
 from .document_parser import DocumentParser

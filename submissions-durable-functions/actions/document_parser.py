@@ -5,7 +5,6 @@ This module provides document parsing functionality using Azure Document Intelli
 for the durable functions orchestration workflow.
 """
 
-import asyncio
 import logging
 import uuid
 from datetime import datetime
@@ -72,20 +71,6 @@ class DocumentParser:
                 credential=self.credential
             )
     
-    def parse_document(self, submission_id: str, document_url: str, user_id: str) -> Dict[str, Any]:
-        """
-        Parse a document using Azure Document Intelligence (synchronous wrapper).
-        
-        Args:
-            submission_id: ID of the submission this document belongs to
-            document_url: Azure Blob Storage URL of the document
-            user_id: ID of the user who uploaded the document
-            
-        Returns:
-            Dict containing the parsing results
-        """
-        return asyncio.run(self.parse_document_async(submission_id, document_url, user_id))
-    
     async def parse_document_async(self, submission_id: str, document_url: str, user_id: str) -> Dict[str, Any]:
         """
         Parse a document using Azure Document Intelligence.
@@ -98,14 +83,16 @@ class DocumentParser:
         Returns:
             Dict containing the parsing results
         """
-        await self._ensure_clients_initialized()
-        
         document_id = str(uuid.uuid4())
         file_name = self._extract_filename_from_url(document_url)
         
-        self.logger.info(f'Starting document parsing for {file_name} (ID: {document_id})')
-        
         try:
+            self.logger.info(f'Starting document parsing for {file_name} (ID: {document_id})')
+            
+            # Ensure clients are initialized
+            await self._ensure_clients_initialized()
+            self.logger.info(f'Azure clients initialized successfully for {file_name}')
+            
             # Download document content
             document_content = await self._download_document(document_url)
             self.logger.info(f'Downloaded {len(document_content)} bytes for {file_name}')
@@ -146,6 +133,8 @@ class DocumentParser:
                 updatedAt=datetime.utcnow()
             )
             
+            self.logger.info(f'Created document record for {file_name}, attempting to store in Cosmos DB')
+            
             # Store in Cosmos DB
             await self._store_document_record(document_record)
             
@@ -159,10 +148,15 @@ class DocumentParser:
             }
             
         except Exception as e:
-            self.logger.error(f'Failed to parse document {file_name}: {e}')
+            self.logger.error(f'CRITICAL ERROR: Failed to parse document {file_name}: {str(e)}', exc_info=True)
+            # Re-raise to let the activity function handle it
             raise
         finally:
-            await self._close_clients()
+            try:
+                await self._close_clients()
+                self.logger.info(f'Closed Azure clients for {file_name}')
+            except Exception as e:
+                self.logger.warning(f'Failed to close Azure clients for {file_name}: {e}')
     
     @retry(
         stop=stop_after_attempt(3),
@@ -194,6 +188,7 @@ class DocumentParser:
         download_stream = await blob_client.download_blob()
         return await download_stream.readall()
     
+    @staticmethod
     def _should_retry_document_intelligence(exception):
         """
         Determine if we should retry Document Intelligence requests based on the exception.
@@ -216,7 +211,7 @@ class DocumentParser:
     @retry(
         stop=stop_after_attempt(5),
         wait=wait_exponential(multiplier=2, min=8, max=60),
-        retry=retry_if_exception(_should_retry_document_intelligence),
+        retry=retry_if_exception(lambda e: DocumentParser._should_retry_document_intelligence(e)),
         before_sleep=before_sleep_log(logging.getLogger(__name__), logging.WARNING),
         after=after_log(logging.getLogger(__name__), logging.INFO)
     )
@@ -297,17 +292,25 @@ class DocumentParser:
         Args:
             document_record: Document record to store
         """
-        database = self.cosmos_client.get_database_client(self.config.cosmos_db.database_name)
-        container = database.get_container_client(self.config.cosmos_db.documents_container_name)
-        
-        # Convert to dict for Cosmos DB
-        document_dict = document_record.dict()
-        document_dict['createdAt'] = document_record.createdAt.isoformat()
-        document_dict['updatedAt'] = document_record.updatedAt.isoformat()
-        
-        await container.create_item(body=document_dict)
-        
-        self.logger.info(f'Stored document record {document_record.id} in Cosmos DB')
+        try:
+            self.logger.info(f'Attempting to store document record {document_record.id} to Cosmos DB')
+            
+            database = self.cosmos_client.get_database_client(self.config.cosmos_db.database_name)
+            container = database.get_container_client(self.config.cosmos_db.documents_container_name)
+            
+            # Convert to dict for Cosmos DB
+            document_dict = document_record.dict()
+            document_dict['createdAt'] = document_record.createdAt.isoformat()
+            document_dict['updatedAt'] = document_record.updatedAt.isoformat()
+            
+            self.logger.info(f'Calling Cosmos DB create_item for document {document_record.id}')
+            
+            await container.create_item(body=document_dict)
+            
+            self.logger.info(f'SUCCESS: Stored document record {document_record.id} in Cosmos DB')
+        except Exception as e:
+            self.logger.error(f'ERROR storing document record {document_record.id} in Cosmos DB: {str(e)}', exc_info=True)
+            raise
     
     def _extract_filename_from_url(self, document_url: str) -> str:
         """Extract filename from blob URL."""
