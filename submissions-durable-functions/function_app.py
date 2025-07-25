@@ -78,8 +78,6 @@ def submission_processor_orchestrator(context: df.DurableOrchestrationContext):
     document_urls = submission_data.get("documentUrls", [])
     user_id = submission_data.get("userId")
     
-    logging.info(f'Starting orchestration for submission {submission_id} with {len(document_urls)} documents')
-    
     results = {
         "submissionId": submission_id,
         "userId": user_id,
@@ -89,51 +87,49 @@ def submission_processor_orchestrator(context: df.DurableOrchestrationContext):
         "status": "processing"
     }
     
-    try:
-        # Step 1: Store submission record
-        yield context.call_activity(
-            "store_submission_activity", 
-            submission_data
-        )
-        results["submissionStored"] = True
-        logging.info(f'Stored submission record for {submission_id}')
+    # Define shared retry options for orchestrator-level retries
+    # Retry every minute for at least 1 hour (60+ attempts)
+    shared_retry_options = df.RetryOptions(
+        first_retry_interval_in_milliseconds=60000,  # 1 minute
+        max_number_of_attempts=65  # 65 minutes total retry time
+    )
+    
+    # Step 1: Store submission record with retry
+    yield context.call_activity_with_retry(
+        "store_submission_activity", 
+        shared_retry_options,
+        submission_data
+    )
+    results["submissionStored"] = True
+    
+    # Step 2: Process all documents in parallel with retry
+    if document_urls:
+        document_tasks = []
+        for document_url in document_urls:
+            document_task_input = {
+                "submissionId": submission_id,
+                "documentUrl": document_url,
+                "userId": user_id
+            }
+            task = context.call_activity_with_retry(
+                "parse_document_activity", 
+                shared_retry_options,
+                document_task_input
+            )
+            document_tasks.append(task)
         
-        # Step 2: Process all documents in parallel
-        if document_urls:
-            document_tasks = []
-            for document_url in document_urls:
-                document_task_input = {
-                    "submissionId": submission_id,
-                    "documentUrl": document_url,
-                    "userId": user_id
-                }
-                task = context.call_activity("parse_document_activity", document_task_input)
-                document_tasks.append(task)
-            
-            # Wait for all documents to be processed
-            document_results = yield context.task_all(document_tasks)
-            results["documentsProcessed"] = document_results
-            
-            successful_docs = [r for r in document_results if r.get("status") == "success"]
-            failed_docs = [r for r in document_results if r.get("status") == "error"]
-            
-            logging.info(f'Document processing completed for {submission_id}: {len(successful_docs)} successful, {len(failed_docs)} failed')
-        
-        # Step 3: Mark orchestration as complete
-        results["status"] = "completed"
-        logging.info(f'Orchestration completed successfully for submission {submission_id}')
-        
-        return results
-        
-    except Exception as e:
-        logging.error(f'Orchestration failed for submission {submission_id}: {e}')
-        results["status"] = "failed"
-        results["error"] = str(e)
-        return results
+        # Wait for all documents to be processed
+        document_results = yield context.task_all(document_tasks)
+        results["documentsProcessed"] = document_results
+    
+    # Step 3: Mark orchestration as complete
+    results["status"] = "completed"
+    
+    return results
 
 
 @app.activity_trigger(input_name="submission_data")
-def store_submission_activity(submission_data: Dict[str, Any]) -> Dict[str, Any]:
+async def store_submission_activity(submission_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Activity function to store submission record in Cosmos DB.
     
@@ -144,11 +140,11 @@ def store_submission_activity(submission_data: Dict[str, Any]) -> Dict[str, Any]
         Dict containing storage results
     """
     storage = SubmissionStorage()
-    return storage.store_submission(submission_data)
+    return await storage.store_submission_async(submission_data)
 
 
 @app.activity_trigger(input_name="document_task_input")
-def parse_document_activity(document_task_input: Dict[str, Any]) -> Dict[str, Any]:
+async def parse_document_activity(document_task_input: Dict[str, Any]) -> Dict[str, Any]:
     """
     Activity function to parse a document using Azure Document Intelligence.
     
@@ -159,7 +155,7 @@ def parse_document_activity(document_task_input: Dict[str, Any]) -> Dict[str, An
         Dict containing parsing results
     """
     parser = DocumentParser()
-    return parser.parse_document(
+    return await parser.parse_document_async(
         document_task_input["submissionId"],
         document_task_input["documentUrl"],
         document_task_input["userId"]

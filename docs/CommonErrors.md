@@ -103,6 +103,46 @@ except Exception as e:
     raise  # ✅ Propagates error for proper handling
 ```
 
+### Orchestrator Execution
+**Orchestrator completes immediately without calling activities (104ms)**
+- Common issue where orchestrator function returns without executing yield statements
+- Activities show as registered but never get called
+- Usually caused by improper generator function implementation or missing yield keywords
+
+**Symptoms**:
+```
+Executed 'submission_processor_orchestrator' (Succeeded, Id=xxx, Duration=104ms)
+```
+
+**Common causes and fixes**:
+```python
+# Wrong - missing yield keyword
+def orchestrator(context):
+    context.call_activity("my_activity", data)  # ❌ Not yielded
+    return result
+
+# Wrong - using return instead of yield  
+def orchestrator(context):
+    return context.call_activity("my_activity", data)  # ❌ Returns generator
+
+# Correct - proper yield usage
+def orchestrator(context):
+    result = yield context.call_activity("my_activity", data)  # ✅ Yields execution
+    return result
+
+# Correct - multiple activities with yield
+def orchestrator(context):
+    step1 = yield context.call_activity("activity1", data1)
+    step2 = yield context.call_activity("activity2", data2)
+    return {"step1": step1, "step2": step2}
+```
+
+**Debug steps**:
+1. Verify all `context.call_activity()` calls have `yield` keyword
+2. Check orchestrator function is a generator (uses `yield` not `return` for activities)  
+3. Ensure no early returns before activity calls
+4. Remove try-catch blocks that might interfere with generator execution
+
 ## 4. Cosmos DB Issues
 **Purpose**: Database operations and change feed processing.
 

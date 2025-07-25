@@ -4,6 +4,156 @@ Key architectural decisions, technical insights, and implementation progress for
 
 ## Recent Updates
 
+### 2025-07-25 - IMPLEMENTED: Simplified Orchestrator Retry Policy
+**Feature**: Simplified dual-layer retry strategy with unified orchestrator-level configuration.
+
+**Implementation Details**:
+- **Unified retry configuration**: Single `RetryOptions` for both storage and document processing
+- **Retry schedule**: Every 1 minute for 65 attempts (65+ minutes total retry time)
+- **Activity-level retries**: Existing tenacity-based retries in activity functions remain
+
+**Technical Architecture**:
+```python
+# Simplified shared retry options
+shared_retry_options = df.RetryOptions(
+    first_retry_interval_in_milliseconds=60000,  # 1 minute
+    max_number_of_attempts=65  # 65 minutes total retry time
+)
+
+# All activities use the same retry policy
+yield context.call_activity_with_retry(
+    "store_submission_activity", 
+    shared_retry_options,
+    submission_data
+)
+```
+
+**Dual-Layer Strategy**:
+1. **Activity Level** (tenacity): 3-5 attempts, seconds-minutes intervals for transient failures
+2. **Orchestrator Level** (RetryOptions): 65 attempts, 1-minute intervals for complete activity failures
+
+**Benefits**:
+- **Simplified configuration**: One retry policy for all orchestrator-level operations
+- **Extended retry window**: Over 1 hour of retry attempts for persistent issues
+- **Consistent behavior**: Same retry pattern for storage and document processing
+- **Azure-native**: Uses Durable Functions built-in retry mechanisms
+
+### 2025-07-25 - DEBUGGING: Orchestrator Function Execution Issues
+**Issue**: Orchestrator continues to complete immediately (104ms) without executing activities despite fixing determinism issues.
+
+**Debugging Steps Taken**:
+1. **Removed try-catch blocks** that might interfere with generator function behavior
+2. **Simplified to basic `call_activity`** instead of `call_activity_with_retry` to isolate the issue
+3. **Verified syntax** against Microsoft's official Python Durable Functions documentation
+4. **Confirmed orchestrator structure** matches working examples from Microsoft docs
+
+**Current Hypothesis**: 
+- Function signature and structure appear correct
+- May be related to runtime configuration or activity function registration
+- Orchestrator should be a generator function using `yield` (✓ confirmed)
+
+**Next Steps**: 
+- Test with minimal orchestrator to verify basic functionality
+- Check activity function registration and imports
+- Verify runtime environment and dependencies
+
+### 2025-07-25 - CRITICAL FIX: Durable Functions Orchestrator Determinism
+**Issue**: Orchestrator function was completing immediately without executing activities due to determinism violations.
+
+**Root Cause**: 
+- **Non-deterministic logging**: `logging.info()` calls in orchestrator function violate determinism requirements
+- **Orchestrator replay**: Durable Functions replay orchestrator code, and non-deterministic operations cause failures
+
+**Solution**: 
+- **Removed all logging** from orchestrator function to ensure determinism
+- **Orchestrator functions must be pure** - no I/O, no random operations, no datetime calls
+- **Activities handle logging** instead of orchestrator
+
+**Technical Details**:
+- Orchestrator functions are replayed multiple times during execution
+- Each replay must produce identical results (deterministic)
+- Non-deterministic operations (logging, DateTime.Now, Random) break this requirement
+- Azure Durable Functions framework checkpoints at each `yield` statement
+
+**Key Learning**: 
+- **Orchestrators coordinate workflows** but don't perform I/O operations
+- **Activities perform actual work** including logging, I/O, and non-deterministic operations
+- **Separation of concerns** is critical for Durable Functions reliability
+
+### 2025-07-25 - Code Simplification: Removed Redundant Method Layers
+**Refactoring**: Simplified method architecture by removing unnecessary method indirection.
+
+**Problem**: Over-engineered method structure with redundant layers:
+- `store_submission` → `store_submission_async` → `_store_submission_async`
+- `parse_document` → `parse_document_async` → `_parse_document_async`
+
+**Solution**: Streamlined to two-method pattern following KISS principle:
+- **Sync wrapper**: `store_submission()` and `parse_document()` with `asyncio.run()`
+- **Async implementation**: `store_submission_async()` and `parse_document_async()` with actual logic
+
+**Benefits**:
+- **Reduced complexity**: Eliminated unnecessary method indirection
+- **Better maintainability**: Less code to maintain and debug
+- **Clearer intent**: Two distinct patterns (sync wrapper vs async implementation)
+- **Follows Python conventions**: Standard pattern for sync/async method pairs
+
+### 2025-07-25 - Activity Functions Async Performance Optimization
+**Performance Enhancement**: Converted Durable Functions activity functions from sync to async for optimal I/O performance.
+
+**Problem Identified**: 
+- Activity functions were synchronous but called async methods internally via `asyncio.run()`
+- This creates a performance anti-pattern that blocks the event loop
+- Reduces concurrent request handling capability
+
+**Solution Implemented**:
+- **Activity Functions**: Made `store_submission_activity` and `parse_document_activity` async
+- **Service Classes**: Added dedicated async methods (`parse_document_async`, `store_submission_async`)
+- **Maintains Backwards Compatibility**: Kept synchronous wrapper methods for other use cases
+
+**Performance Benefits**:
+- **Non-blocking I/O**: Azure SDK calls (Document Intelligence, Blob Storage, Cosmos DB) no longer block the event loop
+- **Better Concurrency**: Python worker can handle multiple requests concurrently 
+- **Optimal Resource Utilization**: Follows Azure Functions Python best practices for I/O-bound workloads
+
+**Technical Implementation**:
+```python
+@app.activity_trigger(input_name="document_task_input")
+async def parse_document_activity(document_task_input: Dict[str, Any]) -> Dict[str, Any]:
+    parser = DocumentParser()
+    return await parser.parse_document_async(...)
+```
+
+### 2025-07-25 - Durable Functions Retry Strategy Enhancement
+**Architectural Decision**: Implemented **dual-layer retry strategy** for optimal resilience in Azure Durable Functions.
+
+**Two-Level Retry Approach**:
+1. **Activity-Level Retries** (existing): Handle transient failures
+   - Network timeouts, rate limiting (429), brief service unavailability (503)
+   - Fast retries with exponential backoff (seconds to minutes)
+   - Limited attempts (3-5 retries)
+
+2. **Orchestrator-Level Retries** (added): Handle longer-term failures  
+   - Service outages lasting hours, infrastructure failures
+   - Longer retry intervals (30s → 5min max) with 2.0 backoff coefficient
+   - Extended retry period (10 attempts over 1 hour)
+
+**Technical Implementation**:
+```python
+orchestrator_retry_options = df.RetryOptions(
+    first_retry_interval_in_milliseconds=30000,  # 30 seconds
+    max_number_of_attempts=10,
+    backoff_coefficient=2.0,
+    max_retry_interval_in_milliseconds=300000,  # 5 minutes
+    retry_timeout_in_milliseconds=3600000  # 1 hour total
+)
+```
+
+**Best Practice Rationale**: 
+- Activity retries handle intermittent issues (Document Intelligence rate limiting)
+- Orchestrator retries handle systemic failures (service downtime)
+- Provides comprehensive fault tolerance without Service Bus dependency
+- Follows Azure Durable Functions recommended patterns for production resilience
+
 ### 2025-07-24 - Azure Durable Functions Implementation
 **Major Addition**: Implemented alternative orchestration approach using Azure Durable Functions for submission processing.
 **Purpose**: 

@@ -84,9 +84,9 @@ class DocumentParser:
         Returns:
             Dict containing the parsing results
         """
-        return asyncio.run(self._parse_document_async(submission_id, document_url, user_id))
+        return asyncio.run(self.parse_document_async(submission_id, document_url, user_id))
     
-    async def _parse_document_async(self, submission_id: str, document_url: str, user_id: str) -> Dict[str, Any]:
+    async def parse_document_async(self, submission_id: str, document_url: str, user_id: str) -> Dict[str, Any]:
         """
         Parse a document using Azure Document Intelligence.
         

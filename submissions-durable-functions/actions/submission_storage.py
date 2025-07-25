@@ -60,9 +60,9 @@ class SubmissionStorage:
             Dict containing the storage results
         """
         import asyncio
-        return asyncio.run(self._store_submission_async(submission_data))
+        return asyncio.run(self.store_submission_async(submission_data))
     
-    async def _store_submission_async(self, submission_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def store_submission_async(self, submission_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Store submission record in Cosmos DB.
         
