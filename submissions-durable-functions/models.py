@@ -102,6 +102,34 @@ class DocumentRecord(BaseModel):
         description="Extracted text content from the document"
     )
     
+    documentType: Optional[str] = Field(
+        default=None,
+        description="Classified document type (invoice, contract, bankStatement, submissionNotes, other)",
+        example="invoice"
+    )
+    
+    summary: Optional[str] = Field(
+        default=None,
+        description="AI-generated summary of the document content"
+    )
+    
+    extractedData: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Structured data extracted from the document"
+    )
+    
+    classificationStatus: str = Field(
+        default="pending",
+        description="Status of document classification",
+        example="completed"
+    )
+    
+    dataExtractionStatus: str = Field(
+        default="pending", 
+        description="Status of document data extraction",
+        example="completed"
+    )
+    
     metadata: Dict[str, Any] = Field(
         default_factory=dict,
         description="Additional metadata extracted from the document"

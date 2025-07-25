@@ -9,15 +9,14 @@ Usage:
     python cleanup_demo_data.py
 """
 
-import asyncio
 import logging
 import os
 import re
 from typing import List
 
-from azure.cosmos import CosmosClient, PartitionKey
+from azure.cosmos import CosmosClient
 from azure.cosmos.exceptions import CosmosResourceNotFoundError
-from azure.identity import DefaultAzureCredential, AzureCliCredential
+from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
 from dotenv import load_dotenv
 
@@ -53,6 +52,11 @@ class DemoDataCleanup:
         self.cosmos_submissions_container = os.getenv('AZURE_COSMOS_DB_SUBMISSIONS_CONTAINER_NAME')
         self.cosmos_submissions_trigger_container = os.getenv('AZURE_COSMOS_DB_SUBMISSIONS_TRIGGER_CONTAINER_NAME')
         
+        # Durable Functions Cosmos DB configuration
+        self.cosmos_durable_functions_database_name = os.getenv('AZURE_COSMOS_DB_DURABLE_FUNCTIONS_DATABASE_NAME')
+        self.cosmos_durable_functions_documents_container = os.getenv('AZURE_COSMOS_DB_DURABLE_FUNCTIONS_DOCUMENTS_CONTAINER_NAME')
+        self.cosmos_durable_functions_submissions_container = os.getenv('AZURE_COSMOS_DB_DURABLE_FUNCTIONS_SUBMISSIONS_CONTAINER_NAME')
+        
         # Storage configuration
         self.storage_account_name = os.getenv('AZURE_STORAGE_ACCOUNT_NAME')
         
@@ -65,6 +69,46 @@ class DemoDataCleanup:
         
         # GUID pattern for container names
         self.guid_pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.IGNORECASE)
+        
+        # Validate configuration
+        self._validate_configuration()
+        
+    def _validate_configuration(self) -> None:
+        """Validate that all required environment variables are set."""
+        required_vars = [
+            ('AZURE_COSMOS_DB_ENDPOINT', self.cosmos_endpoint),
+            ('AZURE_STORAGE_ACCOUNT_NAME', self.storage_account_name),
+        ]
+        
+        missing_vars = []
+        for var_name, var_value in required_vars:
+            if not var_value:
+                missing_vars.append(var_name)
+        
+        if missing_vars:
+            raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
+        
+        # Log configuration status
+        event_sourcing_vars = [
+            self.cosmos_database_name,
+            self.cosmos_events_container,
+            self.cosmos_documents_container,
+            self.cosmos_submissions_container,
+            self.cosmos_submissions_trigger_container
+        ]
+        
+        durable_functions_vars = [
+            self.cosmos_durable_functions_database_name,
+            self.cosmos_durable_functions_documents_container,
+            self.cosmos_durable_functions_submissions_container
+        ]
+        
+        event_sourcing_configured = all(var for var in event_sourcing_vars)
+        durable_functions_configured = all(var for var in durable_functions_vars)
+        
+        logger.info("Configuration status:")
+        logger.info(f"  Event-Sourcing containers: {'✓' if event_sourcing_configured else '✗'}")
+        logger.info(f"  Durable Functions containers: {'✓' if durable_functions_configured else '✗'}")
         
     def cleanup_cosmos_container(self, container_name: str) -> None:
         """
@@ -109,7 +153,7 @@ class DemoDataCleanup:
                     if deleted_count % 10 == 0:
                         logger.info(f"Deleted {deleted_count}/{len(items)} documents from {container_name}")
                         
-                except Exception as e:
+                except Exception:
                     # Fallback: try with id as partition key
                     try:
                         container.delete_item(item['id'], partition_key=item['id'])
@@ -125,19 +169,95 @@ class DemoDataCleanup:
             logger.error(f"Error cleaning up container {container_name}: {str(e)}")
             
     def cleanup_all_cosmos_containers(self) -> None:
-        """Clean up all three Cosmos DB containers."""
-        containers = [
-            self.cosmos_events_container,
-            self.cosmos_documents_container,
-            self.cosmos_submissions_container,
-            self.cosmos_submissions_trigger_container
+        """Clean up all Cosmos DB containers (both event-sourcing and durable functions)."""
+        # Event-sourcing containers
+        event_sourcing_containers = [
+            (self.cosmos_database_name, self.cosmos_events_container),
+            (self.cosmos_database_name, self.cosmos_documents_container),
+            (self.cosmos_database_name, self.cosmos_submissions_container),
+            (self.cosmos_database_name, self.cosmos_submissions_trigger_container)
         ]
         
-        for container_name in containers:
-            if container_name:
-                self.cleanup_cosmos_container(container_name)
+        # Durable Functions containers
+        durable_functions_containers = [
+            (self.cosmos_durable_functions_database_name, self.cosmos_durable_functions_documents_container),
+            (self.cosmos_durable_functions_database_name, self.cosmos_durable_functions_submissions_container)
+        ]
+        
+        # Clean up event-sourcing containers
+        logger.info("--- Cleaning up Event-Sourcing Cosmos DB containers ---")
+        for database_name, container_name in event_sourcing_containers:
+            if container_name and database_name:
+                self.cleanup_cosmos_container_in_database(database_name, container_name)
             else:
-                logger.warning(f"Container name not configured for one of the containers")
+                logger.warning("Container or database name not configured for one of the event-sourcing containers")
+        
+        # Clean up durable functions containers
+        logger.info("--- Cleaning up Durable Functions Cosmos DB containers ---")
+        for database_name, container_name in durable_functions_containers:
+            if container_name and database_name:
+                self.cleanup_cosmos_container_in_database(database_name, container_name)
+            else:
+                logger.warning("Container or database name not configured for one of the durable functions containers")
+                
+    def cleanup_cosmos_container_in_database(self, database_name: str, container_name: str) -> None:
+        """
+        Delete all documents from a Cosmos DB container in a specific database.
+        
+        Args:
+            database_name: Name of the database
+            container_name: Name of the container to clean up
+            
+        Raises:
+            CosmosResourceNotFoundError: If the database or container doesn't exist
+        """
+        try:
+            database = self.cosmos_client.get_database_client(database_name)
+            container = database.get_container_client(container_name)
+            
+            logger.info(f"Cleaning up container: {database_name}/{container_name}")
+            
+            # Query all documents
+            query = "SELECT * FROM c"
+            items = list(container.query_items(query=query, enable_cross_partition_query=True))
+            
+            if not items:
+                logger.info(f"Container {database_name}/{container_name} is already empty")
+                return
+                
+            logger.info(f"Found {len(items)} documents to delete in {database_name}/{container_name}")
+            
+            # Delete each document
+            deleted_count = 0
+            for item in items:
+                try:
+                    # Get the partition key property from the container
+                    container_properties = container.read()
+                    partition_key_path = container_properties['partitionKey']['paths'][0][1:]  # Remove the leading '/'
+                    
+                    # Get the partition key value from the document
+                    partition_key_value = item.get(partition_key_path, item['id'])
+                    
+                    container.delete_item(item['id'], partition_key=partition_key_value)
+                    deleted_count += 1
+                    
+                    if deleted_count % 10 == 0:
+                        logger.info(f"Deleted {deleted_count}/{len(items)} documents from {database_name}/{container_name}")
+                        
+                except Exception:
+                    # Fallback: try with id as partition key
+                    try:
+                        container.delete_item(item['id'], partition_key=item['id'])
+                        deleted_count += 1
+                    except Exception as e2:
+                        logger.warning(f"Failed to delete document {item['id']}: {str(e2)}")
+                    
+            logger.info(f"Successfully deleted {deleted_count} documents from {database_name}/{container_name}")
+            
+        except CosmosResourceNotFoundError:
+            logger.warning(f"Database {database_name} or container {container_name} not found")
+        except Exception as e:
+            logger.error(f"Error cleaning up container {database_name}/{container_name}: {str(e)}")
                 
     def get_guid_containers(self) -> List[str]:
         """
