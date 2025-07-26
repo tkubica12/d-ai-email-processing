@@ -61,6 +61,14 @@ uv run python main.py
 
 #### Background Processing Services
 
+**Durable Functions Submission Processing:**
+```bash
+# Main orchestration service for document processing
+cd submissions-durable-functions
+func start --python
+# Or use VS Code Azure Functions extension for debugging
+```
+
 **Document Processing Pipeline:**
 ```bash
 # Document content extraction
@@ -77,6 +85,62 @@ cd src/docproc-search-indexer && uv sync && uv run python main.py
 ```
 
 **Submission Processing:**
+```bash
+# Intake processing
+cd src/submission-intake && uv sync && uv run python main.py
+```
+
+**Business APIs:**
+```bash
+# Company data APIs
+cd src/company-apis && uv sync && uv run python main.py
+```
+
+## Testing Document Processing Workflow
+
+### End-to-End Flow Testing
+
+1. **Start Required Services**
+   ```bash
+   # Terminal 1: Start Durable Functions
+   cd submissions-durable-functions
+   func start --python
+   
+   # Terminal 2: Start Web Client (optional for direct testing)
+   cd src/client-web && uv run python main.py
+   ```
+
+2. **Test Document Processing**
+   - Upload documents through web interface or place test files in demo-submissions/
+   - Monitor processing through Azure Storage Explorer and Cosmos DB Data Explorer
+   - Check function logs for orchestration progress
+   - Verify document records show completed classification and extraction status
+
+3. **Expected Processing Flow**
+   ```
+   Document Upload → Service Bus Message → Main Orchestrator
+   ↓
+   Store Submission → Document Suborchestrators (parallel)
+   ↓  
+   Parse Document → Classification + Data Extraction (parallel)
+   ↓
+   Updated Cosmos DB Records with structured data
+   ```
+
+### Monitoring Processing Status
+
+Check document processing status in Cosmos DB:
+```json
+{
+  "id": "document-id",
+  "submissionId": "submission-id", 
+  "classificationStatus": "completed",  // pending → completed/failed
+  "dataExtractionStatus": "completed",  // pending → completed/failed
+  "documentType": "invoice",            // Set by classifier
+  "extractedData": { ... },             // Set by extractor
+  "summary": "Document summary..."       // Set by classifier
+}
+```
 ```bash
 # Intake processing
 cd src/submission-intake && uv sync && uv run python main.py

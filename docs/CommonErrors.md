@@ -142,6 +142,38 @@ await container.read_item(item=id)
 await container.read_item(item=id, partition_key=key)
 ```
 
+### ⚠️ CRITICAL: ETag/Patch Operations Parameter Issue
+**ClientSession._request() unexpected keyword 'if_match_etag'**
+**Symptoms**: All patch operations fail with TypeError, functions execute "successfully" but no database updates occur
+
+```python
+# ❌ WRONG - 'if_match_etag' doesn't exist in Python SDK
+request_options = {"if_match_etag": etag} if etag else {}
+await container.patch_item(..., **request_options)
+
+# ✅ CORRECT - Use 'etag' and 'match_condition' parameters  
+from azure.core import MatchConditions
+
+kwargs = {}
+if etag:
+    kwargs["etag"] = etag
+    kwargs["match_condition"] = MatchConditions.IfNotModified
+
+await container.patch_item(
+    item=document_id,
+    partition_key=submission_id, 
+    patch_operations=patch_operations,
+    **kwargs
+)
+```
+
+**Investigation Technique**: Add debug print statements to trace exact failure point:
+```python
+print(f'DEBUG: About to patch document {document_id}')
+await container.patch_item(...)  # Error occurs here
+print(f'DEBUG: Patch completed')  # Never reached
+```
+
 ### Change Feed Processing
 **No events despite data exists**
 ```python

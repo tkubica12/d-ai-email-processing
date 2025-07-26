@@ -135,12 +135,6 @@ class DocumentRecord(BaseModel):
         description="Additional metadata extracted from the document"
     )
     
-    processingStatus: str = Field(
-        default="parsed",
-        description="Current processing status",
-        example="parsed"
-    )
-    
     createdAt: datetime = Field(
         default_factory=datetime.utcnow,
         description="Timestamp when record was created"

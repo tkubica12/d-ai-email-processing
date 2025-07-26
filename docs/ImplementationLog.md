@@ -2,6 +2,130 @@
 
 Key architectural decisions, technical insights, and implementation progress for the AI Email Processing System.
 
+## Document Processing LLM Analysis Implementation (July 26, 2025)
+
+### Parallel Document Processing Architecture
+
+**Implementation Decision**: Created suborchestrator pattern for individual document processing to enable parallel classification and data extraction after parsing completes.
+
+**Architecture**:
+1. **Main Orchestrator** (`submission_processor_orchestrator`):
+   - Stores submission record
+   - Starts suborchestrator for each document in parallel
+   - Collects all document processing results
+
+2. **Document Suborchestrator** (`document_processor_suborchestrator`):
+   - Parses individual document using Document Intelligence
+   - Runs classification and data extraction in parallel after parsing
+   - Returns combined processing results
+
+**Key Benefits**:
+- **Parallel Processing**: Multiple documents processed simultaneously
+- **Nested Parallelism**: Classification and extraction run concurrently for each document
+- **Fault Isolation**: Document failures don't affect other documents
+- **Clear Separation**: Each phase has dedicated retry policies
+
+### Cosmos DB Concurrency Handling
+
+**Technical Decision**: Implemented Cosmos DB Patch API with ETag-based concurrency control to safely handle concurrent updates from classifier and data extractor services.
+
+**Implementation Details**:
+- **Patch Operations**: Update only specific fields (`documentType`, `summary`, `classificationStatus`, `dataExtractionStatus`, `extractedData`)
+- **ETag Concurrency**: Uses `if_match_etag` to prevent lost updates when both services update same document
+- **Retry Strategy**: On 412 Precondition Failed, fetches fresh document and retries with new ETag
+- **Field Isolation**: Each service updates non-overlapping fields to minimize conflicts
+
+**Code Pattern**:
+```python
+patch_operations = [
+    {"op": "replace", "path": "/documentType", "value": classification_result["documentType"]},
+    {"op": "replace", "path": "/classificationStatus", "value": "completed"}
+]
+request_options = {"if_match_etag": etag} if etag else {}
+await container.patch_item(item=document_id, partition_key=submission_id, 
+                          patch_operations=patch_operations, **request_options)
+```
+
+### CRITICAL: Cosmos DB Python SDK Parameter Issue (July 26, 2025)
+
+**Major Issue Discovered**: All document classification and data extraction operations were failing silently with `TypeError: ClientSession._request() got an unexpected keyword argument 'if_match_etag'`.
+
+**Root Cause Analysis**:
+1. **Incorrect Parameter Usage**: Used `if_match_etag` parameter which doesn't exist in the Python SDK
+2. **Silent Failures**: Azure Functions executed successfully but threw TypeError during Cosmos DB operations
+3. **SDK Documentation Gap**: Azure documentation examples showed incorrect parameter names for Python
+
+**Investigation Process**:
+1. **Debug Logging Added**: Inserted print statements throughout classification/extraction flow
+2. **Web Research**: Searched Cosmos DB Python SDK documentation and GitHub issues
+3. **Parameter Discovery**: Found correct syntax uses `etag` and `match_condition` parameters
+
+**Correct Implementation**:
+```python
+# ❌ WRONG - Causes TypeError
+request_options = {"if_match_etag": etag} if etag else {}
+await container.patch_item(..., **request_options)
+
+# ✅ CORRECT - Proper Python SDK syntax
+from azure.core import MatchConditions
+
+kwargs = {}
+if etag:
+    kwargs["etag"] = etag
+    kwargs["match_condition"] = MatchConditions.IfNotModified
+
+await container.patch_item(
+    item=document_id,
+    partition_key=submission_id,
+    patch_operations=patch_operations,
+    **kwargs
+)
+```
+
+**Impact**: 
+- **Before Fix**: 100% classification/extraction failure rate, all operations showing "failed" status
+- **After Fix**: Normal operation restored, documents showing "completed" status
+
+**Key Learning**: Azure Python SDKs often have different parameter names than REST API or other language SDKs. Always verify parameter names in language-specific documentation.
+
+### Mock LLM Implementation Strategy
+
+**Implementation Approach**: Created static mock responses for classification and data extraction while maintaining production-ready code structure.
+
+**Mock Logic**:
+- **Classification**: Based on filename patterns (invoice, contract, statement, notes)
+- **Data Extraction**: Type-specific structured output (invoice fields, contract details, etc.)
+- **Realistic Output**: Uses hash-based deterministic values for consistent testing
+
+**Rationale**: Allows full workflow testing and Cosmos DB integration without LLM API costs during development phase.
+
+### Document Processing Status Fields
+
+**Schema Change**: Removed `processingStatus` field from DocumentRecord model as it was redundant with specific status fields.
+
+**Status Tracking**:
+- `classificationStatus`: "pending" → "completed" | "failed"
+- `dataExtractionStatus`: "pending" → "completed" | "failed"
+- More granular than single processing status
+- Enables independent retry logic for each phase
+
+### Azure Functions Import Pattern
+
+**Critical Pattern Applied**: All custom module imports moved inside function bodies to prevent silent Azure Functions failures.
+
+**Implementation**:
+```python
+@app.activity_trigger(input_name="classification_input")
+async def classify_document_activity(classification_input: Dict[str, Any]):
+    from actions import DocumentClassifier  # Inside function
+    # ... function logic
+```
+
+**New Action Classes Created**:
+- `DocumentClassifier`: Handles document type classification with mock LLM
+- `DocumentDataExtractor`: Extracts structured data with type-specific logic
+- Both implement Cosmos DB Patch API with ETag concurrency control
+
 ## Critical Azure Durable Functions Fixes (July 2025)
 
 ### RESOLVED: Silent Failure Issue

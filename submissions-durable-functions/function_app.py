@@ -113,8 +113,9 @@ def submission_processor_orchestrator(context: df.DurableOrchestrationContext):
                 "documentUrl": document_url,
                 "userId": user_id
             }
-            task = context.call_activity_with_retry(
-                "parse_document_activity", 
+            # Use suborchestrator for each document
+            task = context.call_sub_orchestrator_with_retry(
+                "document_processor_suborchestrator",
                 shared_retry_options,
                 document_task_input
             )
@@ -128,6 +129,87 @@ def submission_processor_orchestrator(context: df.DurableOrchestrationContext):
     results["status"] = "completed"
     
     return results
+
+
+@app.orchestration_trigger(context_name="context")
+def document_processor_suborchestrator(context: df.DurableOrchestrationContext):
+    """
+    Suborchestrator function for processing individual documents.
+    
+    This orchestrator coordinates the workflow for a single document:
+    1. Parse document using Document Intelligence
+    2. Run classification and data extraction in parallel
+    3. Return processing results
+    
+    Args:
+        context: Durable orchestration context
+        
+    Returns:
+        Dict containing document processing results
+    """
+    document_task_input = context.get_input()
+    submission_id = document_task_input.get("submissionId")
+    
+    # Define retry options for suborchestrator activities
+    retry_options = df.RetryOptions(
+        first_retry_interval_in_milliseconds=30000,  # 30 seconds
+        max_number_of_attempts=5
+    )
+    
+    # Step 1: Parse the document
+    parse_result = yield context.call_activity_with_retry(
+        "parse_document_activity",
+        retry_options,
+        document_task_input
+    )
+    
+    # Check if parsing was successful
+    if "error" in parse_result.get("status", ""):
+        return parse_result
+    
+    document_id = parse_result.get("documentId")
+    
+    # Step 2: Run classification and data extraction in parallel
+    classification_input = {
+        "documentId": document_id,
+        "submissionId": submission_id
+    }
+    
+    extraction_input = {
+        "documentId": document_id,
+        "submissionId": submission_id
+    }
+    
+    # Run both tasks in parallel
+    classification_task = context.call_activity_with_retry(
+        "classify_document_activity",
+        retry_options,
+        classification_input
+    )
+    
+    extraction_task = context.call_activity_with_retry(
+        "extract_document_data_activity",
+        retry_options,
+        extraction_input
+    )
+    
+    # Wait for both tasks to complete
+    parallel_results = yield context.task_all([classification_task, extraction_task])
+    classification_result, extraction_result = parallel_results
+    
+    # Combine results
+    return {
+        "documentId": document_id,
+        "fileName": parse_result.get("fileName"),
+        "contentLength": parse_result.get("contentLength"),
+        "parseStatus": parse_result.get("status"),
+        "documentType": classification_result.get("documentType"),
+        "summary": classification_result.get("summary"),
+        "classificationStatus": classification_result.get("status"),
+        "extractedData": extraction_result.get("extractedData"),
+        "extractionStatus": extraction_result.get("status"),
+        "status": "completed"
+    }
 
 
 @app.activity_trigger(input_name="submission_data")
@@ -179,3 +261,49 @@ async def parse_document_activity(document_task_input: Dict[str, Any]) -> Dict[s
             "contentLength": 0,
             "status": f"error: {str(e)}"
         }
+
+
+@app.activity_trigger(input_name="classification_input")
+async def classify_document_activity(classification_input: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Activity function to classify a document using mocked LLM analysis.
+    
+    Args:
+        classification_input: Dictionary containing documentId and submissionId
+        
+    Returns:
+        Dict containing classification results
+    """
+    from actions import DocumentClassifier
+    
+    document_id = classification_input.get("documentId")
+    submission_id = classification_input.get("submissionId")
+    
+    classifier = DocumentClassifier()
+    return await classifier.classify_document_async(
+        document_id=document_id,
+        submission_id=submission_id
+    )
+
+
+@app.activity_trigger(input_name="extraction_input")
+async def extract_document_data_activity(extraction_input: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Activity function to extract structured data from a document using mocked LLM analysis.
+    
+    Args:
+        extraction_input: Dictionary containing documentId and submissionId
+        
+    Returns:
+        Dict containing data extraction results
+    """
+    from actions import DocumentDataExtractor
+    
+    document_id = extraction_input.get("documentId")
+    submission_id = extraction_input.get("submissionId")
+    
+    extractor = DocumentDataExtractor()
+    return await extractor.extract_document_data_async(
+        document_id=document_id,
+        submission_id=submission_id
+    )
