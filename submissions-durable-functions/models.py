@@ -7,8 +7,54 @@ in the durable functions orchestration workflow.
 
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
-from uuid import UUID
 from datetime import datetime
+
+
+class LLMDataExtractionResponse(BaseModel):
+    """
+    Structured response model for OpenAI data extraction API.
+    
+    This model ensures the LLM response matches the expected JSON structure
+    for document data extraction. Fields are nullable since not all documents
+    will contain invoice-specific information.
+    
+    Attributes:
+        invoiceNumber: The unique identifier for the invoice
+        totalAmount: The total amount due as a numeric value without currency symbols
+        currency: The currency code in ISO 4217 format (USD, EUR, GBP, etc.)
+        dueDate: The payment due date in ISO 8601 date format (YYYY-MM-DD)
+        vendor: The name of the company or vendor issuing the invoice
+    """
+    
+    invoiceNumber: Optional[str] = Field(
+        None,
+        description="The unique identifier for the invoice",
+        example="INV-2025-001"
+    )
+    
+    totalAmount: Optional[float] = Field(
+        None,
+        description="The total amount due as a numeric value without currency symbols",
+        example=1250.00
+    )
+    
+    currency: Optional[str] = Field(
+        None,
+        description="The currency code in ISO 4217 format (USD, EUR, GBP, etc.)",
+        example="USD"
+    )
+    
+    dueDate: Optional[str] = Field(
+        None,
+        description="The payment due date in ISO 8601 date format (YYYY-MM-DD)",
+        example="2025-08-07"
+    )
+    
+    vendor: Optional[str] = Field(
+        None,
+        description="The name of the company or vendor issuing the invoice",
+        example="Acme Corp"
+    )
 
 
 class SubmissionMessage(BaseModel):

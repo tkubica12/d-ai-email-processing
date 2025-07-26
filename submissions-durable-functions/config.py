@@ -47,6 +47,22 @@ class DocumentIntelligenceConfig(BaseModel):
     )
 
 
+class AzureOpenAIConfig(BaseModel):
+    """Configuration for Azure OpenAI service."""
+    
+    endpoint: str = Field(
+        ...,
+        description="Azure OpenAI service endpoint URL",
+        example="https://ai-foundry-dev-vwyh.openai.azure.com/"
+    )
+    
+    model: str = Field(
+        default="gpt-4o-mini",
+        description="Azure OpenAI model deployment name",
+        example="gpt-4o-mini"
+    )
+
+
 class StorageConfig(BaseModel):
     """Configuration for Azure Storage."""
     
@@ -62,6 +78,7 @@ class AppConfig(BaseModel):
     
     cosmos_db: CosmosDBConfig
     document_intelligence: DocumentIntelligenceConfig
+    azure_openai: AzureOpenAIConfig
     storage: StorageConfig
     
     @classmethod
@@ -108,6 +125,16 @@ class AppConfig(BaseModel):
             logger.error('AZURE_STORAGE_ACCOUNT_NAME environment variable is missing!')
             raise ValueError('AZURE_STORAGE_ACCOUNT_NAME environment variable is required')
         
+        # Extract Azure OpenAI configuration
+        azure_openai_endpoint = os.getenv('AZURE_OPENAI_ENDPOINT')
+        azure_openai_model = os.getenv('AZURE_OPENAI_MODEL', 'gpt-4o-mini')
+        
+        logger.info(f'Loading configuration: OPENAI_ENDPOINT={azure_openai_endpoint}, MODEL={azure_openai_model}')
+        
+        if not azure_openai_endpoint:
+            logger.error('AZURE_OPENAI_ENDPOINT environment variable is missing!')
+            raise ValueError('AZURE_OPENAI_ENDPOINT environment variable is required')
+        
         logger.info('Configuration loaded successfully')
         
         return cls(
@@ -119,6 +146,10 @@ class AppConfig(BaseModel):
             ),
             document_intelligence=DocumentIntelligenceConfig(
                 endpoint=document_intelligence_endpoint
+            ),
+            azure_openai=AzureOpenAIConfig(
+                endpoint=azure_openai_endpoint,
+                model=azure_openai_model
             ),
             storage=StorageConfig(
                 account_name=storage_account_name

@@ -1,7 +1,7 @@
 """
 Document data extractor action for Azure Durable Functions.
 
-This module provides document data extraction functionality using mocked LLM analysis
+This module provides document data extraction functionality using Azure OpenAI
 for the durable functions orchestration workflow. Updates documents container with
 extracted data results and handles concurrency using Cosmos DB Patch API with ETag.
 """
@@ -9,11 +9,14 @@ extracted data results and handles concurrency using Cosmos DB Patch API with ET
 import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
+from pathlib import Path
 
 from azure.identity.aio import DefaultAzureCredential
 from azure.cosmos.aio import CosmosClient
 from azure.core.exceptions import HttpResponseError, ClientAuthenticationError
 from azure.cosmos.exceptions import CosmosResourceNotFoundError
+from openai import AsyncAzureOpenAI
+from jinja2 import Environment, FileSystemLoader
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -24,13 +27,14 @@ from tenacity import (
 )
 
 from config import AppConfig
+from models import LLMDataExtractionResponse
 
 
 class DocumentDataExtractor:
     """
-    Document data extractor using mocked LLM analysis.
+    Document data extractor using Azure OpenAI API.
     
-    This class handles document data extraction with static mock responses
+    This class handles document data extraction using Azure OpenAI with structured outputs
     and updates Cosmos DB documents container using Patch API for concurrency safety.
     """
     
@@ -42,18 +46,47 @@ class DocumentDataExtractor:
         
         # Initialize clients (will be created async when needed)
         self.cosmos_client: Optional[CosmosClient] = None
+        self.openai_client: Optional[AsyncAzureOpenAI] = None
+        self.system_prompt_template = None
     
     async def _ensure_client_initialized(self):
-        """Ensure Cosmos DB client is initialized."""
+        """Ensure Cosmos DB and OpenAI clients are initialized."""
         if not self.cosmos_client:
             self.cosmos_client = CosmosClient(
                 url=self.config.cosmos_db.endpoint,
                 credential=self.credential
             )
+        
+        if not self.openai_client:
+            self.openai_client = AsyncAzureOpenAI(
+                azure_endpoint=self.config.azure_openai.endpoint,
+                azure_ad_token_provider=self._get_azure_ad_token,
+                api_version="2024-08-01-preview"
+            )
+        
+        if not self.system_prompt_template:
+            # Load system prompt template from prompts folder
+            template_dir = Path(__file__).parent / "prompts"
+            env = Environment(loader=FileSystemLoader(template_dir))
+            self.system_prompt_template = env.get_template("extractor_system_prompt.jinja2")
+
+    async def _get_azure_ad_token(self) -> str:
+        """
+        Get Azure AD token for OpenAI API authentication.
+        
+        Returns:
+            Azure AD access token for Cognitive Services
+        """
+        token = await self.credential.get_token("https://cognitiveservices.azure.com/.default")
+        return token.token
     
     async def extract_document_data_async(self, document_id: str, submission_id: str) -> Dict[str, Any]:
         """
-        Extract structured data from document using mocked LLM analysis.
+        Extract structured data from document using Azure OpenAI API.
+        
+        This method processes ALL documents regardless of type and lets the LLM
+        determine what data can be extracted. For non-invoice documents, fields
+        will be null but the extraction still runs.
         
         Args:
             document_id: Unique document identifier
@@ -76,16 +109,24 @@ class DocumentDataExtractor:
                 raise ValueError(f"Document {document_id} not found")
             
             print(f'DEBUG: Document record fetched for extraction {document_id}')
+            print(f'DEBUG: Document details - fileName: {document_record.get("fileName")}, contentLength: {len(document_record.get("content", ""))}')
             
-            # Mock LLM data extraction based on document type and content
-            extraction_result = self._mock_extract_document_data(document_record)
-            print(f'DEBUG: Extraction result: {extraction_result}')
+            # OpenAI data extraction using structured outputs
+            extraction_result = await self._extract_document_data_with_openai(document_record)
+            
+            # Convert to dict format expected by update method, or None if no extraction
+            extraction_dict = None
+            if extraction_result:
+                extraction_dict = extraction_result.model_dump(exclude_none=True)
+                print(f'DEBUG: Extraction result: {extraction_dict}')
+            else:
+                print('DEBUG: No data extraction performed (failed)')
             
             # Update document with extraction results using Patch API
             await self._update_document_extraction_with_retry(
                 document_id, 
                 submission_id, 
-                extraction_result,
+                extraction_dict,
                 document_record.get('_etag')
             )
             
@@ -94,7 +135,7 @@ class DocumentDataExtractor:
             
             return {
                 "documentId": document_id,
-                "extractedData": extraction_result,
+                "extractedData": extraction_dict,
                 "status": "completed"
             }
             
@@ -150,64 +191,57 @@ class DocumentDataExtractor:
             self.logger.warning(f'Document {document_id} not found in submission {submission_id}')
             return None
     
-    def _mock_extract_document_data(self, document_record: Dict[str, Any]) -> Dict[str, Any]:
+    async def _extract_document_data_with_openai(self, document_record: Dict[str, Any]) -> Optional[LLMDataExtractionResponse]:
         """
-        Mock document data extraction based on document type and content.
+        Extract document data using Azure OpenAI API.
+        
+        This method processes ALL documents and lets the LLM determine what data
+        can be extracted. For non-invoice documents, fields will be null.
         
         Args:
             document_record: Document record from Cosmos DB
             
         Returns:
-            Extracted structured data based on document type
+            Extracted structured data or None if API call fails
+            
+        Raises:
+            Exception: If OpenAI API call fails
         """
-        document_type = document_record.get('documentType', 'other')
-        filename = document_record.get('fileName', '').lower()
         content = document_record.get('content', '')
+        filename = document_record.get('fileName', 'unknown')
         
-        # Mock extraction logic based on document type
-        if document_type == "invoice":
-            return {
-                "invoiceNumber": f"INV-{hash(filename) % 10000:04d}",
-                "totalAmount": round(abs(hash(content) % 50000) / 100, 2),
-                "currency": "USD",
-                "dueDate": "2025-08-15",
-                "vendor": f"Vendor-{hash(filename[:10]) % 1000:03d}"
-            }
-        elif document_type == "contract":
-            return {
-                "contractNumber": f"CNT-{hash(filename) % 10000:04d}",
-                "effectiveDate": "2025-07-01",
-                "expirationDate": "2026-06-30",
-                "contractValue": round(abs(hash(content) % 1000000) / 100, 2),
-                "parties": [f"Party-A-{hash(filename[:5]) % 100:02d}", f"Party-B-{hash(filename[5:10]) % 100:02d}"]
-            }
-        elif document_type == "bankStatement":
-            return {
-                "accountNumber": f"****{hash(filename) % 10000:04d}",
-                "statementPeriod": "2025-06-01 to 2025-06-30",
-                "openingBalance": round(abs(hash(content[:100]) % 100000) / 100, 2),
-                "closingBalance": round(abs(hash(content[-100:]) % 100000) / 100, 2),
-                "transactionCount": abs(hash(content) % 50) + 10
-            }
-        elif document_type == "submissionNotes":
-            return {
-                "noteType": "submission_context",
-                "keyPoints": [
-                    f"Point 1: {content[:50]}..." if len(content) > 50 else content,
-                    f"Document contains {len(content.split())} words",
-                    f"Created from file: {document_record.get('fileName')}"
+        print(f'DEBUG: Extracting data from document {filename} with {len(content)} characters')
+        
+        if not content.strip():
+            print(f'DEBUG: Empty content for document {filename}, skipping extraction')
+            return None
+        
+        # Render system prompt from template
+        system_prompt = self.system_prompt_template.render()
+        print(f'DEBUG: System prompt rendered for data extraction, length: {len(system_prompt)}')
+        
+        try:
+            print('DEBUG: Making OpenAI API call for data extraction')
+            response = await self.openai_client.beta.chat.completions.parse(
+                model=self.config.azure_openai.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": content}
                 ],
-                "priority": "medium",
-                "followUpRequired": len(content) > 1000
-            }
-        else:
-            return {
-                "documentFormat": document_record.get('contentType', 'unknown'),
-                "wordCount": len(content.split()),
-                "characterCount": len(content),
-                "requiresManualReview": True,
-                "extractionConfidence": 0.5
-            }
+                response_format=LLMDataExtractionResponse,
+                temperature=0,
+                max_tokens=1000
+            )
+            
+            extraction_result = response.choices[0].message.parsed
+            print(f'DEBUG: OpenAI extraction result: {extraction_result}')
+            
+            return extraction_result
+            
+        except Exception as e:
+            print(f'DEBUG ERROR: OpenAI API call failed: {str(e)}')
+            self.logger.error(f'OpenAI API call failed for {filename}: {str(e)}')
+            raise
     
     @retry(
         stop=stop_after_attempt(5),

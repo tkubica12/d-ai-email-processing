@@ -1,9 +1,10 @@
-# Common Errors Reference
+# Common Errors & Solutions
 
-Quick troubleshooting guide for development issues, organized by category.
+Quick reference for critical issues encountered during development.
 
-## 1. Azure Authentication & Resources
+## Azure Authentication & Resources
 
+### Authentication Failures
 **DefaultAzureCredential failed**
 ```powershell
 az login
@@ -13,145 +14,92 @@ az account set --subscription <subscription-id>
 **AuthorizationFailed (403)**
 - Check RBAC roles in Azure portal
 - Re-apply Terraform: `terraform apply`
-- Verify service principal scope
 
-**Resource already exists**
+**Resource conflicts**
 ```powershell
 terraform import <resource_type>.<name> <azure_resource_id>
-# OR
-terraform destroy -target=<resource>
+terraform destroy -target=<resource>  # Alternative
 ```
 
-## 2. Environment Setup
+## Environment & Dependencies
 
-**Missing environment variables**
-```powershell
-terraform output  # Get current values
-# Update .env file
-```
-
-**Import/dependency errors**
-```powershell
-uv sync && uv run python
-```
-
-**Missing Azure SDK packages** - Add to `pyproject.toml`:
+### Missing Dependencies
+**Environment variables**: `terraform output` → update `.env`
+**Python packages**: `uv sync && uv run python`
+**Azure SDK**: Add to `pyproject.toml`:
 ```toml
 azure-cosmos = "^4.0"
-azure-identity = "^1.15" 
+azure-identity = "^1.15"
 azure-data-tables = "^12.0"
 ```
 
-**Type hints** - Use built-in types: `list`, `dict` (not `typing.List`, `typing.Dict`)
+**Type hints**: Use `list`, `dict` (not `typing.List`, `typing.Dict`)
 
-## 3. Azure Durable Functions
+## Azure Functions Critical Issues ⚠️
 
-### Silent Function Failures ⚠️ CRITICAL
-**Symptoms**: Function logs show completion but no application code executes
-**Cause**: Module-level import failures during Azure Functions cold start
-
+### Silent Function Failures
+**Cause**: Module-level imports crash during cold start
 ```python
-# ❌ WRONG - Module-level imports cause silent crashes
+# ❌ NEVER do module-level imports
 from models import SubmissionMessage
-from actions import DocumentParser
 
-@app.activity_trigger(input_name="data")  
+@app.activity_trigger(input_name="data")
 async def my_activity(data):
-    # Code never executes - crashed during import
+    # Code never executes - import crashed
 
-# ✅ CORRECT - Import inside function
+# ✅ ALWAYS import inside functions
 @app.activity_trigger(input_name="data")
 async def my_activity(data):
     from models import SubmissionMessage
-    from actions import DocumentParser
-    # Function executes properly
+    # Function works properly
 ```
 
 ### Storage Permissions
-**DurableTaskStorageException** - Requires ALL three storage roles:
-```terraform
-"Storage Blob Data Reader"
-"Storage Table Data Contributor"  
-"Storage Queue Data Contributor"  # Often forgotten
-```
-
-### Document Intelligence Integration
-**'begin_analyze_document() missing argument: body'**
-```python
-# ❌ Wrong parameter name
-poller = await client.begin_analyze_document(
-    model_id="prebuilt-layout",
-    analyze_request=request  # Wrong
-)
-
-# ✅ Correct parameter name  
-poller = await client.begin_analyze_document(
-    model_id="prebuilt-layout",
-    body=request  # Correct
-)
-```
+**DurableTaskStorageException** - Requires ALL three roles:
+- `Storage Blob Data Reader`
+- `Storage Table Data Contributor`
+- `Storage Queue Data Contributor` ← Often missed
 
 ### Orchestrator Issues
-**Orchestrator completes immediately (104ms) without calling activities**
-**Cause**: Missing `yield` keywords
-
+**Immediate completion (104ms)** - Missing `yield`:
 ```python
-# ❌ Wrong - activities never execute
+# ❌ Missing yield
 def orchestrator(context):
-    context.call_activity("my_activity", data)  # Missing yield
-    return result
+    context.call_activity("my_activity", data)
 
-# ✅ Correct - proper yield usage
+# ✅ Proper yield
 def orchestrator(context):
     result = yield context.call_activity("my_activity", data)
-    return result
 ```
 
-### Activity Function Parameters
-**Method signature mismatches**
+## Cosmos DB Issues
+
+### Parameter Errors
+**Unexpected keyword 'partition_key'**
 ```python
-# Debug technique - log parameters before calls
-print(f"Calling with: submission_id={submission_id}, url={document_url}")
-result = await parser.parse_document_async(submission_id, document_url, user_id)
-```
-
-## 4. Cosmos DB Operations
-
-### Basic CRUD Operations
-**Entity already exists (409)** - Use `upsert_item()` instead of `create_item()`
-**Entity not found (404)** - Verify partition key and document ID format (use UUIDs)
-
-### Async SDK Parameter Issues
-**ClientSession._request() unexpected keyword 'partition_key'**
-```python
-# ❌ Wrong - explicit partition_key on create/replace
+# ❌ Wrong - Don't specify partition_key for create/replace
 await container.create_item(body=data, partition_key=key)
-await container.replace_item(item=id, body=data, partition_key=key)
 
-# ✅ Correct - SDK handles partition key automatically
+# ✅ Correct - SDK handles automatically
 await container.create_item(body=data)
-await container.replace_item(item=id, body=data)
 ```
 
-**read_item() missing partition_key argument**
+**Missing partition_key for reads**
 ```python
-# ❌ Wrong - missing partition key on read
+# ❌ Wrong
 await container.read_item(item=id)
 
-# ✅ Correct - read operations require explicit partition key
+# ✅ Correct - Reads need explicit partition key
 await container.read_item(item=id, partition_key=key)
 ```
 
-### ⚠️ CRITICAL: ETag/Patch Operations Parameter Issue
-**ClientSession._request() unexpected keyword 'if_match_etag'**
-**Symptoms**: All patch operations fail with TypeError, functions execute "successfully" but no database updates occur
-
+### ETag Operations ⚠️ CRITICAL
+**Unexpected keyword 'if_match_etag'** - Parameter doesn't exist in Python SDK
 ```python
-# ❌ WRONG - 'if_match_etag' doesn't exist in Python SDK
-request_options = {"if_match_etag": etag} if etag else {}
-await container.patch_item(..., **request_options)
+# ❌ WRONG - 'if_match_etag' doesn't exist
+await container.patch_item(..., if_match_etag=etag)
 
-# ✅ CORRECT - Use 'etag' and 'match_condition' parameters  
+# ✅ CORRECT - Use 'etag' and 'match_condition'
 from azure.core import MatchConditions
 
 kwargs = {}
@@ -159,105 +107,90 @@ if etag:
     kwargs["etag"] = etag
     kwargs["match_condition"] = MatchConditions.IfNotModified
 
-await container.patch_item(
-    item=document_id,
-    partition_key=submission_id, 
-    patch_operations=patch_operations,
-    **kwargs
-)
+await container.patch_item(item=id, partition_key=key, patch_operations=ops, **kwargs)
 ```
 
-**Investigation Technique**: Add debug print statements to trace exact failure point:
-```python
-print(f'DEBUG: About to patch document {document_id}')
-await container.patch_item(...)  # Error occurs here
-print(f'DEBUG: Patch completed')  # Never reached
-```
-
-### Change Feed Processing
-**No events despite data exists**
-```python
-# Use start_time when no continuation token
-feed_iterator = container.query_items_change_feed(start_time="Beginning")
-
-# Iterate directly over items
-async for event_data in feed_iterator:
-    await self._process_event(event_data)
-    
-# Check continuation token after iteration
-if hasattr(feed_iterator, 'continuation_token'):
-    self.continuation_token = feed_iterator.continuation_token
-```
-
-### Serialization Issues
+### Serialization
 **datetime not JSON serializable**
 ```python
-# ❌ Wrong - causes datetime serialization error
+# ❌ Wrong
 await container.create_item(body=projection.model_dump())
 
-# ✅ Correct - properly serializes datetime objects
+# ✅ Correct
 await container.create_item(body=projection.model_dump(mode='json'))
 ```
 
-## 5. API Development
+## API Development
 
-### FastAPI Issues
-**422 Unprocessable Entity**
-- Use camelCase parameter names to match OpenAPI spec
-- Ensure all enum values have dictionary entries
-
-**Timezone issues on Windows**
+### Azure OpenAI Issues
+**400 BadRequest** - Use structured outputs:
 ```python
-# Use timezone.utc instead of ZoneInfo
-from datetime import datetime, timezone
-datetime.now(timezone.utc)
+# ❌ Wrong - Standard API
+response = await client.chat.completions.create(...)
+
+# ✅ Correct - Beta API with structured outputs
+response = await client.beta.chat.completions.parse(
+    model="gpt-4o-mini",
+    messages=[...],
+    response_format=MyPydanticModel,
+    temperature=0
+)
 ```
 
-### OpenAI API
-**400 BadRequest with empty body**
-- Flatten nested Pydantic models (avoid `$ref` in schema)
-- Use stable API versions: `2024-06-01`
-
-### Data Model Issues
-**'LLMDataExtractionResponse' object has no attribute 'type'**
+**Authentication** - Use Azure AD, not API keys:
 ```python
-# ❌ Wrong - attribute doesn't exist
-extraction_result.type
-
-# ✅ Correct - use document metadata
-document_record.type or 'unknown'
+client = AsyncAzureOpenAI(
+    azure_endpoint=endpoint,
+    azure_ad_token_provider=self._get_azure_ad_token,
+    api_version="2024-08-01-preview"
+)
 ```
 
-## 6. Development Environment
+### Document Intelligence
+**Missing argument: body**
+```python
+# ❌ Wrong parameter name
+poller = await client.begin_analyze_document(model_id="...", analyze_request=request)
 
-**Port already in use**
+# ✅ Correct parameter name
+poller = await client.begin_analyze_document(model_id="...", body=request)
+```
+
+### Architecture Misunderstanding ⚠️
+**Data Extraction Logic**: Run extraction on ALL documents, not just invoices
+```python
+# ❌ Wrong - Don't filter by type
+if document_type == "invoice":
+    result = await extract_data(document)
+
+# ✅ Correct - Always extract, LLM handles type
+result = await extract_data(document)  # Returns nulls for non-invoice fields
+```
+
+## Development Tools
+
+### Port Issues
 ```powershell
 netstat -ano | findstr :8000
 taskkill /PID <process_id> /F
 ```
 
-**Container build fails**
-- Ensure `uv.lock` exists before building
-- Check network connectivity for package downloads
-
-**File corruption recovery**
+### File Recovery
 ```powershell
-git log --oneline                    # Check history
-git checkout HEAD~1 -- <file>       # Restore from backup
-git stash                            # Backup before risky edits
+git stash                    # Backup before risky edits
+git checkout HEAD~1 -- <file>  # Restore from history
 ```
 
-## Quick Debug Commands
+## Quick Diagnostics
 ```powershell
 # Test Azure auth
 uv run python -c "from azure.identity import DefaultAzureCredential; DefaultAzureCredential().get_token('https://storage.azure.com/.default')"
 
-# Check environment variables
-uv run python -c "import os; print(os.getenv('AZURE_STORAGE_ACCOUNT_NAME'))"
-
 # Test imports
 python -c "from module import Class"
 
-# Cosmos DB query
-SELECT TOP 5 c.eventType FROM c
+# Debug function calls with prints
+print(f'DEBUG: About to call function with {param}')
+result = await function_call(param)
+print(f'DEBUG: Function returned {result}')
 ```
