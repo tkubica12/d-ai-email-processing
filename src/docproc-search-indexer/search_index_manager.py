@@ -7,7 +7,7 @@ security trimming capabilities.
 """
 
 import logging
-from typing import List, Optional
+from typing import Optional
 
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
@@ -22,7 +22,6 @@ from azure.search.documents.indexes.models import (
     VectorSearchProfile,
     HnswAlgorithmConfiguration,
     VectorSearchAlgorithmKind,
-    VectorSearchAlgorithmMetric,
     SemanticConfiguration,
     SemanticField,
     SemanticPrioritizedFields,
@@ -246,9 +245,9 @@ class SearchIndexManager:
                 AzureOpenAIVectorizer(
                     vectorizer_name="openai-vectorizer",
                     parameters=AzureOpenAIVectorizerParameters(
-                        resource_url=self.openai_config.resource_uri or self.openai_config.endpoint,
-                        deployment_name="text-embedding-3-large",
-                        model_name="text-embedding-3-large",
+                        resource_url=self.openai_config.embedding_endpoint,
+                        deployment_name=self.openai_config.deployment_name,
+                        model_name=self.openai_config.deployment_name,
                         api_key=None,  # Use managed identity
                         auth_identity=None  # Use service's system-assigned identity
                     )

@@ -94,6 +94,12 @@ class OpenAIConfig(BaseModel):
         example="https://your-openai-instance.openai.azure.com"
     )
     
+    embedding_endpoint: str = Field(
+        ...,
+        description="Azure OpenAI embedding endpoint URL (classic OpenAI service for AI Search vectorizers)",
+        example="https://your-openai-embeddings-instance.openai.azure.com"
+    )
+    
     deployment_name: str = Field(
         ...,
         description="Azure OpenAI embedding deployment name",
@@ -220,13 +226,14 @@ class AppConfig(BaseModel):
         
         # Extract Azure OpenAI configuration
         azure_openai_endpoint = os.getenv('AZURE_OPENAI_ENDPOINT')
+        azure_openai_embedding_endpoint = os.getenv('AZURE_OPENAI_EMBEDDING_ENDPOINT')
         azure_openai_resource_uri = os.getenv('AZURE_OPENAI_RESOURCE_URI')
         azure_openai_deployment = os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME')
         
-        if not all([azure_openai_endpoint, azure_openai_deployment]):
+        if not all([azure_openai_endpoint, azure_openai_embedding_endpoint, azure_openai_deployment]):
             raise ValueError(
                 "Missing required Azure OpenAI configuration. "
-                "Check AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_DEPLOYMENT_NAME environment variables."
+                "Check AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_EMBEDDING_ENDPOINT and AZURE_OPENAI_DEPLOYMENT_NAME environment variables."
             )
         
         # Extract logging configuration
@@ -250,6 +257,7 @@ class AppConfig(BaseModel):
             ),
             openai=OpenAIConfig(
                 endpoint=azure_openai_endpoint,
+                embedding_endpoint=azure_openai_embedding_endpoint,
                 resource_uri=azure_openai_resource_uri,
                 deployment_name=azure_openai_deployment,
                 api_version=os.getenv('AZURE_OPENAI_API_VERSION', '2024-06-01'),

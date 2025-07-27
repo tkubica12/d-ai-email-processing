@@ -22,12 +22,30 @@ The service requires the following environment variables:
 - `AZURE_COSMOS_DB_EVENTS_CONTAINER_NAME`: Events container name (default: events)
 - `AZURE_COSMOS_DB_DOCUMENTS_CONTAINER_NAME`: Documents container name (default: documents)
 - `AZURE_STORAGE_ACCOUNT_NAME`: Azure Storage account name for continuation tokens
+- `AZURE_SEARCH_SERVICE_NAME`: Azure AI Search service name
+- `AZURE_SEARCH_INDEX_NAME`: Azure AI Search index name
+- `AZURE_OPENAI_ENDPOINT`: Azure AI Foundry endpoint for direct API calls
+- `AZURE_OPENAI_EMBEDDING_ENDPOINT`: Classic Azure OpenAI endpoint for AI Search vectorizers
+- `AZURE_OPENAI_DEPLOYMENT_NAME`: OpenAI embedding deployment name
 
 ### Optional Variables
 
 - `AZURE_TABLE_STORAGE_ENABLED`: Enable persistent continuation token storage (default: false)
 - `AZURE_TABLE_STORAGE_TABLE_NAME`: Table name for continuation tokens (default: continuationtokens)
+- `AZURE_OPENAI_API_VERSION`: OpenAI API version (default: 2024-06-01)
+- `AZURE_OPENAI_EMBEDDING_DIMENSIONS`: Embedding dimensions (default: 3072)
+- `AZURE_OPENAI_CHUNK_SIZE`: Document chunk size (default: 2000)
+- `AZURE_OPENAI_CHUNK_OVERLAP`: Chunk overlap size (default: 200)
 - `LOG_LEVEL`: Logging level (default: INFO)
+
+### Important: Dual OpenAI Configuration
+
+This service requires **two separate OpenAI endpoints**:
+
+1. **AI Foundry Endpoint** (`AZURE_OPENAI_ENDPOINT`): Used for direct embedding API calls
+2. **Classic OpenAI Endpoint** (`AZURE_OPENAI_EMBEDDING_ENDPOINT`): Required for AI Search vectorizers
+
+**Why both are needed**: AI Search vectorizers only support classic Azure OpenAI Service endpoints (`https://<name>.openai.azure.com`), not AI Foundry endpoints (`https://<name>.cognitiveservices.azure.com`).
 
 ## Running the Service
 
