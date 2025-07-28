@@ -63,28 +63,16 @@ class SearchIndexManager:
     
     def ensure_index_exists(self) -> bool:
         """
-        Ensure the search index exists with the correct schema, updating it if necessary.
+        Create the search index. This method is called when index upload fails,
+        so we just create the index without checking if it exists first.
         
         Returns:
-            bool: True if index was created or updated successfully, False on error
+            bool: True if index was created successfully, False on error
             
         Raises:
-            Exception: If index creation/update fails
+            Exception: If index creation fails
         """
         try:
-            # Check if index already exists
-            existing_indexes = [index.name for index in self.client.list_indexes()]
-            
-            if self.config.index_name in existing_indexes:
-                logger.info(f"Search index '{self.config.index_name}' already exists")
-                # Check if the existing index has the correct schema
-                if self._validate_index_schema():
-                    logger.info("Index schema is up to date")
-                    return True
-                else:
-                    logger.info("Index schema needs update, recreating index")
-                    return self._recreate_index()
-            
             # Create the index
             logger.info(f"Creating search index '{self.config.index_name}'")
             index = self._create_index_definition()
@@ -94,55 +82,13 @@ class SearchIndexManager:
             return True
             
         except Exception as e:
-            logger.error(f"Failed to ensure search index exists: {e}")
+            # If index already exists, that's fine - just log and continue  
+            if "already exists" in str(e) or "ResourceNameAlreadyInUse" in str(e):
+                logger.info(f"Search index '{self.config.index_name}' already exists")
+                return True
+            
+            logger.error(f"Failed to create search index: {e}")
             raise
-    
-    def _validate_index_schema(self) -> bool:
-        """
-        Validate that the existing index has the required vector field.
-        
-        Returns:
-            bool: True if schema is valid, False if update needed
-        """
-        try:
-            existing_index = self.client.get_index(self.config.index_name)
-            
-            # Check if contentVector field exists
-            vector_field_exists = any(
-                field.name == "contentVector" 
-                for field in existing_index.fields
-            )
-            
-            # Check if vector search configuration exists
-            vector_search_exists = existing_index.vector_search is not None
-            
-            return vector_field_exists and vector_search_exists
-            
-        except Exception as e:
-            logger.warning(f"Failed to validate index schema: {e}")
-            return False
-    
-    def _recreate_index(self) -> bool:
-        """
-        Delete and recreate the index with the correct schema.
-        
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        try:
-            logger.info(f"Deleting existing index '{self.config.index_name}'")
-            self.client.delete_index(self.config.index_name)
-            
-            logger.info("Creating new index with updated schema")
-            index = self._create_index_definition()
-            result = self.client.create_index(index)
-            
-            logger.info(f"Successfully recreated search index '{result.name}'")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to recreate index: {e}")
-            return False
     
     def _create_index_definition(self) -> SearchIndex:
         """

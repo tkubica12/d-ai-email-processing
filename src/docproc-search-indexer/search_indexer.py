@@ -74,16 +74,13 @@ class SearchIndexer:
             database = self.cosmos_client.get_database_client(self.config.cosmos_db.database_name)
             self.documents_container = database.get_container_client(self.config.cosmos_db.documents_container_name)
             
-            # Initialize search index manager (using sync credential)
+            # Initialize search index manager (using sync credential) 
             sync_credential = SyncDefaultAzureCredential()
             self.search_index_manager = SearchIndexManager(
                 config=self.config.ai_search,
                 openai_config=self.config.openai,
                 credential=sync_credential
             )
-            
-            # Ensure the search index exists (sync call)
-            self.search_index_manager.ensure_index_exists()
             
             # Initialize search client for indexing documents
             self.search_client = SearchClient(
@@ -184,6 +181,7 @@ class SearchIndexer:
             search_documents = [chunk.to_search_document() for chunk in chunks]
             
             try:
+                # Try to upload documents directly
                 result = await self.search_client.upload_documents(search_documents)
                 
                 # Check if all documents were indexed successfully
@@ -194,8 +192,30 @@ class SearchIndexer:
                 self.logger.info(f"Successfully indexed {len(search_documents) - failed_count} chunks for document {document.id}")
                 
             except Exception as e:
-                self.logger.error(f"Failed to upload documents to search index: {e}")
-                return await self._create_failed_event(event, f"Failed to upload to search index: {str(e)}")
+                # Check if error is due to index not existing
+                if "index" in str(e).lower() and ("not found" in str(e).lower() or "does not exist" in str(e).lower()):
+                    self.logger.info(f"Index not found, creating it and retrying upload...")
+                    
+                    # Create the index using the search index manager
+                    self.search_index_manager.ensure_index_exists()
+                    
+                    # Retry the upload
+                    try:
+                        result = await self.search_client.upload_documents(search_documents)
+                        
+                        # Check if all documents were indexed successfully after retry
+                        failed_count = len([r for r in result if not r.succeeded])
+                        if failed_count > 0:
+                            self.logger.warning(f"Failed to index {failed_count} out of {len(search_documents)} chunks after retry")
+                        
+                        self.logger.info(f"Successfully indexed {len(search_documents) - failed_count} chunks for document {document.id} after index creation")
+                        
+                    except Exception as retry_e:
+                        self.logger.error(f"Failed to upload documents to search index after index creation: {retry_e}")
+                        return await self._create_failed_event(event, f"Failed to upload to search index after index creation: {str(retry_e)}")
+                else:
+                    self.logger.error(f"Failed to upload documents to search index: {e}")
+                    return await self._create_failed_event(event, f"Failed to upload to search index: {str(e)}")
             
             # Return success event
             return await self._create_success_event(event, self.config.ai_search.index_name)
