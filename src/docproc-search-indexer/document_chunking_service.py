@@ -113,7 +113,7 @@ class DocumentChunkingService:
         )
         
         self.client = AsyncAzureOpenAI(
-            azure_endpoint=config.endpoint,
+            azure_endpoint=config.embedding_endpoint,
             api_version=config.api_version,
             azure_ad_token_provider=token_provider
         )
