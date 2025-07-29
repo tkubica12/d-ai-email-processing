@@ -114,6 +114,11 @@ output "azure_openai_endpoint" {
   value       = "https://${azapi_resource.ai_foundry.body.properties.customSubDomainName}.cognitiveservices.azure.com"
 }
 
+output "azure_openai_embedding_endpoint" {
+  description = "The endpoint URL for the classic Azure OpenAI service for embeddings"
+  value       = azurerm_cognitive_account.openai_embeddings.endpoint
+}
+
 output "ai_foundry_name" {
   description = "The name of the AI Foundry"
   value       = azapi_resource.ai_foundry.name

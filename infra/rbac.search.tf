@@ -20,6 +20,13 @@ resource "azurerm_role_assignment" "search_openai_user" {
   principal_id         = azurerm_search_service.main.identity[0].principal_id
 }
 
+# AI Search service access to embedding model in separate OpenAI service
+resource "azurerm_role_assignment" "search_openai_embeddings_user" {
+  scope                = azurerm_cognitive_account.openai_embeddings.id
+  role_definition_name = "Cognitive Services OpenAI User"
+  principal_id         = azurerm_search_service.main.identity[0].principal_id
+}
+
 resource "azurerm_role_assignment" "search_storage_blob_reader" {
   scope                = azapi_resource.storage_account.id
   role_definition_name = "Storage Blob Data Reader"

@@ -1,0 +1,52 @@
+{
+  "formrecognizer-1-ConnectionRuntimeUrl": {
+    "type": "String",
+    "value": "@appsetting('formrecognizer-1-ConnectionRuntimeUrl')"
+  },
+  "formrecognizer-1-Authentication": {
+    "type": "Object",
+    "value": {
+      "type": "ManagedServiceIdentity"
+    }
+  },
+  "azureopenai-1-ConnectionRuntimeUrl": {
+    "type": "String",
+    "value": "@appsetting('azureopenai-1-ConnectionRuntimeUrl')"
+  },
+  "azureopenai-1-Authentication": {
+    "type": "Object",
+    "value": {
+      "type": "ManagedServiceIdentity"
+    }
+  },
+  "azureagentservice-1-ConnectionRuntimeUrl": {
+    "type": "String",
+    "value": "@appsetting('azureagentservice-1-ConnectionRuntimeUrl')"
+  },
+  "azureagentservice-1-Authentication": {
+    "type": "Object",
+    "value": {
+      "type": "ManagedServiceIdentity"
+    }
+  },
+  "teams-1-ConnectionRuntimeUrl": {
+    "type": "String",
+    "value": "@appsetting('teams-1-ConnectionRuntimeUrl')"
+  },
+  "teams-1-Authentication": {
+    "type": "Object",
+    "value": {
+      "type": "ManagedServiceIdentity"
+    }
+  },
+  "office365-1-ConnectionRuntimeUrl": {
+    "type": "String",
+    "value": "@appsetting('office365-1-ConnectionRuntimeUrl')"
+  },
+  "office365-1-Authentication": {
+    "type": "Object",
+    "value": {
+      "type": "ManagedServiceIdentity"
+    }
+  }
+}

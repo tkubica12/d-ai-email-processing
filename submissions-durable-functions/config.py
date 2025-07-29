@@ -61,6 +61,18 @@ class AzureOpenAIConfig(BaseModel):
         description="Azure OpenAI model deployment name",
         example="gpt-4o-mini"
     )
+    
+    embedding_endpoint: str = Field(
+        ...,
+        description="Azure OpenAI embedding endpoint URL (must use openai.azure.com domain)",
+        example="https://openai-email-dev-vwyh.openai.azure.com/"
+    )
+    
+    embedding_deployment: str = Field(
+        default="text-embedding-3-large",
+        description="Azure OpenAI embedding model deployment name",
+        example="text-embedding-3-large"
+    )
 
 
 class StorageConfig(BaseModel):
@@ -73,6 +85,27 @@ class StorageConfig(BaseModel):
     )
 
 
+class AzureSearchConfig(BaseModel):
+    """Configuration for Azure AI Search service."""
+    
+    service_name: str = Field(
+        ...,
+        description="Azure AI Search service name",
+        example="search-email-dev-vwyh"
+    )
+    
+    index_name: str = Field(
+        default="documents-index-functions",
+        description="Azure AI Search index name for documents",
+        example="documents-index-functions"
+    )
+    
+    @property
+    def endpoint(self) -> str:
+        """Get the full Azure AI Search endpoint URL."""
+        return f"https://{self.service_name}.search.windows.net"
+
+
 class AppConfig(BaseModel):
     """Main application configuration."""
     
@@ -80,6 +113,7 @@ class AppConfig(BaseModel):
     document_intelligence: DocumentIntelligenceConfig
     azure_openai: AzureOpenAIConfig
     storage: StorageConfig
+    azure_search: AzureSearchConfig
     
     @classmethod
     def from_env(cls) -> 'AppConfig':
@@ -128,12 +162,29 @@ class AppConfig(BaseModel):
         # Extract Azure OpenAI configuration
         azure_openai_endpoint = os.getenv('AZURE_OPENAI_ENDPOINT')
         azure_openai_model = os.getenv('AZURE_OPENAI_MODEL', 'gpt-4o-mini')
+        azure_openai_embedding_endpoint = os.getenv('AZURE_OPENAI_EMBEDDING_ENDPOINT')
+        azure_openai_embedding_deployment = os.getenv('AZURE_OPENAI_EMBEDDING_DEPLOYMENT', 'text-embedding-3-large')
         
         logger.info(f'Loading configuration: OPENAI_ENDPOINT={azure_openai_endpoint}, MODEL={azure_openai_model}')
+        logger.info(f'Loading configuration: EMBEDDING_ENDPOINT={azure_openai_embedding_endpoint}, EMBEDDING_DEPLOYMENT={azure_openai_embedding_deployment}')
         
         if not azure_openai_endpoint:
             logger.error('AZURE_OPENAI_ENDPOINT environment variable is missing!')
             raise ValueError('AZURE_OPENAI_ENDPOINT environment variable is required')
+            
+        if not azure_openai_embedding_endpoint:
+            logger.error('AZURE_OPENAI_EMBEDDING_ENDPOINT environment variable is missing!')
+            raise ValueError('AZURE_OPENAI_EMBEDDING_ENDPOINT environment variable is required')
+        
+        # Extract Azure Search configuration
+        azure_search_service_name = os.getenv('AZURE_SEARCH_SERVICE_NAME')
+        azure_search_index_name = os.getenv('AZURE_SEARCH_INDEX_NAME', 'documents-index-functions')
+        
+        logger.info(f'Loading configuration: SEARCH_SERVICE={azure_search_service_name}, INDEX={azure_search_index_name}')
+        
+        if not azure_search_service_name:
+            logger.error('AZURE_SEARCH_SERVICE_NAME environment variable is missing!')
+            raise ValueError('AZURE_SEARCH_SERVICE_NAME environment variable is required')
         
         logger.info('Configuration loaded successfully')
         
@@ -149,9 +200,15 @@ class AppConfig(BaseModel):
             ),
             azure_openai=AzureOpenAIConfig(
                 endpoint=azure_openai_endpoint,
-                model=azure_openai_model
+                model=azure_openai_model,
+                embedding_endpoint=azure_openai_embedding_endpoint,
+                embedding_deployment=azure_openai_embedding_deployment
             ),
             storage=StorageConfig(
                 account_name=storage_account_name
+            ),
+            azure_search=AzureSearchConfig(
+                service_name=azure_search_service_name,
+                index_name=azure_search_index_name
             )
         )

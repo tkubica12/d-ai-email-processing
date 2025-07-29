@@ -9,5 +9,6 @@ from .document_parser import DocumentParser
 from .submission_storage import SubmissionStorage
 from .document_classifier import DocumentClassifier
 from .document_data_extractor import DocumentDataExtractor
+from .document_search_indexer import DocumentSearchIndexer
 
-__all__ = ['DocumentParser', 'SubmissionStorage', 'DocumentClassifier', 'DocumentDataExtractor']
+__all__ = ['DocumentParser', 'SubmissionStorage', 'DocumentClassifier', 'DocumentDataExtractor', 'DocumentSearchIndexer']

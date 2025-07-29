@@ -4,6 +4,7 @@ Demo utility to clean up all demo data from Azure resources.
 This script performs the following cleanup operations:
 1. Deletes all records from Cosmos DB containers (events, documents, submissions)
 2. Deletes all storage containers in GUID format, preserving the policies-docs container
+3. Drops Azure AI Search indexes (documents-index, documents-index-functions)
 
 Usage:
     python cleanup_demo_data.py
@@ -17,6 +18,7 @@ from typing import List
 from azure.cosmos import CosmosClient
 from azure.cosmos.exceptions import CosmosResourceNotFoundError
 from azure.identity import DefaultAzureCredential
+from azure.search.documents.indexes import SearchIndexClient
 from azure.storage.blob import BlobServiceClient
 from dotenv import load_dotenv
 
@@ -32,6 +34,7 @@ logging.getLogger('azure.core.pipeline.policies.http_logging_policy').setLevel(l
 logging.getLogger('azure.identity').setLevel(logging.WARNING)
 logging.getLogger('azure.storage').setLevel(logging.WARNING)
 logging.getLogger('azure.cosmos').setLevel(logging.WARNING)
+logging.getLogger('azure.search').setLevel(logging.WARNING)
 
 
 class DemoDataCleanup:
@@ -60,12 +63,26 @@ class DemoDataCleanup:
         # Storage configuration
         self.storage_account_name = os.getenv('AZURE_STORAGE_ACCOUNT_NAME')
         
+        # Azure AI Search configuration
+        self.search_service_name = os.getenv('AZURE_SEARCH_SERVICE_NAME')
+        self.search_index_name = os.getenv('AZURE_SEARCH_INDEX_NAME', 'documents-index')
+        self.search_functions_index_name = os.getenv('AZURE_SEARCH_FUNCTIONS_INDEX_NAME', 'documents-index-functions')
+        
         # Initialize clients
         self.cosmos_client = CosmosClient(self.cosmos_endpoint, self.credential)
         self.blob_service_client = BlobServiceClient(
             account_url=f"https://{self.storage_account_name}.blob.core.windows.net",
             credential=self.credential
         )
+        
+        # Initialize AI Search clients (only if service name is configured)
+        self.search_index_client = None
+        if self.search_service_name:
+            search_endpoint = f"https://{self.search_service_name}.search.windows.net"
+            self.search_index_client = SearchIndexClient(
+                endpoint=search_endpoint,
+                credential=self.credential
+            )
         
         # GUID pattern for container names
         self.guid_pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.IGNORECASE)
@@ -105,10 +122,12 @@ class DemoDataCleanup:
         
         event_sourcing_configured = all(var for var in event_sourcing_vars)
         durable_functions_configured = all(var for var in durable_functions_vars)
+        search_configured = bool(self.search_service_name)
         
         logger.info("Configuration status:")
         logger.info(f"  Event-Sourcing containers: {'✓' if event_sourcing_configured else '✗'}")
         logger.info(f"  Durable Functions containers: {'✓' if durable_functions_configured else '✗'}")
+        logger.info(f"  Azure AI Search: {'✓' if search_configured else '✗'}")
         
     def cleanup_cosmos_container(self, container_name: str) -> None:
         """
@@ -317,6 +336,36 @@ class DemoDataCleanup:
         for container_name in guid_containers:
             self.delete_storage_container(container_name)
             
+    def drop_search_index(self, index_name: str) -> None:
+        """
+        Drop an Azure AI Search index.
+        
+        Args:
+            index_name: Name of the index to drop
+        """
+        if not self.search_index_client:
+            logger.warning("Search index client not configured, skipping index drop")
+            return
+            
+        try:
+            logger.info(f"Dropping AI Search index: {index_name}")
+            self.search_index_client.delete_index(index_name)
+            logger.info(f"Successfully dropped index: {index_name}")
+        except Exception as e:
+            logger.warning(f"Could not drop index {index_name}: {str(e)}")
+            
+    def cleanup_all_search_indexes(self) -> None:
+        """Drop all configured AI Search indexes."""
+        if not self.search_service_name:
+            logger.info("Azure AI Search service not configured, skipping index cleanup")
+            return
+            
+        # Drop main documents index
+        self.drop_search_index(self.search_index_name)
+        
+        # Drop functions documents index  
+        self.drop_search_index(self.search_functions_index_name)
+            
     def run_cleanup(self) -> None:
         """Run the complete cleanup process."""
         logger.info("Starting demo data cleanup process...")
@@ -328,6 +377,10 @@ class DemoDataCleanup:
         # Clean up storage containers
         logger.info("=== Cleaning up storage containers ===")
         self.cleanup_guid_storage_containers()
+        
+        # Clean up AI Search indexes  
+        logger.info("=== Cleaning up AI Search indexes ===")
+        self.cleanup_all_search_indexes()
         
         logger.info("Demo data cleanup completed successfully!")
 

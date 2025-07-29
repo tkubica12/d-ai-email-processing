@@ -9,6 +9,7 @@ azure-identity
 azure-storage-blob
 azure-ai-documentintelligence
 azure-servicebus
+azure-search-documents
 pydantic
 python-dotenv
 tenacity

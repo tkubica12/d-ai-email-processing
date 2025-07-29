@@ -117,6 +117,7 @@ class DocumentParser:
             document_record = DocumentRecord(
                 id=document_id,
                 submissionId=submission_id,
+                userId=user_id,
                 documentUrl=document_url,
                 fileName=file_name,
                 contentType=self._get_content_type(file_name),

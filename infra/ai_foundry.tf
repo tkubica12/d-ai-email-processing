@@ -66,23 +66,31 @@ resource "azapi_resource" "gpt_41_deployment" {
   }
 }
 
-# Text embedding model deployment
-resource "azapi_resource" "text_embedding_deployment" {
-  type      = "Microsoft.CognitiveServices/accounts/deployments@2024-06-01-preview"
-  name      = "text-embedding-3-large"
-  parent_id = azapi_resource.ai_foundry.id
+# Classic Azure OpenAI Service for AI Search vectorizer support
+# AI Search vectorizers require traditional OpenAI Service endpoints, not AI Foundry endpoints
+resource "azurerm_cognitive_account" "openai_embeddings" {
+  name                          = "openai-embeddings-${local.prefix}"
+  location                      = var.location
+  resource_group_name           = azurerm_resource_group.main.name
+  kind                          = "OpenAI"
+  sku_name                      = "S0"
+  custom_subdomain_name         = "openai-embeddings-${local.prefix}"
+  public_network_access_enabled = true
+}
 
-  body = {
-    sku = {
-      name     = "GlobalStandard"
-      capacity = 150
-    }
-    properties = {
-      model = {
-        name    = "text-embedding-3-large"
-        format  = "OpenAI"
-        version = "1"
-      }
-    }
+# Text embedding model deployment for AI Search vectorizers
+resource "azurerm_cognitive_deployment" "embeddings_deployment" {
+  name                 = "text-embedding-3-large"
+  cognitive_account_id = azurerm_cognitive_account.openai_embeddings.id
+
+  model {
+    format  = "OpenAI"
+    name    = "text-embedding-3-large"
+    version = "1"
+  }
+
+  sku {
+    name     = "GlobalStandard"
+    capacity = 150
   }
 }

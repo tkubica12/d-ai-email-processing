@@ -19,6 +19,13 @@ resource "azurerm_role_assignment" "current_user_ai_developer" {
   principal_id         = data.azurerm_client_config.current.object_id
 }
 
+# Current user permissions for OpenAI embeddings service
+resource "azurerm_role_assignment" "current_user_openai_embeddings_user" {
+  scope                = azurerm_cognitive_account.openai_embeddings.id
+  role_definition_name = "Cognitive Services OpenAI User"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
 # Document Parser Foundry service AI permissions
 resource "azurerm_role_assignment" "docproc_parser_foundry_document_intelligence_user" {
   scope                = azurerm_cognitive_account.document_intelligence.id
@@ -43,6 +50,13 @@ resource "azurerm_role_assignment" "docproc_classifier_openai_user" {
 # Document Search Indexer service AI permissions
 resource "azurerm_role_assignment" "docproc_search_indexer_openai_user" {
   scope                = azapi_resource.ai_foundry.id
+  role_definition_name = "Cognitive Services OpenAI User"
+  principal_id         = azurerm_user_assigned_identity.docproc_search_indexer.principal_id
+}
+
+# Document Search Indexer service AI permissions - Classic OpenAI for AI Search vectorizers
+resource "azurerm_role_assignment" "docproc_search_indexer_openai_embeddings_user" {
+  scope                = azurerm_cognitive_account.openai_embeddings.id
   role_definition_name = "Cognitive Services OpenAI User"
   principal_id         = azurerm_user_assigned_identity.docproc_search_indexer.principal_id
 }
@@ -119,6 +133,13 @@ resource "azurerm_role_assignment" "durable_functions_document_intelligence_user
 
 resource "azurerm_role_assignment" "durable_functions_openai_user" {
   scope                = azapi_resource.ai_foundry.id
+  role_definition_name = "Cognitive Services OpenAI User"
+  principal_id         = azurerm_user_assigned_identity.durable_functions.principal_id
+}
+
+# Durable Functions service AI permissions - Classic OpenAI for embeddings
+resource "azurerm_role_assignment" "durable_functions_openai_embeddings_user" {
+  scope                = azurerm_cognitive_account.openai_embeddings.id
   role_definition_name = "Cognitive Services OpenAI User"
   principal_id         = azurerm_user_assigned_identity.durable_functions.principal_id
 }

@@ -57,6 +57,31 @@ class LLMDataExtractionResponse(BaseModel):
     )
 
 
+class LLMClassificationResponse(BaseModel):
+    """
+    Structured response model for OpenAI document classification API.
+    
+    This model ensures the LLM response matches the expected JSON structure
+    for document classification with consistent response format.
+    
+    Attributes:
+        type: Document type classification (invoice, contract, bankStatement, submissionNotes, other)
+        summary: One-paragraph summary of the document's key content
+    """
+    
+    type: str = Field(
+        ...,
+        description="Document type classification (invoice, contract, bankStatement, submissionNotes, other)",
+        example="invoice"
+    )
+    
+    summary: str = Field(
+        ...,
+        description="One-paragraph summary of the document's key content",
+        example="This invoice document contains billing information for professional services provided in January 2025, with a total amount of $1,250.00 due by February 15, 2025."
+    )
+
+
 class SubmissionMessage(BaseModel):
     """
     Message payload received from Service Bus for new submissions.
@@ -103,6 +128,7 @@ class DocumentRecord(BaseModel):
     Attributes:
         id: Unique document identifier
         submissionId: Reference to the submission this document belongs to
+        userId: User who uploaded the document
         documentUrl: Azure Blob Storage URL for the document
         fileName: Original filename of the document
         contentType: MIME type of the document
@@ -123,6 +149,12 @@ class DocumentRecord(BaseModel):
         ...,
         description="Reference to the submission this document belongs to",
         example="123e4567-e89b-12d3-a456-426614174000"
+    )
+    
+    userId: str = Field(
+        ...,
+        description="User who uploaded the document",
+        example="user123"
     )
     
     documentUrl: str = Field(

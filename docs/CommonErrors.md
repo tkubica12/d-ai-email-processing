@@ -146,6 +146,13 @@ client = AsyncAzureOpenAI(
 )
 ```
 
+### AI Search Vectorizer Issues ⚠️ CRITICAL
+**AI Search vectorizers don't support AI Foundry endpoints**
+- AI Search vectorizers require classic Azure OpenAI Service endpoints
+- Use separate classic OpenAI Service for embedding vectorizers
+- Use `AZURE_OPENAI_EMBEDDING_ENDPOINT` for vectorizer configuration
+- AI Foundry endpoints only work for direct API calls, not vectorizers
+
 ### Document Intelligence
 **Missing argument: body**
 ```python

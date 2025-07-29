@@ -122,9 +122,9 @@ cd src/company-apis && uv sync && uv run python main.py
    ↓
    Store Submission → Document Suborchestrators (parallel)
    ↓  
-   Parse Document → Classification + Data Extraction (parallel)
+   Parse Document → Classification + Data Extraction + Search Indexing (parallel)
    ↓
-   Updated Cosmos DB Records with structured data
+   Updated Cosmos DB Records + Indexed in Azure AI Search
    ```
 
 ### Monitoring Processing Status
@@ -136,11 +136,37 @@ Check document processing status in Cosmos DB:
   "submissionId": "submission-id", 
   "classificationStatus": "completed",  // pending → completed/failed
   "dataExtractionStatus": "completed",  // pending → completed/failed
+  "indexingStatus": "completed",        // pending → completed/failed
   "documentType": "invoice",            // Set by classifier
   "extractedData": { ... },             // Set by extractor
-  "summary": "Document summary..."       // Set by classifier
+  "summary": "Document summary...",     // Set by classifier
+  "chunksIndexed": 5                    // Number of chunks indexed
 }
 ```
+
+### Testing Search Functionality
+
+After documents are processed and indexed, test search capabilities:
+
+1. **Check Azure AI Search Index**
+   - Navigate to Azure AI Search service in Azure Portal
+   - Verify `documents-index-functions` index contains document chunks
+   - Use Search Explorer to test queries
+
+2. **Verify Document Chunks**
+   ```json
+   // Example indexed chunk
+   {
+     "id": "doc-123_0",
+     "content": "Invoice content chunk...",
+     "chunkIndex": 0,
+     "documentId": "doc-123",
+     "submissionId": "sub-456", 
+     "userId": "user@example.com",
+     "indexedAt": "2025-07-27T10:30:00Z",
+     "contentVector": [0.1, 0.2, ...]  // 3072-dimensional embedding
+   }
+   ```
 ```bash
 # Intake processing
 cd src/submission-intake && uv sync && uv run python main.py

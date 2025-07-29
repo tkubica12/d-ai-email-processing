@@ -9,6 +9,7 @@ import azure.functions as func
 import azure.durable_functions as df
 import json
 import logging
+from datetime import datetime
 from typing import Dict, Any
 
 # Configure logging for Azure SDK libraries
@@ -169,7 +170,7 @@ def document_processor_suborchestrator(context: df.DurableOrchestrationContext):
     
     document_id = parse_result.get("documentId")
     
-    # Step 2: Run classification and data extraction in parallel
+    # Step 2: Run classification, data extraction, and search indexing in parallel
     classification_input = {
         "documentId": document_id,
         "submissionId": submission_id
@@ -180,7 +181,12 @@ def document_processor_suborchestrator(context: df.DurableOrchestrationContext):
         "submissionId": submission_id
     }
     
-    # Run both tasks in parallel
+    indexing_input = {
+        "documentId": document_id,
+        "submissionId": submission_id
+    }
+    
+    # Run all three tasks in parallel
     classification_task = context.call_activity_with_retry(
         "classify_document_activity",
         retry_options,
@@ -193,9 +199,15 @@ def document_processor_suborchestrator(context: df.DurableOrchestrationContext):
         extraction_input
     )
     
-    # Wait for both tasks to complete
-    parallel_results = yield context.task_all([classification_task, extraction_task])
-    classification_result, extraction_result = parallel_results
+    indexing_task = context.call_activity_with_retry(
+        "index_document_activity",
+        retry_options,
+        indexing_input
+    )
+    
+    # Wait for all three tasks to complete
+    parallel_results = yield context.task_all([classification_task, extraction_task, indexing_task])
+    classification_result, extraction_result, indexing_result = parallel_results
     
     # Combine results
     return {
@@ -208,6 +220,8 @@ def document_processor_suborchestrator(context: df.DurableOrchestrationContext):
         "classificationStatus": classification_result.get("status"),
         "extractedData": extraction_result.get("extractedData"),
         "extractionStatus": extraction_result.get("status"),
+        "chunksIndexed": indexing_result.get("chunksIndexed"),
+        "indexingStatus": indexing_result.get("status"),
         "status": "completed"
     }
 
@@ -307,3 +321,61 @@ async def extract_document_data_activity(extraction_input: Dict[str, Any]) -> Di
         document_id=document_id,
         submission_id=submission_id
     )
+
+
+@app.activity_trigger(input_name="indexing_input")
+async def index_document_activity(indexing_input: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Activity function to index document content into Azure AI Search.
+    
+    Args:
+        indexing_input: Dictionary containing documentId and submissionId
+        
+    Returns:
+        Dict containing search indexing results
+    """
+    document_id = indexing_input.get("documentId")
+    submission_id = indexing_input.get("submissionId")
+    
+    print(f"DEBUG: Starting search indexing activity for document {document_id} in submission {submission_id}")
+    logging.info(f"Starting search indexing activity for document {document_id} in submission {submission_id}")
+    
+    try:
+        print("DEBUG: Attempting to import DocumentSearchIndexer...")
+        from actions import DocumentSearchIndexer
+        print("DEBUG: DocumentSearchIndexer imported successfully")
+        
+        print("DEBUG: Creating DocumentSearchIndexer instance...")
+        indexer = DocumentSearchIndexer()
+        print("DEBUG: DocumentSearchIndexer instance created successfully")
+        
+        print("DEBUG: Calling index_document_async...")
+        result = await indexer.index_document_async(
+            document_id=document_id,
+            submission_id=submission_id
+        )
+        
+        print(f"DEBUG: Search indexing completed with result: {result}")
+        logging.info(f"Search indexing completed with result: {result}")
+        return result
+        
+    except ImportError as e:
+        error_msg = f"Failed to import search indexer dependencies: {str(e)}"
+        print(f"ERROR: {error_msg}")
+        logging.error(error_msg)
+        return {
+            "documentId": document_id,
+            "status": "error",
+            "error": error_msg,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        error_msg = f"Search indexing failed for document {document_id}: {str(e)}"
+        print(f"ERROR: {error_msg}")
+        logging.error(error_msg, exc_info=True)
+        return {
+            "documentId": document_id,
+            "status": "error",
+            "error": error_msg,
+            "timestamp": datetime.utcnow().isoformat()
+        }

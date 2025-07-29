@@ -20,6 +20,11 @@
     "AzureWebJobsStorage__credential": "managedIdentity",
     "AzureWebJobsStorage__managedIdentityResourceId": "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/resourceGroups/rg-email-dev-vwyh/providers/Microsoft.ManagedIdentity/userAssignedIdentities/logic-app-vwyh",
     "APPINSIGHTS_INSTRUMENTATIONKEY": "f32286fb-e1b2-4b09-b74f-8769f649923c",
-    "AzureWebJobsStorage__tableServiceUri": "https://stemaildevvwyhemail.table.core.windows.net"
+    "AzureWebJobsStorage__tableServiceUri": "https://stemaildevvwyhemail.table.core.windows.net",
+    "formrecognizer-1-ConnectionRuntimeUrl": "https://796b941889f7c49e.10.common.logic-swedencentral.azure-apihub.net/apim/formrecognizer/099e700f746142a9a5a420df96576e31",
+    "azureopenai-1-ConnectionRuntimeUrl": "https://796b941889f7c49e.10.common.logic-swedencentral.azure-apihub.net/apim/azureopenai/07a4f906f5c049138b0bbb7b9fdee601",
+    "azureagentservice-1-ConnectionRuntimeUrl": "https://796b941889f7c49e.10.common.logic-swedencentral.azure-apihub.net/apim/azureagentservice/869e38a72b904c8092e57ada632ab3c9",
+    "teams-1-ConnectionRuntimeUrl": "https://796b941889f7c49e.10.common.logic-swedencentral.azure-apihub.net/apim/teams/3f5e579f7ca848b4aa1928a743cb2b5b",
+    "office365-1-ConnectionRuntimeUrl": "https://796b941889f7c49e.10.common.logic-swedencentral.azure-apihub.net/apim/office365/b02b6302b078496f9f6c80a024b7d4e5"
   }
 }

@@ -1,7 +1,7 @@
 """
 Document classifier action for Azure Durable Functions.
 
-This module provides document classification functionality using mocked LLM analysis
+This module provides document classification functionality using Azure OpenAI
 for the durable functions orchestration workflow. Updates documents container with
 classification results and handles concurrency using Cosmos DB Patch API with ETag.
 """
@@ -9,11 +9,14 @@ classification results and handles concurrency using Cosmos DB Patch API with ET
 import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
+from pathlib import Path
 
 from azure.identity.aio import DefaultAzureCredential
 from azure.cosmos.aio import CosmosClient
 from azure.core.exceptions import HttpResponseError, ClientAuthenticationError
 from azure.cosmos.exceptions import CosmosResourceNotFoundError
+from openai import AsyncAzureOpenAI
+from jinja2 import Environment, FileSystemLoader
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -24,13 +27,14 @@ from tenacity import (
 )
 
 from config import AppConfig
+from models import LLMClassificationResponse
 
 
 class DocumentClassifier:
     """
-    Document classifier using mocked LLM analysis.
+    Document classifier using Azure OpenAI API.
     
-    This class handles document classification with static mock responses
+    This class handles document classification using Azure OpenAI with structured outputs
     and updates Cosmos DB documents container using Patch API for concurrency safety.
     """
     
@@ -42,18 +46,43 @@ class DocumentClassifier:
         
         # Initialize clients (will be created async when needed)
         self.cosmos_client: Optional[CosmosClient] = None
+        self.openai_client: Optional[AsyncAzureOpenAI] = None
+        self.system_prompt_template = None
     
     async def _ensure_client_initialized(self):
-        """Ensure Cosmos DB client is initialized."""
+        """Ensure Cosmos DB and OpenAI clients are initialized."""
         if not self.cosmos_client:
             self.cosmos_client = CosmosClient(
                 url=self.config.cosmos_db.endpoint,
                 credential=self.credential
             )
+        
+        if not self.openai_client:
+            self.openai_client = AsyncAzureOpenAI(
+                azure_endpoint=self.config.azure_openai.endpoint,
+                azure_ad_token_provider=self._get_azure_ad_token,
+                api_version="2024-08-01-preview"
+            )
+        
+        if not self.system_prompt_template:
+            # Load system prompt template from prompts folder
+            template_dir = Path(__file__).parent / "prompts"
+            env = Environment(loader=FileSystemLoader(template_dir))
+            self.system_prompt_template = env.get_template("classifier_system_prompt.jinja2")
+
+    async def _get_azure_ad_token(self) -> str:
+        """
+        Get Azure AD token for OpenAI API authentication.
+        
+        Returns:
+            Azure AD access token for Cognitive Services
+        """
+        token = await self.credential.get_token("https://cognitiveservices.azure.com/.default")
+        return token.token
     
     async def classify_document_async(self, document_id: str, submission_id: str) -> Dict[str, Any]:
         """
-        Classify document using mocked LLM analysis.
+        Classify document using Azure OpenAI API.
         
         Args:
             document_id: Unique document identifier
@@ -77,25 +106,36 @@ class DocumentClassifier:
             
             print(f'DEBUG: Document record fetched for {document_id}')
             
-            # Mock LLM classification based on filename patterns
-            classification_result = self._mock_classify_document(document_record)
-            print(f'DEBUG: Classification result: {classification_result}')
+            # OpenAI classification using structured outputs
+            classification_result = await self._classify_document_with_openai(document_record)
+            
+            # Convert to dict format expected by update method
+            classification_dict = None
+            if classification_result:
+                classification_dict = {
+                    "documentType": classification_result.type,
+                    "summary": classification_result.summary
+                }
+                print(f'DEBUG: Classification result: {classification_dict}')
+            else:
+                print('DEBUG: No classification performed (failed)')
+                raise ValueError("Classification failed")
             
             # Update document with classification results using Patch API
             await self._update_document_classification_with_retry(
                 document_id, 
                 submission_id, 
-                classification_result,
+                classification_dict,
                 document_record.get('_etag')
             )
             
             print(f'DEBUG: Document classification updated for {document_id}')
-            self.logger.info(f'Document classification completed for {document_id}: {classification_result["documentType"]}')
+            self.logger.info(f'Document classification completed for {document_id}: {classification_dict["documentType"]}')
             
             return {
                 "documentId": document_id,
-                "documentType": classification_result["documentType"],
-                "summary": classification_result["summary"],
+                "documentType": classification_dict["documentType"],
+                "summary": classification_dict["summary"],
                 "status": "completed"
             }
             
@@ -152,40 +192,61 @@ class DocumentClassifier:
             self.logger.warning(f'Document {document_id} not found in submission {submission_id}')
             return None
     
-    def _mock_classify_document(self, document_record: Dict[str, Any]) -> Dict[str, Any]:
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type((ClientAuthenticationError, HttpResponseError, TimeoutError, ConnectionError)),
+        before_sleep=before_sleep_log(logging.getLogger(__name__), logging.WARNING),
+        after=after_log(logging.getLogger(__name__), logging.INFO)
+    )
+    async def _classify_document_with_openai(self, document_record: Dict[str, Any]) -> Optional[LLMClassificationResponse]:
         """
-        Mock document classification based on filename patterns.
+        Classify document using Azure OpenAI API.
         
         Args:
             document_record: Document record from Cosmos DB
             
         Returns:
-            Classification result with documentType and summary
+            Classification result or None if API call fails
+            
+        Raises:
+            Exception: If OpenAI API call fails
         """
-        filename = document_record.get('fileName', '').lower()
         content = document_record.get('content', '')
+        filename = document_record.get('fileName', 'unknown')
         
-        # Mock classification logic based on filename patterns
-        if 'invoice' in filename or 'bill' in filename:
-            document_type = "invoice"
-            summary = f"Invoice document with {len(content.split())} words of content. Contains billing information and payment details."
-        elif 'contract' in filename or 'agreement' in filename:
-            document_type = "contract"
-            summary = f"Contract document with {len(content.split())} words of content. Contains legal terms and conditions."
-        elif 'statement' in filename or 'bank' in filename:
-            document_type = "bankStatement"
-            summary = f"Bank statement document with {len(content.split())} words of content. Contains financial transaction details."
-        elif 'note' in filename or 'memo' in filename:
-            document_type = "submissionNotes"
-            summary = f"Submission notes document with {len(content.split())} words of content. Contains additional context and explanations."
-        else:
-            document_type = "other"
-            summary = f"General document with {len(content.split())} words of content. Classification requires manual review."
+        print(f'DEBUG: Classifying document {filename} with {len(content)} characters')
         
-        return {
-            "documentType": document_type,
-            "summary": summary
-        }
+        if not content.strip():
+            print(f'DEBUG: Empty content for document {filename}, skipping classification')
+            return None
+        
+        # Render system prompt from template
+        system_prompt = self.system_prompt_template.render()
+        print(f'DEBUG: System prompt rendered for classification, length: {len(system_prompt)}')
+        
+        try:
+            print('DEBUG: Making OpenAI API call for classification')
+            response = await self.openai_client.beta.chat.completions.parse(
+                model=self.config.azure_openai.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": content}
+                ],
+                response_format=LLMClassificationResponse,
+                temperature=0,
+                max_tokens=1000
+            )
+            
+            classification_result = response.choices[0].message.parsed
+            print(f'DEBUG: OpenAI classification result: {classification_result}')
+            
+            return classification_result
+            
+        except Exception as e:
+            print(f'DEBUG ERROR: OpenAI API call failed: {str(e)}')
+            self.logger.error(f'OpenAI API call failed for {filename}: {str(e)}')
+            raise
     
     @retry(
         stop=stop_after_attempt(5),
@@ -290,7 +351,10 @@ class DocumentClassifier:
         )
     
     async def _close_client(self):
-        """Close Cosmos DB client."""
+        """Close Azure clients."""
         if self.cosmos_client:
             await self.cosmos_client.close()
             self.cosmos_client = None
+        if self.openai_client:
+            await self.openai_client.close()
+            self.openai_client = None

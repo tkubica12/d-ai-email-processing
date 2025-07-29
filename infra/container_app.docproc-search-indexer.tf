@@ -84,8 +84,12 @@ resource "azapi_resource" "docproc_search_indexer" {
                 value = "https://${azapi_resource.ai_foundry.body.properties.customSubDomainName}.cognitiveservices.azure.com"
               },
               {
+                name  = "AZURE_OPENAI_EMBEDDING_ENDPOINT"
+                value = azurerm_cognitive_account.openai_embeddings.endpoint
+              },
+              {
                 name  = "AZURE_OPENAI_DEPLOYMENT_NAME"
-                value = azapi_resource.text_embedding_deployment.name
+                value = azurerm_cognitive_deployment.embeddings_deployment.name
               },
               {
                 name  = "AZURE_OPENAI_API_VERSION"
